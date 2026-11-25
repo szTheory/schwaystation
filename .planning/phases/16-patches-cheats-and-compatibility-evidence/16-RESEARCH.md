@@ -282,21 +282,13 @@ The state loader checks the complete payload, runs VALIDATE without mutation, th
 | A2 | Chosen raw-track file layouts have exact byte-to-sector mapping. | Architecture Patterns | Wrong map patches different data; reject any layout not shown by provider source and a known-answer test. |
 | A3 | A BPS target can be staged within the media bound and available temporary storage. | BPS whole-file parsing | If not, reject safely or use capped temp-file output; always clean on error and preserve input. |
 
-## Open Questions
+## Resolved Research Questions
 
-1. **What is sufficient native source identity for PPF2/PPF3?**
-   - What we know: local prep documents PPF2 size plus a 1,024-byte block; PPF3 has an optional block but no size check; PPF1 has no native check.
-   - What's unclear: whether native sample checks meet the phase identity claim or all PPF versions need an external expected SHA-256.
-   - Recommendation: at minimum require caller SHA for PPF1 and PPF3 when blockcheck is disabled; do not call CRC/block checks cryptographic identity.
-2. **Which provider source layouts have an exact 2352-byte offset mapping?**
-   - What we know: host/disc_image.c computes source offsets by track index and sector size, synthesizes MODE1/2048 headers, and dispatches CHD/PBP/ECM/CCD through separate providers.
-   - What's unclear: whether source offset zero matches PPF offset zero when stored and virtual pregaps are present.
-   - Recommendation: select one proven raw file layout and add an end-to-end case showing the changed byte lands in the expected guest-read sector.
-3. **How should the BPS target be staged?**
-   - What we know: BPS emits a complete target; source cannot be mutated; target CRC and geometry must pass before publication.
-   - What's unclear: the best balance between memory and temporary-file staging under the existing 1 GiB logical image cap.
-   - Recommendation: use bounded owned temporary output outside the repository where memory cost is excessive; check every I/O result and clean on all failures.
+1. **Native source identity — RESOLVED.** Require the caller-supplied whole-source SHA-256 for every PPF version, then enforce each version's native checks. PPF2 carries size and block checks; PPF3 has no source-size field and its 1,024-byte block check is optional; PPF1 has no native source check. BPS uses its source/target/patch CRCs. Report the checks performed and do not call CRCs or block checks cryptographic identity. This follows locked D-01 and is implemented/tested in plans 07–10.
+2. **Raw provider mapping — RESOLVED.** Support one CUE data track backed by a raw file whose bytes start at file offset zero, with no stored or virtual pregap. Reject other layouts until they have an exact mapping. Plan 07 adds independent byte-to-sector fixtures at offset zero, the final byte, and a 2352-byte boundary, including an end-to-end guest-read check.
+3. **BPS staging — RESOLVED.** Use the plan-selected bounded staging policy: stage targets up to 1 MiB in memory; use private temporary storage for larger targets, within the existing 1 GiB logical-image bound, with a 64 MiB patch bound and 1 MiB metadata bound. Validate CRCs and unchanged sector geometry before publication; clean the task-owned temporary target on every exit. Plan 09 covers transformation and cleanup.
 
+These resolutions select conservative support boundaries; they do not assert that unimplemented layout variants are supported.
 ## Environment Availability
 
 | Dependency | Required By | Available | Version | Fallback |

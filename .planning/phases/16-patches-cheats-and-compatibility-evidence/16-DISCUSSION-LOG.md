@@ -22,7 +22,7 @@
 | Exclude PPF1 because it has no embedded source identity | Safer but falls short of the required PPF 1/2/3 family | |
 
 **Agent selection:** Recommended option selected under the owner's standing autonomous authorization.
-**Notes:** The primary PPF3 spec confirms there is no image-size field and its 1,024-byte block check is optional. PPF2 has the source-size and block checks; PPF block checks and BPS CRCs are not cryptographic identity. BPS transforms a byte stream; PPF is represented as ordered sparse records.
+**Notes:** The primary PPF3 spec confirms there is no image-size field and its 1,024-byte block check is optional. PPF2 has the source-size and block checks. The implementation requires caller SHA-256 for every PPF version and applies all native checks; PPF block checks and BPS CRCs are not cryptographic identity. BPS transforms a byte stream; PPF is represented as ordered sparse records.
 
 ---
 
