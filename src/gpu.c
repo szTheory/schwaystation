@@ -180,6 +180,9 @@ void schway__gpu_reset(schway *inst)
     g->vertical_range = 0x00040010u;
     g->field_status = 1u;
     g->beam_tick = inst->ticks;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        g->gun_sensor[port].deadline = UINT64_MAX;
+    }
 }
 
 static int gpu_beam_active(const schway *inst)

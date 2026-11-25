@@ -28,6 +28,17 @@ enum schway__gpu_phase {
     SCHWAY__GPU_TRANSFER_FROM_VRAM
 };
 
+struct schway__gpu_gun_sensor {
+    uint32_t armed;
+    uint32_t consumed;
+    int32_t aim_x;
+    int32_t aim_y;
+    uint32_t target_line;
+    uint32_t target_clock;
+    uint64_t deadline;
+    uint32_t phase;
+};
+
 struct schway__gpu {
     uint32_t fifo[SCHWAY__GPU_FIFO_WORDS];
     uint32_t fifo_count;
@@ -65,6 +76,7 @@ struct schway__gpu {
     uint16_t clut_cache[SCHWAY__GPU_CLUT_CACHE_ENTRIES];
     uint32_t clut_x, clut_y, clut_count, clut_valid;
     uint64_t busy_until;
+    struct schway__gpu_gun_sensor gun_sensor[2];
 };
 
 void schway__gpu_reset(schway *inst);

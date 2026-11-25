@@ -59,6 +59,8 @@ static void pad_clear_gun_observation(schway *inst, uint32_t port)
     inst->pad.gun_result_x[port] = 0u;
     inst->pad.gun_result_y[port] = 0u;
     inst->pad.gun_result_valid[port] = 0u;
+    memset(&inst->gpu.gun_sensor[port], 0, sizeof inst->gpu.gun_sensor[port]);
+    inst->gpu.gun_sensor[port].deadline = UINT64_MAX;
 }
 
 static void pad_clear_gun(schway *inst, uint32_t port)

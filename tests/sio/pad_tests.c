@@ -1285,14 +1285,26 @@ static void seed_gun_observation(schway *inst, uint32_t port)
     inst->pad.gun_result_x[port] = 123u;
     inst->pad.gun_result_y[port] = 45u;
     inst->pad.gun_result_valid[port] = 1u;
+    inst->gpu.gun_sensor[port].armed = 1u;
+    inst->gpu.gun_sensor[port].consumed = 1u;
+    inst->gpu.gun_sensor[port].aim_x = 123;
+    inst->gpu.gun_sensor[port].aim_y = 45;
+    inst->gpu.gun_sensor[port].target_line = 34u;
+    inst->gpu.gun_sensor[port].target_clock = 56u;
+    inst->gpu.gun_sensor[port].deadline = inst->ticks + 100u;
+    inst->gpu.gun_sensor[port].phase = 7u;
 }
 
-static int gun_pad_state_cleared(const schway *inst, uint32_t port)
+static int gun_state_cleared(const schway *inst, uint32_t port)
 {
     const schway_gun_input zero = {0};
+    const struct schway__gpu_gun_sensor *sensor = &inst->gpu.gun_sensor[port];
     return gun_records_equal(&inst->pad.gun_input[port], &zero) &&
            inst->pad.gun_enabled[port] == 0u && inst->pad.gun_result_x[port] == 0u &&
-           inst->pad.gun_result_y[port] == 0u && inst->pad.gun_result_valid[port] == 0u;
+           inst->pad.gun_result_y[port] == 0u && inst->pad.gun_result_valid[port] == 0u &&
+           sensor->armed == 0u && sensor->consumed == 0u && sensor->aim_x == 0 &&
+           sensor->aim_y == 0 && sensor->target_line == 0u && sensor->target_clock == 0u &&
+           sensor->deadline == UINT64_MAX && sensor->phase == 0u;
 }
 
 static int gun_latch(void)
@@ -1313,6 +1325,9 @@ static int gun_latch(void)
     size_t sensor_state_bytes = 2u * (7u * sizeof(uint32_t) + sizeof(uint64_t));
     gun_tap_check(sizeof inst->gpu >= gpu_state_end + sensor_state_bytes,
                   "GPU reserves fixed event timing state for both direct ports");
+    gun_tap_check(inst->gpu.gun_sensor[0].deadline == UINT64_MAX &&
+                      inst->gpu.gun_sensor[1].deadline == UINT64_MAX,
+                  "both GPU sensor deadlines start inactive");
     schway_input first;
     memset(&first, 0, sizeof first);
     first.size = (uint32_t)sizeof first;
@@ -1367,7 +1382,7 @@ static int gun_latch(void)
                   "ordinary controller selection is accepted");
     schway__pad_frame_end(inst);
     schway__pad_frame_start(inst);
-    gun_tap_check(gun_pad_state_cleared(inst, 0u),
+    gun_tap_check(gun_state_cleared(inst, 0u),
                   "switching to a digital pad clears gun input and result");
 
     seed_gun_observation(inst, 0u);
@@ -1376,32 +1391,32 @@ static int gun_latch(void)
                   "empty port selection is accepted");
     schway__pad_frame_end(inst);
     schway__pad_frame_start(inst);
-    gun_tap_check(gun_pad_state_cleared(inst, 0u),
+    gun_tap_check(gun_state_cleared(inst, 0u),
                   "switching to no device clears shot and protocol state");
 
     schway_input valid_again;
     memset(&valid_again, 0, sizeof valid_again);
     valid_again.size = (uint32_t)sizeof valid_again;
     valid_again.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
-    valid_again.guns[0] = first.guns[0];
+    seed_gun_observation(inst, 0u);
     gun_tap_check(schway_set_input(inst, &valid_again) == SCHWAY_STATUS_OK,
                   "gun can be selected again after clearing");
     schway__pad_frame_end(inst);
     schway__pad_frame_start(inst);
-    gun_tap_check(gun_records_equal(&inst->pad.gun_input[0], &valid_again.guns[0]) &&
-                      inst->pad.gun_result_valid[0] == 0u,
-                  "reselection with current aim does not replay the previous shot");
+    gun_tap_check(gun_state_cleared(inst, 0u),
+                  "reselection without valid aim does not replay the previous shot");
 
     schway_input legacy;
     memset(&legacy, 0, sizeof legacy);
     legacy.size = (uint32_t)offsetof(schway_input, guns);
     legacy.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    seed_gun_observation(inst, 0u);
     gun_tap_check(schway_set_input(inst, &legacy) == SCHWAY_STATUS_OK,
                   "frozen API v9 input size remains accepted");
     schway__pad_frame_end(inst);
     schway__pad_frame_start(inst);
     gun_tap_check(inst->pad.device[0] == SCHWAY_INPUT_DEVICE_DIGITAL &&
-                      gun_pad_state_cleared(inst, 0u),
+                      gun_state_cleared(inst, 0u),
                   "old-size callers clear gun availability");
 
     schway_input other_input;
@@ -1423,10 +1438,19 @@ static int gun_latch(void)
                       inst->pad.gun_input[0].flags == 0u && inst->pad.gun_input[1].flags == 0u,
                   "ports and emulator instances retain independent snapshots");
 
+    seed_gun_observation(other, 0u);
+    seed_gun_observation(other, 1u);
+    schway__pad_set_connected(other, 0u, 1u);
+    gun_tap_check(gun_state_cleared(other, 0u) &&
+                      other->pad.gun_result_valid[1] == 1u &&
+                      other->gpu.gun_sensor[1].armed == 1u &&
+                      other->gpu.gun_sensor[1].deadline == other->ticks + 100u,
+                  "invalidating one direct port preserves the other sensor");
+
     seed_gun_observation(other, 1u);
     gun_tap_check(schway_reset(other, SCHWAY_RESET_POWER) == SCHWAY_STATUS_OK,
                   "power reset completes");
-    gun_tap_check(gun_pad_state_cleared(other, 1u),
+    gun_tap_check(gun_state_cleared(other, 1u),
                   "power reset clears latched input and pad protocol state");
     schway_destroy(inst);
     schway_destroy(other);
