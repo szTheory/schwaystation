@@ -23,3 +23,11 @@ restores in-flight card protocol progress but does not roll back the receiving i
 A completed guest Write changes the addressed card sector and generation. A host save replaces a complete image
 through an exclusive sibling temporary and atomic rename; a failed flush or replacement preserves the previous
 file. The core itself never opens card files.
+
+## Save states
+
+State format 21 includes machine-owned light-gun state: the selected device, latched aim and button flags,
+Justifier enable state, the last sampled coordinates, and any pending GPU beam-sensor deadline. This lets a load
+resume an in-flight serial poll or scheduled sensor event at the same point. Input waiting for the next frame is
+host-owned and is not saved; the host supplies it again through the normal input API. Memory-card image bytes and
+generations remain outside save states. States from earlier formats are rejected instead of partially restored.

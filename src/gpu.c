@@ -102,11 +102,13 @@ static int32_t state_i32(struct schway__state_io *io, const char *name, int32_t 
         io->visitor(io->user, name, value, 1u, 4u);
         return *value;
     }
-    uint32_t encoded = (uint32_t)*value ^ UINT32_C(0x80000000);
-    encoded = schway__state_u32(io, name, &encoded, 0u, UINT32_MAX);
-    int32_t decoded = (int32_t)((int64_t)encoded - INT64_C(0x80000000));
+    uint32_t raw;
+    memcpy(&raw, value, sizeof raw);
+    raw = schway__state_u32(io, name, &raw, 0u, UINT32_MAX);
+    int32_t decoded;
+    memcpy(&decoded, &raw, sizeof decoded);
     if (io->mode == SCHWAY__STATE_APPLY) {
-        *value = decoded;
+        memcpy(value, &raw, sizeof raw);
     }
     return decoded;
 }
