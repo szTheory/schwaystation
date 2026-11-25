@@ -118,6 +118,11 @@ automation and efficiency preferences; autonomous authorization and phase bounda
 - If Docker is used, give every task-created image, container, network and volume a project- and task-identifiable
   name (for example `schwaystation-phase11-ccd`). Remove those task-owned resources when finished. Never use a
   global prune command that could delete resources belonging to another project or user.
+- At the end of every bounded local probe, test, or fuzz campaign, wait for the command to finish and confirm
+  its child processes have exited; a timed-out shell session does not prove its children stopped. If a process
+  outlives its bound, inspect its command, parent and output, then stop only the attributable task-owned process.
+  Preserve useful corpus or crash findings, and remove task-owned temporary containers and outputs when no
+  longer needed. Do not leave probes or fuzzers running between steps.
 - Apply small, evidence-backed efficiency fixes within the authorized scope. Measure before/after when possible;
   record larger work as one todo bound to the phase that first needs it. Capture each run as its command, exit
   status and URL; do not repeat a green full suite for bookkeeping.

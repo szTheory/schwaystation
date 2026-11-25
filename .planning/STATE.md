@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 15
-current_phase_name: GunCon and Justifier
+current_phase: 16
+current_phase_name: Patches, cheats and compatibility evidence
 current_plan: Not started
 status: planning
-stopped_at: Phase 14 x86_64 tests-enabled WASI producer confirmed 947969; corrected pin and final hosted run pending
-last_updated: "2026-11-24T16:53:54Z"
-last_activity: 2026-11-24
-last_activity_desc: Phase 14 matched x86_64 tests-enabled WASI producer at 947969; correcting the pin after the earlier arm64 tests-off mismatch
-state_head: 2ab13f4e0d44f1ddb4fd9c31f7ddb2804c19b074
+stopped_at: Phase 15 complete, ready to plan Phase 16
+last_updated: "2026-11-25T18:59:19.028Z"
+last_activity: 2026-11-25
+last_activity_desc: "Phase 15 shipped as PR #44"
+state_head: 27ad36e076d68a8a921f11a460d86923a6f52159
 progress:
   total_phases: 10
-  completed_phases: 8
-  total_plans: 95
-  completed_plans: 95
-  percent: 80
+  completed_phases: 9
+  total_plans: 107
+  completed_plans: 107
+  percent: 90
 ---
 
 # Project State
@@ -26,16 +26,96 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — the matching x86_64 tests-enabled WASI producer measures 947,969 bytes; PR #42 needs this pin, Main CI and release before Phase 15
+**Current focus:** Phase 15 — finish goal-backward verification and ship the reviewed GunCon and Justifier changes. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
 
 ## Current Position
 
-Phase: 15 — GunCon and Justifier
+Phase: 16 — Patches, cheats and compatibility evidence
 Current Plan: Not started
-Total Plans in Phase: Not planned
+Total Plans in Phase: 12
 Status: Ready to plan
-Last activity: 2026-11-24 — the tests-enabled x86_64 WASI producer matched CI at 947,969 bytes; update the bound before final hosted retry
-Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Its final PR head still needs green Main CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
+Last activity: 2026-11-25 -- Phase 15 shipped as PR #44
+Progress: [█████████░] 90% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
+
+### Phase 15 discussion (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary session model ID unavailable. Three read-only role reports covered
+domain behavior, GPU/SIO/API architecture, libretro integration, input robustness, and CI/devops. The adversarial
+pass resolved their topology difference: Phase 15 promises direct-port guns only; multitap gun and shared
+multi-Justifier behavior remain unclaimed. The additive API v10 recommendation preserves the 228-byte v9 prefix
+and 24-byte nested controller stride. LIGHTGUN is the complete host path; POINTER is a documented subset; missing
+capability is invalid input and cannot produce a hit. The beam event samples the aimed pixel at integer GPU time.
+The brightness threshold is an explicit emulator model because the cited T2 source has no calibrated number.
+No code changed and no tests ran during discussion.
+
+Context and discussion log were preflighted with `git diff --check` (exit 0) and committed as `63a37af`.
+Before expensive phase checks, verify ABI offsets, sorted inventories, selectors and budgets; run focused API,
+SIO, beam and libretro tests before the required local and hosted gates. Use `act` only if workflow changes add
+coverage, review every hosted run's critical path and runner use, and keep todo 052 deferred until the controller
+plan is stable. No Docker resources were created. No owner hardware capture is planned.
+
+The emulator has synthetic fixture and host integration evidence, but no current evidence establishes a retail
+game as playable. Do not infer retail compatibility from this gun protocol work.
+
+### Phase 15 planning research (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-phase-researcher` gpt-6-luna xhigh; primary runtime model ID unavailable.
+The three-role discussion fan-out was already complete, so the researcher converted that synthesis into
+`15-RESEARCH.md` and checked only the current implementation seams. Timed waits for its return totaled at least
+14 minutes; active work was not measured. No tests or source changes were made. The planning inputs
+passed `git diff --check`, and GSD reports both `has_context` and `has_research` true. Research commit: `073013a`.
+
+The research identified two plan risks to resolve against code: whether the aimed-pixel sample must read live
+RGB555 VRAM or reconstructed RGB24 output, and how to synchronize Timer 0/1 at the exact Justifier beam time
+before IRQ10. Keep the threshold numeric decision to the implementation after those representations are fixed.
+
+### Phase 15 planning and plan review (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-planner` gpt-6.1-sol high; `gsd-plan-checker` gpt-6-luna xhigh; primary session model ID unavailable. Planning produced ten plans across seven dependency waves for GUN-01, GUN-02 and SIO-05. The independent checker found one portability blocker: machine-specific GSD home paths in the plan execution contexts would fail repository hygiene. All ten references were changed to the existing home-relative `@~/.codex/...` convention; plan structure, shell/failure-direction probes, `git diff --check` and `sh scripts/hygiene.sh --tree` then passed, and the checker passed with no remaining findings. Planning artifacts are ready for the required `docs(15): create phase plan` commit; source work and implementation tests have not started. Wall time from the preceding STATE checkpoint was about 27 minutes; active time was not isolated. No hosted CI, Act or Docker resources were used.
+
+### Phase 15 Plan 15-03 execution (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. Plan execution ran from 2026-11-25T04:28:06Z through 04:41:31Z (13m25s wall). Both tasks followed RED/GREEN: the pad-state probe and GPU-storage probe each produced classifier-accepted target assertion failures before their implementation commits. One strict-build `-Wshadow` failure was corrected by renaming the direct input local; the targeted rerun passed. `cmake --preset ci`, the focused SIO pad/API target build, the four-selector API/pad set (4/4), the final `sio.gun.latch` selector (1/1), the fixture budget check (1/1), ABI-offset checks and sorted SIO inventory preflight passed. No broad workflow, hosted CI, Act or Docker work was needed at this plan boundary. Task commits: `3e9af4a`, `fd627ab`, `f275820`, `c0af4f1`; summary: `.planning/phases/15-guncon-and-justifier/15-03-SUMMARY.md`.
+
+### Phase 15 Plan 15-08 execution (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. The recorded wall window ran from the Plan 15-07 closeout at 2026-11-25T13:49:09Z through the final task commit at 14:18:35Z (29m26s). Task 1 used an accepted failing POINTER integration assertion before implementing capability-gated fallback. Task 2 found frame latching and tap restrictions already implemented by prior plans; regression tests plus documentation passed without a production fix.
+
+`cmake --preset ci`, required-selector enumeration, ABI v9, documentation budget and fixture budget checks passed. The Task 1 three-selector set passed 3/3, the Task 2 five-selector set passed 5/5, targeted builds and `git diff --check` passed. The first Task 2 run exposed an incomplete test-host LIGHTGUN trigger setup after pointer input state was separated; the mock was corrected before the final green run. A full-tree hygiene scan was stopped after about 25 seconds (exit 130) as redundant; the configured staged hygiene hook passed on both task commits. No broad workflow, hosted CI, Act or Docker or fuzz campaign was run. Task commits: `3390f94`, `f8e2a4e`, `059cc0f`, `a6f6b09`; summary: `.planning/phases/15-guncon-and-justifier/15-08-SUMMARY.md`.
+
+### Phase 15 Plan 15-09 execution (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. The plan ran from 2026-11-25T14:26:43Z through task closeout at about 15:05Z (38 minutes wall time). Both sequential tasks had accepted RED evidence before implementation. Focused SIO/GPU continuation selectors passed 4/4, then the aggregate state/version/no-allocation selectors passed 8/8, with the final GPU reset/disabled-display cases passing 1/1. The exact local stable-state producer reported 3,757,754 bytes and the updated exact quality bound comparison passed. An intermediate visitor mismatch led to matching signed fixed-width serialization to visitor bytes; the test-only field inventory was expanded to cover the new fields. `cmake --preset ci`, ABI v9, selector preflight and `git diff --check` passed. No broad workflow, hosted CI, Act, Docker or fuzz campaign was run. Task commits: `f879ecc`, `e9fe132`, `00f3677`, `00f030b`; summary: `.planning/phases/15-guncon-and-justifier/15-09-SUMMARY.md`.
+
+### Phase 15 Plan 15-10 execution (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh. Plan work took about 60 minutes after the Plan 15-09 closeout; exact start time was not separately recorded. Both tasks completed: five synthetic gun feature rows and generated compatibility wording were added, and state/WASI/Cachegrind quality values were remeasured against the phase merge base. Cheap inventory, selector, fixture, repo-check budget and docs checks preceded the producers. The 12 focused gun selectors passed; the quality policy group passed 5/5. The linked WASI artifact measured 956,794 bytes; state measured 3,757,754 bytes. Cachegrind was within the existing 100-basis-point limit for both affected workloads. The focused compatibility CTest command returned exit 8 because its `built.openbios.shell` fixture setup produced a different hash on the Phase 15 head than on the merge base; the seven selected compatibility/documentation tests themselves passed. This earlier-phase regression is recorded for phase review. The Ubuntu producer container and image and temporary source trees were removed after measurement; no fuzzing or broad workflow ran. Task commits: `d7ee26e`, `25943c2`; summary: `.planning/phases/15-guncon-and-justifier/15-10-SUMMARY.md`.
+
+### Phase 14 final hosted verification and release (2026-11-24)
+
+Runtime/model: Codex; primary session model ID unavailable. The corrected exact-head Main CI run
+[45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) passed on `75beb849f4b9e8a9a3bd023cc5c80632e4c74d56`
+in 3,943 seconds (65m43s); its BE32 job passed in 64m09s, including the exact 947,969-byte WASI gate, portable tests,
+all six build legs, ASan, RetroArch, and the cross-platform hash comparison. Nightly
+[45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657) passed in 814 seconds (13m34s); its
+fuzz job took 802 seconds and the 11 bounded campaigns took 672 seconds. Both timing endpoints reported zero billable
+milliseconds, so no dollar savings are inferred.
+
+The final-hosted-run review found the BE32 CTest lane was the Main critical path. It ran 657 tests in 3,709.53 seconds;
+`libretro.input.movies` was explicitly `RUN_SERIAL` and took 1,106.63 seconds after the other 656 tests completed. A
+dedicated movie-test shard could save about 18 minutes while retaining every case, but needs isolated fixture setup,
+disjoint shard inventories, and an exact JUnit-union check. Phase 14 research excludes workflow wiring, so this is
+recorded as todo 052 bound to Phase 15. The Nightly fuzz job is dominated by its 11 required 60-second campaigns;
+parallelizing them might reduce wall time, but the evidence does not show preserved per-target throughput or a cost
+reduction. Existing cheap preflight and CTest auto-parallelism remain; no quality or coverage was reduced.
+
+PR #42 merged as `1256732fe7d6d75166a54bbdefa07ab78e667774`. Post-merge Main CI
+[45454749260](https://github.com/szTheory/schwaystation/actions/runs/45454749260) and Release
+[45454749282](https://github.com/szTheory/schwaystation/actions/runs/45454749282) passed. Release PR #43 merged as
+`f08fc08d40a1ebcb42708e0a31be3111e3eed711`; its Main CI
+[45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) and Release
+[45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) passed, and v0.14.0 was published.
+No Docker resources were created during this final verification attempt.
 
 ### Phase 14 verification closeout (2026-11-24)
 
@@ -1490,7 +1570,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 290
+- Total plans completed: 302
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1512,6 +1592,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 12 | 7 | - | - |
 | 13 | 9 | - | - |
 | 14 | 16 | - | - |
+| 15 | 12 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1773,6 +1854,16 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P14 | 32m22s | 1 tasks | 3 files |
 | Phase 14 P15 | 13m | 1 tasks | 3 files |
 | Phase 14 P16 | 12m | 1 tasks | 4 files |
+| Phase 15 P01 | 14 min | 3 tasks | 9 files |
+| Phase 15 P02 | 20m 10s | 2 tasks | 7 files |
+| Phase 15 P03 | 13m 25s | 2 tasks | 5 files |
+| Phase 15 P04 | 13m | 2 tasks | 3 files |
+| Phase 15 P05 | 2h28m | 2 tasks | 4 files |
+| Phase 15 P6 | about 3h 52m wall time; active time not isolated | 2 tasks | 5 files |
+| Phase 15 P07 | 24m commit window; active start not separately recorded | 2 tasks | 4 files |
+| Phase 15 P08 | 29m 26s | 2 tasks | 4 files |
+| Phase 15 P09 | 38m | 2 tasks | 9 files |
+| Phase 15 P10 | 60m | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -2252,6 +2343,29 @@ Recent decisions affecting current work:
 - [Phase 14]: Keep compatibility claims limited to passing selector evidence; leave retail-game support and undocumented Jogcon behavior unclaimed.
 - [Phase 14]: Set state.bytes to the exact 3,757,638-byte local stable-state producer measurement.
 - [Phase 14]: Leave WASI-size and Ir/frame bounds unchanged pending their exact hosted producers.
+- [Phase 15]: Freeze the complete released v9 input and endpoint layouts locally so API v10 cannot move the 228-byte prefix or 24-byte endpoint stride.
+- [Phase 15]: Register planned gun behavior in existing test targets and inventories; leave future behavior selectors gating until their owning plans implement them.
+- [Phase 15]: Keep the released 228-byte API v9 input prefix and 24-byte controller endpoint stride unchanged.
+- [Phase 15]: Append two explicit 16-byte direct-port gun records at offset 228 in API v10.
+- [Phase 15]: Normalize only size-tagged caller bytes and validate the complete snapshot before replacing pending input; reject guns on enabled multitaps.
+- [Phase 15]: Keep pending host input outside saved state; serialize only hardware-visible latched continuation in Plan 09.
+- [Phase 15]: Pad owns gun protocol/result state and invalidates GPU-owned per-port beam events through the instance.
+- [Phase 15]: GunCon unavailable or unsampled input returns X=0001h/Y=000Ah; explicit offscreen or reload returns X=0001h/Y=0005h as a deterministic model choice.
+- [Phase 15]: GunCon reports only the documented active-low A, trigger, and B wire bits; unsupported bits remain released.
+- [Phase 15]: Use one bounded GPU scheduler deadline per latched direct-port aim and sample live VRAM at that beam point.
+- [Phase 15]: Use RGB5 channel sum >= 48 as an uncalibrated threshold, decode RGB24 with scanout byte addressing, and truncate the regional 8 MHz X conversion.
+- [Phase 15]: Raise IRQ10 from the GPU beam callback only for an enabled bright Justifier sample. — The existing scheduler synchronizes Timer0 and Timer1 before the callback. Preserve its timer-to-GPU-to-DMA order instead of changing timers.c or globally reordering devices.
+- [Phase 15]: Reuse the existing serialized byte-staging lane for Justifier sensing enable. — This preserves the established continuation format and avoids adding a state-format field or revision.
+- [Phase 15]: Use official LIGHTGUN base ID and Justifier subclass 2 on direct ports; do not offer guns behind multitaps.
+- [Phase 15]: Treat capability as device-type support only; zero input_state values remain neutral and cannot identify absent controls.
+- [Phase 15]: Prefer LIGHTGUN when both device types are advertised; POINTER is a limited fallback without forced reload.
+- [Phase 15]: Keep GunCon and Justifier on direct physical ports; multitap sockets reject guns.
+- [Phase 15]: Pending host input remains outside serialized machine state; the host submits it through the normal input API after load.
+- [Phase 15]: State format and behavior revision 21 carry gun protocol fields; state.bytes tracks the exact 3757754-byte producer result.
+- [Phase 15]: Keep gun compatibility evidence synthetic; no retail-game or physical calibration claim is supported.
+- [Phase 15]: Set exact WASI and Cachegrind bounds from measured current-head producers; preserve the 100-basis-point relative limit.
+- [Phase 15]: Limit frame-start GPU synchronization to direct-gun configurations so the no-gun OpenBIOS timing path stays unchanged while armed sensors retain mode-zero sampling.
+- [Phase 15]: Reject GunCon and Justifier in every saved multitap endpoint and guard direct-gun polling against endpoint indexes outside its two-port arrays.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2362,6 +2476,7 @@ come from `AGENTS.md`.
 
 | Date | Step | Runtime | Model |
 |------|------|---------|-------|
+| 2026-11-25 | /gsd-execute-plan 15-05 | Codex/OpenGSD executor gpt-6-luna; 2h28m wall from 06:01:43Z to 08:29Z. Focused ABI/budget preflight passed 2/2; beam timing controls passed 3/3; geometry matrix passed 28 assertions and the required selector set passed 4/4 in 0.03s. Task commits: `6d3fba9`, `b519b6a`, `bc72f56`. No broad suite, hosted CI, Act or Docker. The 20–28m low-confidence estimate was exceeded while deriving scheduler deadline/retarget behavior and adding edge coverage; next plans should compile the smallest visible path before expanding geometry cases. | gpt-6-luna |
 | 2026-11-18 | v1.0 audit, completion and cleanup | Codex/OpenGSD 1.20.0; reused exact-tree hosted CI; no local long suite rerun | Primary GPT-6 session (exact model ID unavailable); integration checker gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-discuss-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; three read-only advisors and adversarial synthesis | GPT-6 session (exact model ID not exposed); advisors gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-plan-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; 26 plans, 19 waves; schema/structure, command/failure probes, decision and requirement coverage; post-planning gaps clear | GPT-6 session (exact model ID not exposed); planner gpt-6.1-sol high; researcher and checker gpt-6-luna xhigh |
@@ -2502,8 +2617,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T12:38:34.398Z
-Stopped at: Phase 14 complete, ready to plan Phase 15
+Last session: 2026-11-25T16:39:57.389Z
+Stopped at: Phase 15 complete, ready to plan Phase 16
 Resume file: None
 
 ### v1.0 session history
@@ -2801,3 +2916,31 @@ and `docs/maintaining.md`; no extra workflow change or repeated full local suite
 planning on its branch, refresh the stale Phase 7 and Phase 8 verification reports using the exact main/release
 evidence already available, then continue Phase 10 discussion and planning. The roadmap now marks Phase 9
 complete; the Phase 9 report and tracking edits still need to be committed and shipped through PR #32.
+
+### Phase 15 gap-plan execution and final local workflow (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary and typed agent model IDs were not exposed. Plan 15-11 updated only the Format 21 `gpu_motion` state hashes at frames
+150 and 180 to the exact runner values. `git diff --check`, `cmake --preset ci`, selector-count preflight, and
+the two focused state selectors passed; the selectors took 0.67 seconds.
+
+The first full `cmake --workflow --preset ci` attempt on `c79b694` exited 8 after 49 seconds (CTest 48.32s).
+It exposed one remaining stale test assumption: `libretro.input.controls` still called the now-supported
+`RETRO_DEVICE_LIGHTGUN` an invalid device selection. The correct fix was in the host test, not the emulator.
+Plan 15-12 changes only that negative control to `RETRO_DEVICE_KEYBOARD`, retaining LIGHTGUN tests and the
+serialized-state assertions. A focused CTest run before rebuilding the changed host test used the stale binary
+and failed in 1.34 seconds. The plan was corrected to rebuild `schwaystation-test-libretro-host` first; the
+build passed and the focused selector then passed 1/1 in 1.33 seconds.
+
+Code review ran before final verification and found no active issues in either gap fix. On reviewed head
+`97606163409f6be78c08b8a2249b85bb68930619`, `time cmake --workflow --preset ci` exited 0 in 74.50 seconds.
+CTest's JUnit report records 717/717 passing cases and 71 seconds suite time; the release selector passed 8/8
+in 1.54 seconds. The slowest cases were `policy.quality_metrics` (39.50s), `libretro.host` (35.56s),
+`libretro.input.movies` (25.84s, serial tail), `runner.disc.legacy` (20.48s) and `runner.hashes_file`
+(16.48s). The required cases and bounds remain intact. No workflow files changed, so Act would add no coverage
+beyond the complete local workflow. Hosted Main and Release checks remain required during ship. This was a
+local workflow, so there is no run URL.
+
+All bounded CTest and workflow commands returned; CTest waited for its child processes, and no task-owned
+fuzzer or Docker resource was created in this closeout. The earlier stopped fuzz jobs remain covered by the
+durable cleanup rule in `AGENTS.md` and `.planning/AUTONOMOUS.md`. Goal-backward Phase 15 verification and ship
+are next; previous Phase 7–14 verifier fingerprints currently need refresh after shared-file changes.

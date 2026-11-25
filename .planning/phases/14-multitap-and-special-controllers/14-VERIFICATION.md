@@ -1,6 +1,6 @@
 ---
 phase: multitap-and-special-controllers
-verified: 2026-11-24T16:50:33Z
+verified: 2026-11-25T02:06:11Z
 status: passed
 score: 49/49 must-haves verified
 covered_files:
@@ -81,7 +81,7 @@ covered_files:
   - tests/sio/pad_tests.c
   - tests/sio/sio_tests.c
   - tests/sio/tests.cmake
-covered_digest: "v4:sha256:e3ebad0df9e2c0cedf7e5b9b6aaa197e530c8cb7ab3c95212e138d2c975c13b3"
+covered_digest: "v4:sha256:dad9dabed5bbda8f47271fddca5ab527532bdda84e26b8427f1ffb08c84c12e5"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -89,9 +89,9 @@ overrides_applied: 0
 # Phase 14: Multitap and Special Controllers Verification Report
 
 **Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.
-**Verified:** 2026-11-24 16:50:33 UTC
+**Verified:** 2026-11-25 02:06:11 UTC
 **Status:** passed
-**Re-verification:** No — the prior report had no `gaps:` section, so this follows the initial verification path with refreshed evidence.
+**Re-verification:** Documentation-only freshness pass after `docs/testing.md` changed. The Phase 14 implementation and passing test/hosted CI evidence are unchanged.
 
 ## Goal Achievement
 
@@ -147,7 +147,7 @@ overrides_applied: 0
 | 46 | Deinit clears every sidecar path, saved generation and temporary test hook. | ✓ VERIFIED | State/reset/load/disc-swap persistence selectors pass in the final workflow. |
 | 47 | The feature ledger identifies only the controller/tap predicates actually proved by passing selectors. | ✓ VERIFIED | Feature preflight, independent ratchet and generated-doc selectors pass in the final workflow. |
 | 48 | Controller and save documentation is reachable from existing embedding/testing docs. | ✓ VERIFIED | Documentation/API-name, fixture-hash and producer-backed quality selectors pass in the final workflow. |
-| 49 | Quality bounds change only from named producer measurements, and required final verification remains explicit. | ✓ VERIFIED | The matching Ubuntu 26.04 x86_64 Clang/LLD 21.1.8 WASI producer with CHD and test registration enabled measured 947,969 bytes; `quality.cmake` and `policy.quality_metrics` passed after the exact pin update. Main CI run [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507) independently measured 947,969 but failed against the then-old 947,899 ceiling. The corrected hosted retry remains pending before ship. Cachegrind measured 1,620,101 / 138,319,540 Ir/frame on its hosted producer. |
+| 49 | Quality bounds change only from named producer measurements, and required final verification remains explicit. | ✓ VERIFIED | The matching Ubuntu 26.04 x86_64 Clang/LLD 21.1.8 WASI producer with CHD and test registration enabled measured 947,969 bytes; `quality.cmake` and `policy.quality_metrics` passed after the exact pin update. The final Main CI run [45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) passed on the corrected pin. Cachegrind measured 1,620,101 / 138,319,540 Ir/frame on its hosted producer. |
 
 **Score:** 49/49 truths verified (0 present, behavior-unverified).
 
@@ -246,7 +246,7 @@ N/A — no visual UI or owner-hardware-only acceptance criterion exists. The lib
 
 ## Gaps Summary
 
-**No implementation gaps found.** All four roadmap criteria, all 45 plan truths and all 46 declared artifacts are verified. The WASI bound matches the exact final-source x86_64 tests-enabled producer measurement (947,969 bytes); the corrected local value comparison and focused policy test pass. A 16-test focused rerun covering the roadmap criteria also passed. Cachegrind pins match their hosted producer measurements. The corrected hosted Main CI retry remains pending before ship and Phase 15 starts.
+**No implementation gaps found.** All four roadmap criteria, all 45 plan truths and all 46 declared artifacts are verified. The WASI bound matches the exact final-source x86_64 tests-enabled producer measurement (947,969 bytes); the corrected local value comparison and focused policy test pass. A 16-test focused rerun covering the roadmap criteria also passed. Cachegrind pins match their hosted producer measurements. At the time this report was first written, the corrected hosted Main CI retry remained pending. It subsequently passed on the exact corrected head in run [45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076); Nightly [45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657), post-merge Main CI [45454749260](https://github.com/szTheory/schwaystation/actions/runs/45454749260), post-merge Release [45454749282](https://github.com/szTheory/schwaystation/actions/runs/45454749282), release-PR Main CI [45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) and Release [45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) also passed. PR #42 and release PR #43 merged; v0.14.0 was published. Final timings and the measured CI efficiency candidate are recorded in the Phase 14 Plan 16 summary and STATE.md.
 
 ---
 

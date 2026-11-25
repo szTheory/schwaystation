@@ -1030,10 +1030,10 @@ foreach(row IN LISTS schway__motion_hashes)
     LABELS fixtures portable TIMEOUT 60)
 endforeach()
 foreach(row IN ITEMS
-    # Format 19 adds the selected board identity. State hashes change while
-    # rendered frame hashes remain unchanged.
-    "150|a9218281c1d5b51fff4f48fc9fa388cf0459c5c0bf136b8ecb462cbb0d466d9b"
-    "180|b8285ab088a9a7d19afc2986913aa3f16780bb8fd52bea2c8b75e2d538076124")
+    # Format 21 adds serialized gun continuation state. State hashes change
+    # while rendered frame hashes remain unchanged.
+    "150|8b8ad482d710e39fd0b0f296a42a52389be74cd4b7ffa5956e5799a14aff3e60"
+    "180|5c53ec895577a2638a22e14261157a22a7dbffcac552af8c449d0bb0d6f40da0")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)

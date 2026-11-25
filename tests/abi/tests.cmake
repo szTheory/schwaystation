@@ -156,6 +156,15 @@ schway_warnings(schwaystation-test-api-v9)
 schway_add_test(NAME abi.api_v9 COMMAND schwaystation-test-api-v9
   LABELS abi portable TIMEOUT 10)
 
+# Fault prevented: the released 228-byte v9 caller overruns or loses direct/tap input at frame latch.
+add_executable(schwaystation-test-api-v10 ${PROJECT_SOURCE_DIR}/tests/api/v10.c)
+target_link_libraries(schwaystation-test-api-v10 PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-api-v10 PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-api-v10)
+schway_add_test(NAME abi.api_v10 COMMAND schwaystation-test-api-v10
+  LABELS abi portable TIMEOUT 10)
+
 # The public header compiles alone as C17 and as C++17 with warnings fatal.
 # Fault prevented: a header that only the core's own build, with its own
 # flags and language, can compile. C++ is enabled here only; an embedding

@@ -2,7 +2,7 @@
 title: "Prompt coverage"
 summary: "Every ask in the owner's kickoff prompt (2026-10-19) mapped to the file and section that answers it, with a status; and where the owner's constraints and preparation's recommendations differ."
 read_when: "At kickoff review and at every milestone close; when the owner asks whether something was forgotten."
-updated: 2026-11-18
+updated: 2026-11-24
 ---
 
 # Prompt coverage
@@ -27,19 +27,19 @@ Rows are never renumbered or deleted; new asks take the next number.
 | 8 | Correct; address what people dislike about other emulators | ECO 2 (C.NN, G.NN); CONFORMANCE 1 to 3; SYS 10, GPU 7, SCM 7 (confidence tables) | Documented | |
 | 9 | Best-practice C, CMake, CI, with an adversarial fan-out per decision point through every stakeholder lens | ENGINEERING 2 to 4; BRIEF (fan-out method); DECISIONS; DEC.106 | Documented | discuss runs the fan-out again per phase |
 | 10 | Code that is a joy to read, educational, KISS, YAGNI, ponytail.dev | AGENTS Style; ENGINEERING 10; DEC.90 | Documented | |
-| 11 | Baselines in every measurable dimension, ratcheted to diminishing returns | ENGINEERING 8 (`quality.json`); CONFORMANCE 3.2 (ledger ratchet); DEC.86 | Partial | Phase 7 records repeatable Ir/frame and state bytes plus comparable CI bounds; linked WASI module bytes remain unmeasured. See `07-BASELINES.md`. |
+| 11 | Baselines in every measurable dimension, ratcheted to diminishing returns | ENGINEERING 8 (`quality.json`); CONFORMANCE 3.2 (ledger ratchet); DEC.86 | Documented | Phase 7 measured Ir/frame, state bytes, linked WASI bytes and comparable CI bounds; current values and producer changes are in `07-BASELINES.md` and `quality.json`. Device MIPS remain separately identified as assumptions in row 32. |
 | 12 | Hardware documentation with provenance, primary sources first, a RAG-friendly second brain in .planning | BRIEF (tiers, pins, markers); README (index); SYS, GPU, SCM, PER, PX; PROVENANCE 7 | Documented | facts graduate to `docs/hardware/<chip>.md` as subsystems land (ENGINEERING 11) |
 | 13 | Development velocity as fast as possible | GSD-HANDOFF 1 to 3; LESSONS XFER-001, 002, 068, 083, 094; DEC.06, DEC.07, DEC.99, DEC.107 | Documented | phase 1 ports cogmaster at a public pin |
 | 14 | Telemetry without overhead, optional | ARCHITECTURE 6 (counters, first fault, hooks); DEC.24 (traced loop only when hooks are installed); ECO 2 G.05 (no network telemetry) | Documented | hooks ABI v5.0 (SEED-004) |
 | 15 | Great day-0/1/2 DX, easy adoption, docs never stale, self-documenting code | ENGINEERING 11, 12; HOSTS 1, 4, 7; DEC.89 | Documented | |
 | 16 | Property-based testing, fuzzing, safe with hostile input | ENGINEERING 3; PER 7; CONFORMANCE 6; AGENTS rule 4; DEC.46, DEC.81 | Documented | fuzz targets report-only until green (AGENTS rule 8) |
-| 17 | Fast CI and builds | ENGINEERING 4; DEC.79; SEED-007 | Documented | Exact-attempt timing now measures the current CI DAG; comparable historical full-CI pushes take 2,249–3,293 seconds. The release-App PR comparison remains for ship. See `07-CI-EFFICIENCY.md`. |
+| 17 | Fast CI and builds | ENGINEERING 4; DEC.79; SEED-007 | Documented | Exact-attempt timing measures the current CI DAG; comparable historical full-CI pushes take 2,249–3,293 seconds. Release-App PR #29 retained required checks and measured heavy-matrix skips; its missing merge-ref SHA prevents an exact speedup comparison. See `07-CI-EFFICIENCY.md`. |
 | 18 | Ship early and often; automated releases | AGENTS rule 10; ENGINEERING 5; DEC.06, DEC.87 | Documented | every phase a release; first one v1.0 ph1 |
 | 19 | Always PRs, green main, triage at every step, auto-merge and auto-release with zero human verification where possible | AGENTS rules 6, 10; ENGINEERING 5 to 7; `scripts/apply-repo-settings.sh`; DEC.88 | Documented | |
 | 20 | 12-factor secrets (`.env.local` locally, Actions secrets in CI) | ENGINEERING 13; `.env.example`; GSD-HANDOFF 7; DEC.95 | Documented | |
 | 21 | Rolling near/mid/long roadmap revised at every milestone | `.planning/PRODUCT-ROADMAP.md`; seeds; GSD-HANDOFF 4; DEC.05 | Documented | |
 | 22 | Performance stress testing to p99.999 on critical flows, folded into CI | ENGINEERING 8 (nightly `bench` tails over 300,000 frames; per-PR Ir gate); DEC.85 | Documented | |
-| 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Partial | Phase 7 captures an attributable CI efficiency report and current-attempt measurement path; the real release-App comparison is pending ship. |
+| 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Documented | `AGENTS.md`, `.planning/AUTONOMOUS.md` and `docs/maintaining.md` require critical-path, duplicate-work, iteration-time and Actions-cost review on every CI and ship/release run while preserving all gates. Phase 14's measured serial movie-test candidate is pending as todo 052. |
 | 24 | Recurring weakest-quality-dimension reviews baked in | ENGINEERING 12; SEED-007 | Partial | Phase 7 scored all seven dimensions and verified its selected README correction; recurring milestone reviews remain in SEED-007. See `07-QUALITY-REVIEW.md`. |
 | 25 | Verification shifted left and automated; only the truly necessary handed to the owner; recorded so it never loops back | AGENTS rule 6; DEC.101; GSD-HANDOFF 3 | Documented | settled, never re-proposed |
 | 26 | Stop after each GSD phase so the owner can check and switch models | AGENTS rule 9; GSD-HANDOFF 3, 5, 6; `scripts/hygiene.sh` stop policy; DEC.98 | Documented | v1.0 and the authorized v2.0 autonomous run follow the phase-boundary stop; rule 9 retains the release/ship boundary |

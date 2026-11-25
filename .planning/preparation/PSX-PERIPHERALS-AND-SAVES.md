@@ -2,7 +2,7 @@
 title: "PlayStation controllers, memory cards, saves, game identity, patches and parser bounds"
 summary: "SIO0 register and /ACK protocol, every pad and gun with its ID bytes and config commands, the 128 KB memory card layout and command set, card file formats and the libretro .srm conventions, save-state constraints, SYSTEM.CNF and rcheevos identity, PPF and GameShark handling, hostile-input bounds and the milestone placement for schwaystation."
 read_when: "Before designing or changing the SIO0 module, any controller or memory-card device, the save export, the save-state visitor, the disc identifier, the runner's patch or cheat path, or the loader fuzz targets."
-updated: 2026-11-19
+updated: 2026-11-25
 ---
 # PlayStation peripherals and saves (research PER)
 
@@ -99,7 +99,7 @@ Payloads in 2.1. Beetle PSX and PCSX-ReARMed expose neGcon twist response (linea
 | GunCon (5A63h) | the gun measures from the video cable: X in 8 MHz clocks since HSYNC, Y in scanlines since VSYNC, delivered in halfwords 2–3 of the 42h reply, read shortly after VBLANK | X valid 04Dh–1CDh; Y PAL 20h–127h, NTSC 19h–F8h; X = 0001h, Y = 0005h "light during VSYNC" (gun pointed off screen or at a dark area), X = 0001h, Y = 000Ah "no light or busy"; about 30,000 cycles between VBLANK and VSYNC on NTSC, a read takes about 15,000 cycles |
 | Konami Justifier / Hyperblaster (5A31h) | the sensor pulls controller-port pin 8 (/IRQ10) when it sees the beam; the game enables it with `01 42 00 x0 00` (10h on) and reads Timer 0 (dot) and Timer 1 (line) in the IRQ10 handler | NTSC X = (Timer0 − 140) × 0.198166, PAL × 0.196358; Y = Timer1. Sony's libgun does not acknowledge the old IRQ10 first, so the first read is unreliable |
 
-**Recommendation (v2.0):** the host supplies a cursor in output pixels plus trigger; the GPU phase records the (line, dot) at which each output pixel was emitted and its brightness; GunCon converts to the 8 MHz and line units, the Justifier raises IRQ10 at the matching GPU timestamp if the pixel is bright enough. **Strongest alternative:** geometric conversion with no brightness test. **Would change if:** a title is found that calibrates against a dark screen and expects the error codes.
+**Delivered v2.0 model:** the host supplies frame-latched aim in output pixels; one bounded GPU event advances to the aimed beam position and samples live VRAM there. GunCon converts that position to 8 MHz and line units. An enabled Justifier raises IRQ10 for a bright sample after Timer 0/1 synchronize to the same event. The deterministic brightness rule sums RGB555 channels (or reduced RGB24 channels) and accepts 48 or above; it is a model choice, not a calibrated measurement. No per-pixel timestamp or brightness history is stored. See [GPU light-gun beam sample](../../docs/hardware/gpu.md#light-gun-beam-sample) and [SIO gun behavior](../../docs/hardware/sio.md#guncon-polls). **Strongest alternative:** geometric conversion with no brightness test. **Would change if:** measured physical-controller captures calibrate the threshold or a title demonstrates a different response.
 
 ### 2.8 PocketStation (SCPH-4000) [PER.06][PER.01]
 A memory card with an ARM7TDMI (variable clock, max 7.995 MHz), 2 KB SRAM, 16 KB BIOS ROM, 128 KB flash, 32×32 1-bit LCD, 12-bit PCM speaker, five buttons, IrDA and an RTC. Its card port adds commands 58h–5Fh to the standard 52h/53h/57h commands. PocketStation executables live in card files whose names replace "-" by "P" and use title-sector bytes 50h–5Fh [PER.01]. **Phase 8 scope:** bounded, deterministic card-port metadata and the documented storage transfer backed only by the selected 128 KB card image. It does not execute PocketStation programs or model its CPU, BIOS, RAM, LCD, RTC, audio, buttons or IrDA. See the transcript and storage limits below.
@@ -261,7 +261,7 @@ Fuzz targets in v1.0 (ENGINEERING 3 names them; ARCHITECTURE 13): `fuzz.cue`, `f
 | serial, region, boot EXE identity; rcheevos MD5 in the runner | v1.0 | per-game cards and the libretro database key on the serial |
 | multitap SCPH-1070 (both methods, cards on the tap) | v2.0 | 4-player titles in the whole-library pass |
 | mouse, neGcon, Jogcon (no force feedback), Dual Analog flight mode (5A53h) | v2.0 | payload-only devices; Jogcon motor seed |
-| GunCon, Justifier with GPU-timestamped beam | v2.0 | needs the GPU phase's per-pixel timestamps |
+| GunCon and Justifier with a bounded GPU beam event | v2.0 | delivered for direct ports; synthetic predicates are documented, but physical sensitivity remains uncalibrated |
 | sector overlay hook, cheat application in the libretro layer | v2.0 | hackers and translators in the library pass |
 | save states (visitor frozen), rewind, run-ahead, disc-swap state, movies | v3.0 | format freeze after the library pass; constraints respected from phase 1 |
 | PocketStation ARM core, LCD, 58h–5Fh | later seed | separate CPU; v1 stores its files as plain card data |

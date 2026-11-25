@@ -3,6 +3,10 @@ sio.control.baud	portable,sio
 sio.digital.poll_irq	portable,sio
 sio.fifo.overrun	portable,sio
 sio.fifo.widths	portable,sio
+sio.gun.guncon	portable,sio
+sio.gun.justifier	portable,sio
+sio.gun.latch	portable,sio
+sio.gun.state	portable,sio
 sio.irq.ack_order	portable,sio
 sio.pad.analog_button_edges	portable,sio
 sio.pad.config_commands	portable,sio

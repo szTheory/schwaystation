@@ -1,8 +1,8 @@
 ---
 phase: 08-per-game-card-saves
-verified: 2026-11-19T23:04:05Z
+verified: 2026-11-25T01:56:17Z
 status: passed
-score: 5/5 must-haves verified
+score: 11/11 truths verified
 covered_files:
   - .github/workflows/ci.yml
   - .planning/phases/08-per-game-card-saves/08-01-PLAN.md
@@ -62,20 +62,22 @@ covered_files:
   - tests/retroarch/test.cfg.in
   - tests/retroarch/verify.py
   - tests/runner/tests.cmake
-covered_digest: "v4:sha256:d53f1b7a14cb27a7df5eb845513bcd472082fbe08a620cd1b591b339d7607cfb"
+covered_digest: "v4:sha256:f9cfbef170ec873a35a414ae21a3b745ae04c25f0bc5cddc7a47001d46e33683"
 behavior_unverified: 0
 overrides_applied: 0
+decision_coverage:
+  honored: 10
+  total: 10
+  not_honored: []
 human_verification: []
-ship_evidence_pending:
-  - "Phase PR CI and the release PR/main CI remain ship-time gates."
 ---
 
 # Phase 8: Per-game card saves Verification Report
 
 **Phase Goal:** Players can use independent memory cards per game, import and export supported card files, and recover their progress after reopening the emulator.
-**Verified:** 2026-11-19T23:04:05Z
+**Verified:** 2026-11-25T01:56:17Z
 **Status:** passed
-**Re-verification:** No — initial verification
+**Re-verification:** No — the prior report had no `gaps:` section, so the verifier followed initial-mode rules.
 
 ## Goal Achievement
 
@@ -83,100 +85,130 @@ ship_evidence_pending:
 
 | # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | Normalized serials produce stable save names, declared multi-disc sets share identity, and invalid or missing serials use distinct content-derived fallbacks. | ✓ VERIFIED | Runner identity is resolved before card paths are applied. The executable fallback hashes validated bytes; the disc fallback frames media type and hashes ordered TOC metadata and provider sector/subcode data. Runner tests cover serial precedence, moved media, playlist identity, disc swaps and fallback changes. |
-| 2 | Raw, GME, MEM and PSX card files round trip with byte-identical card contents; invalid input leaves active data and stored files unchanged. | ✓ VERIFIED | Host import validates size and wrapper signatures before copying into the output. Export writes a temporary complete image and atomically replaces the destination. The card file tests cover wrappers, byte preservation, malformed input and failed publication. |
-| 3 | Runner saves reload across processes, isolate games and both slots, and preserve complete files after write failure. | ✓ VERIFIED | Fresh-process fixture tests exercise both card slots and separate identities; controls cover failed writes and refused input. |
-| 4 | Libretro exposes and reloads card 1 through SAVE_RAM, persists additional slots separately, passes in-process and hosted fresh-process continuation, and advertises saves only after verification. | ✓ VERIFIED | The API maps RETRO_MEMORY_SAVE_RAM to card 1; generated metadata says libretro_saves true and the claim checker maps that claim to persistence and controls tests. Local selectors pass. Hosted run 44618451958 passed the full required matrix and RetroArch card step on the claim-true implementation head; its artifact records two processes, 120 frames each, two 131,072-byte card images and advancing counters. |
-| 5 | A guest can use documented PocketStation storage commands from 58h onward to read and write card data. | ✓ VERIFIED | The protocol implementation and pinned transcript are exercised by unit tests and the manifested PocketStation guest. The guest fixture selector passed. |
+| 1 | Normalized serials give stable save names; a declared multi-disc set shares the first valid serial identity; invalid or absent serials use a versioned content digest. | ✓ VERIFIED | `host/save_game_identity.c` normalizes serials and resolves executable or full-disc-set digests; the disc digest covers ordered TOC fields, sectors and subcode. `runner/main.c` resolves once before applying the same identity to card paths. The registered runner identity and playlist checks cover spelling, first-member precedence, fallback changes, moved media and disc swaps. |
+| 2 | Raw and supported GME, MEM and PSX card images round trip their 131,072 card bytes, while malformed imports and failed exports preserve prior data. | ✓ VERIFIED | `host/cards.c` validates lengths and wrapper signatures into a temporary image before changing caller memory, then publishes complete card images through a temporary file and atomic replace. `tests/card/files.c` checks byte equality for raw and wrapper formats, malformed input, unchanged output and prior-file preservation after flush/replace failures. `docs/runner.md` documents the supported formats. |
+| 3 | Runner saves reload in a new process, keep games and card slots separate, and preserve the prior complete file after a failed write. | ✓ VERIFIED | `runner/main.c` loads each socket using the resolved game identity and only flushes changed card generations. Runner and guest integration tests check fresh-process reload, two-game/two-slot isolation and injected save failure against the existing file. |
+| 4 | The libretro host exposes card 1 through `RETRO_MEMORY_SAVE_RAM`, persists other slots separately, resumes both cards in-process and across clean RetroArch processes, and grounds its save claim in tests. | ✓ VERIFIED | `retro_get_memory_data/size` maps SAVE_RAM to the live card 1 memory. Other sockets use content-derived paths in the frontend save directory and atomic card persistence. The metadata template sets `libretro_saves = "true"`; `tests/cmake/info_claims.cmake` requires both registered persistence and controls tests. The current required RetroArch job exercises two clean processes and asserts both 131,072-byte card files and advancing guest counters. |
+| 5 | A real guest can read and write card storage through the documented PocketStation commands from `58h` onward. | ✓ VERIFIED | `src/card.c` handles bounded `58h`–`5Fh` protocol commands and stages validated storage writes before commit. The guest fixture transfers and checks card data through emulated JOY transactions; its registered integration selector is part of the current CI inventory. |
+| 6 | The owned PocketStation guest fixture is built and included in the portable test inventory. | ✓ VERIFIED | `tests/fixtures/tests.cmake` builds `pocketstation_storage.exe` and registers `fixtures.pocketstation_storage`; `tests/fixtures/inventory.txt` and the fixture manifest include the required inputs. The required CI RetroArch job also carries the memory-card guest as an artifact. |
+| 7 | Pinned protocol evidence sets the storage bounds and byte direction before the first storage implementation. | ✓ VERIFIED | The source transcript and byte-order probe are recorded in `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` and `DECISIONS.md`. Git history places the Phase 8 transcript pin at `8ae1c4b` before the first metadata implementation/test sequence, with the focused directory-order probe preceding the storage implementation. |
+| 8 | Loading a state restores validated in-flight card transport fields without replacing card bytes or their generation. | ✓ VERIFIED | `src/card.c` serializes pending protocol state only; the card images and generation are instance-owned persistent data outside ordinary states. `card.state.pocketstation_metadata` and related state tests compare the receiving image and generation before and after state application, including rejected fields. |
+| 9 | Phase acceptance checks preflight inputs and exact CTest registrations before expensive work. | ✓ VERIFIED | `08-09-PLAN.md` defines the required ordered checks. The current build’s CTest inventory contains the card, runner, libretro, PocketStation and persistence selectors; fixture registrations and artifact wiring were traced in source. The exact-head required CI run completed successfully. |
+| 10 | Card protocol state transitions have deterministic tests before final verification. | ✓ VERIFIED | Registered card tests cover completed versus aborted writes, bad checksums, bounded PocketStation reads/writes, slot selection, state restore and card/generation preservation. Runner and libretro tests add fresh-process persistence and failed-publication cases. The current exact-head Main CI passed. |
+| 11 | Integrated source review happened before verification. | ✓ VERIFIED | `08-REVIEW.md` records the reviewed implementation, test and CI files, resolved warnings, and no open findings at 2026-11-19T22:38:51Z. This report was verified later; source behavior and wiring were inspected again for this pass. |
 
-**Score:** 5/5 truths verified (0 present, behavior-unverified)
+**Score:** 11/11 truths verified (0 present, behavior-unverified)
 
 ### Required Artifacts
 
-| Artifact | Expected | Status | Details |
-|---|---|---|---|
-| host/cards.c and host/cards.h | Validated card import, exact wrapper handling and atomic full-image export | ✓ VERIFIED | Implementations are used by runner and libretro hosts; card.files round-trip and failure tests passed. |
-| host/save_game_identity.c and runner/main.c | Stable executable/disc identity applied before either runner card slot loads | ✓ VERIFIED | Runner source resolves one identity before loading both paths; runner CMake includes the identity implementation and the runner persistence selectors passed. |
-| src/card.c | Bounded two-slot card transport and PocketStation storage protocol | ✓ VERIFIED | JOY protocol, state and write-commit tests passed; the guest exercised the public transport. |
-| libretro/libretro.c and schwaystation_libretro.info.in | SAVE_RAM mapping, additional-slot persistence and grounded save claim | ✓ VERIFIED | The host tests and metadata claim/refusal self-test passed; the exact-head hosted RetroArch test passed. |
-| tests/fixtures/src/pocketstation_storage.asm and fixture registration | Reproducible guest storage transaction | ✓ VERIFIED | The source is manifested, assembled through the fixture helper and registered as fixtures.pocketstation_storage; that test passed. |
-| CI RetroArch path | Required fresh-process card continuation proof | ✓ VERIFIED | The required job is wired to the cards mode and artifact; exact-head run 44618451958 passed. |
+All **40/40 plan-declared artifacts** pass `gsd_run query verify.artifacts`: every file exists, has substantive content and has no reported stub/pattern issue.
 
-**Artifacts:** All 40 plan-declared artifacts passed the GSD artifact checks across Plans 08-01 through 08-10.
+| Plan | Declared artifacts | Status |
+|---|---|---|
+| 08-01 | `tests/cmake/info_claims.cmake`, `tests/cmake/info_claims_self_test.cmake`, fixture inventory, manifest, PocketStation guest source | ✓ VERIFIED (5/5) |
+| 08-02 | `host/cards.c`, `host/cards.h`, `tests/card/files.c` | ✓ VERIFIED (3/3) |
+| 08-03 | `docs/runner.md`, identity source/header, runner CMake and startup | ✓ VERIFIED (5/5) |
+| 08-04 | Decisions and protocol source docs, embedding docs, card source/header | ✓ VERIFIED (5/5) |
+| 08-05 | Libretro host source and its test harness/registration | ✓ VERIFIED (3/3) |
+| 08-06 | Card source/header/tests and manifested PocketStation fixture/source | ✓ VERIFIED (5/5) |
+| 08-07 | CI workflow and RetroArch script/config/verifier | ✓ VERIFIED (4/4) |
+| 08-08 | Runner guide, disc probe, identity source and runner startup | ✓ VERIFIED (5/5) |
+| 08-09 | Plan evidence summary, testing docs and fixture test registration | ✓ VERIFIED (3/3) |
+| 08-10 | Claim evidence summary and libretro metadata template | ✓ VERIFIED (2/2) |
 
 ### Key Link Verification
 
-| From | To | Via | Status | Details |
+The path-only key-link query directly verified 2/16 plan links. It reported lexical false negatives for the other 14 because CMake target lists, fixture macros and API calls do not contain the target path as a literal. I traced those links through the source, include/target wiring and registered selectors:
+
+| # | From | To | Status | Evidence |
 |---|---|---|---|---|
-| runner/main.c | host/save_game_identity.c | runner source list and one-time startup resolution | ✓ WIRED | CMake includes the identity implementation; runner startup calls the resolver before loading either slot. |
-| host/cards.c | tests/card/files.c | host library linked into card-file test target | ✓ WIRED | tests/card/tests.cmake links the test executable to schwaystation-host; four card-file selectors passed. |
-| tests/cmake/info_claims.cmake | tests/libretro/inventory.txt | inventory passed by the registered CTest | ✓ WIRED | tests/libretro/tests.cmake supplies the inventory path; the claim checker requires both card persistence and controls rows. |
-| tests/fixtures/tests.cmake | PocketStation guest source | fixture macro, manifest and registered guest selector | ✓ WIRED | The assembly source is assembled and the guest test is registered; its test passed. |
-| libretro/libretro.c | host/cards.h and frontend SAVE_RAM | import/export helpers and memory mapping | ✓ WIRED | The implementation includes the host card API and maps SAVE_RAM to card 1; in-process and hosted persistence checks passed. |
-| .github/workflows/ci.yml | tests/retroarch/run_retroarch.cmake | required RetroArch guest artifact and cards mode | ✓ WIRED | Workflow regression checks and the exact-head hosted card step passed. |
+| 1 | `tests/fixtures/tests.cmake` | `tests/fixtures/src/pocketstation_storage.asm` | ✓ WIRED | Fixture macro assembles the source; `fixtures.pocketstation_storage` runs the produced executable. |
+| 2 | `tests/cmake/info_claims.cmake` | `tests/libretro/inventory.txt` | ✓ WIRED | The registered claim test supplies the libretro inventory to the checker. |
+| 3 | `host/cards.c` | `tests/card/files.c` | ✓ WIRED | The test target links `schwaystation-host`; file tests call the import/export API. |
+| 4 | `runner/main.c` | `host/save_game_identity.c` | ✓ WIRED | Runner source list includes the resolver; startup calls it once before loading card paths. |
+| 5 | `src/card.c` | `tests/card/card_tests.c` | ✓ WIRED | Card test executable links the core library and exercises JOY protocol/state behavior. |
+| 6 | `libretro/libretro.c` | `host/cards.h` | ✓ WIRED | Libretro includes the host card API and imports/atomically persists card images. |
+| 7 | `tests/libretro/host.c` | `libretro/libretro.c` | ✓ WIRED | Host test dynamically loads the libretro module and exercises SAVE_RAM and secondary slots. |
+| 8 | `tests/fixtures/src/pocketstation_storage.asm` | `src/card.c` | ✓ WIRED | The assembled guest communicates through CPU/JOY register transactions and the emulated card protocol. |
+| 9 | `src/card.c` | `tests/card/card_tests.c` | ✓ WIRED | Protocol and state selectors cover bounded fields, commit behavior and state application. |
+| 10 | `.github/workflows/ci.yml` | `tests/retroarch/run_retroarch.cmake` | ✓ WIRED | Required hosted RetroArch step invokes the script in `MODE=cards`. |
+| 11 | `runner/main.c` | `host/save_game_identity.c` | ✓ WIRED | Runner resolves identity before either card slot is loaded or paths are frozen. |
+| 12 | `host/save_game_identity.c` | `host/disc_image.h` | ✓ WIRED | Resolver walks selected playlist members and their ordered TOC/sector providers. |
+| 13 | `tests/fixtures/tests.cmake` | `src/card.c` | ✓ WIRED | The guest fixture runs against the runner/core target containing the card implementation. |
+| 14 | `.github/workflows/ci.yml` | `tests/fixtures/src/memcard_roundtrip.asm` | ✓ WIRED | CI builds/uploads the guest, downloads it in the RetroArch job and checks that it exists before use. |
+| 15 | `libretro/schwaystation_libretro.info.in` | `tests/cmake/info_claims.cmake` | ✓ WIRED | Generated metadata is checked; a true saves claim requires both card persistence and controls tests. |
+| 16 | `.github/workflows/ci.yml` | `tests/retroarch/run_retroarch.cmake` | ✓ WIRED | Exact-head CI uses the same required two-process card path as Plan 08-07. |
 
-The generic key-link checker reported lexical false negatives for several CMake-variable and target-list relationships. Those links were traced through the CMake source lists and test registrations above; the registered behavioral selectors passed.
-
-### Data-Flow Trace
+### Data-Flow Trace (Level 4)
 
 | Artifact | Data variable | Source | Produces real data | Status |
 |---|---|---|---|---|
-| host card import/export | 128 KiB card image | Input file or caller-provided card bytes | Yes | ✓ FLOWING |
-| runner save identity | identity component | Serial metadata or executable/disc content | Yes | ✓ FLOWING |
-| libretro card 1 | SAVE_RAM span | Live instance card memory | Yes | ✓ FLOWING |
-| libretro card 2 | save image | Live instance card memory, atomically persisted by host | Yes | ✓ FLOWING |
-| PocketStation guest | protocol response and card bytes | Guest transactions through the emulated card transport | Yes | ✓ FLOWING |
+| Card import/export | 131,072-byte card image | Validated disk image or live card memory; atomic file publisher | Yes | ✓ FLOWING |
+| Runner identity and paths | Serial/digest component | Executable bytes or ordered provider TOC, sectors and subcode | Yes | ✓ FLOWING |
+| Runner reload/flush | Socket image and generation | Save file import; changed instance card memory | Yes | ✓ FLOWING |
+| Libretro card 1 | SAVE_RAM span | Live instance-owned card 1 memory exposed to frontend | Yes | ✓ FLOWING |
+| Libretro other slots | Per-content save paths | Frontend save directory and live instance card memory | Yes | ✓ FLOWING |
+| PocketStation guest | Command bytes and card storage | Guest JOY transactions through the emulator's card implementation | Yes | ✓ FLOWING |
 
 ### Behavioral Spot-Checks
 
-| Behavior | Command | Result | Status |
+| Behavior | Command/evidence | Result | Status |
 |---|---|---|---|
-| Phase 8 identity, file validation, atomic writes, protocol, runner, libretro and fixture regressions | cmake --preset ci && ctest --preset ci --no-tests=error -R '^(abi[.]api_v4|card[.]|runner[.]cards[.]|runner[.]disc[.]load|libretro[.](cards|info)[.]|fixtures[.](pocketstation_storage|memcard_roundtrip[.]))' --output-on-failure | Configure exit 0; 24/24 tests passed in 5.13 seconds | ✓ PASS |
-| Real RetroArch fresh-process continuation | Required hosted CI run 44618451958 | Full required matrix passed; two independent 120-frame processes resumed both card slots; artifact 14576843021 | ✓ PASS |
-| Save capability claim | libretro.info.claims and libretro.info.claims.self_test | Passed in the 24-test selector; claim maps to both required card tests | ✓ PASS |
+| Current-source integrated CI, including registered card, runner, libretro, guest and portability checks | [Main CI run 45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076), source head `75beb849f4b9e8a9a3bd023cc5c80632e4c74d56) | Passed | ✓ PASS |
+| Released-tree regression check on the current repository HEAD | [Post-merge Main CI run 45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354), head `f08fc08d40a1ebcb42708e0a31be3111e3eed711` | Passed | ✓ PASS |
+| Required RetroArch save continuation and release workflow on the released head | [Release run 45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400), head `f08fc08d40a1ebcb42708e0a31be3111e3eed711` | Passed | ✓ PASS |
+| Relevant current CTest registrations | `ctest --test-dir build/ci -N` with card, runner, libretro, PocketStation and memory-card fixture selectors | All required selectors are registered; this enumerated tests without rerunning them | ✓ PASS |
+
+No full suite was rerun for this report. The supplied exact-head Main/Release results cover the current code; the current working tree is at the released `f08fc08d40a1ebcb42708e0a31be3111e3eed711` head.
 
 ### Probe Execution
 
-No probes are declared or implied by the Phase 8 plans.
+No probe scripts are declared or implied by the Phase 8 plans.
 
 ### Requirements Coverage
 
-| Requirement | Source Plan | Description | Status | Evidence |
-|---|---|---|---|---|
-| SAVE-01 | 08-01, 08-03, 08-08, 08-09 | Stable per-game identity, multi-disc identity and content-derived fallback | ✓ SATISFIED | Runner identity tests and the 24-test selector passed. |
-| SAVE-02 | 08-02, 08-09 | Validated raw/wrapped import, byte-preserving export and atomic failure behavior | ✓ SATISFIED | Card file wrapper, round-trip and failure selectors passed. |
-| SAVE-03 | 08-01, 08-03, 08-08, 08-09 | Runner reload, two-game/two-slot isolation and complete-file preservation | ✓ SATISFIED | Runner and fresh-process guest selectors passed. |
-| SAVE-04 | 08-01, 08-05, 08-07, 08-09, 08-10 | Libretro card APIs, two-slot persistence and verified capability claim | ✓ SATISFIED | Local host selectors and exact-head hosted CI/RetroArch proof passed. |
-| SAVE-05 | 08-01, 08-04, 08-06, 08-09 | Documented PocketStation storage protocol and guest round trip | ✓ SATISFIED | Protocol/state tests and the PocketStation fixture passed. |
+| Requirement | Source plans | Status | Evidence |
+|---|---|---|---|
+| SAVE-01 | 08-01, 08-02, 08-03, 08-08, 08-09 | ✓ SATISFIED | Normalized serials and executable/disc-set fallback identities are wired to card paths and covered by runner/card tests. |
+| SAVE-02 | 08-02, 08-09 | ✓ SATISFIED | Raw and supported wrapper validation, byte-preserving import/export, atomic publication and failure preservation are implemented and tested. |
+| SAVE-03 | 08-01, 08-02, 08-03, 08-08, 08-09 | ✓ SATISFIED | Runner reloads both slots, keeps game identities separate and preserves old files after a failed publish. |
+| SAVE-04 | 08-01, 08-05, 08-07, 08-09, 08-10 | ✓ SATISFIED | SAVE_RAM mapping, other-slot persistence, claim checks and fresh-process RetroArch checks are wired and passed. |
+| SAVE-05 | 08-01, 08-04, 08-06, 08-09 | ✓ SATISFIED | Documented bounded PocketStation commands, state behavior, guest fixture and deterministic tests are present and passed. |
 
-**Coverage:** 5/5 requirements satisfied; no orphaned Phase 8 requirements.
+**Coverage:** 5/5 Phase 8 requirements satisfied; no orphaned Phase 8 requirements.
+
+### Test Quality Audit
+
+| Test files | Linked requirement | Active/disabled | Circular | Assertion strength | Verdict |
+|---|---|---|---|---|---|
+| `tests/card/files.c` and `tests/card/tests.cmake` | SAVE-02 | Active; no disabled linked tests | No circular expected-value writer found | Byte-for-byte equality and unchanged-state assertions | ✓ PASS |
+| `tests/runner/tests.cmake` and registered runner selectors | SAVE-01, SAVE-03 | Active; no disabled linked tests | Generated input fixtures are checked against fixed expected paths, hashes and bytes | Multi-run value and failure-preservation assertions | ✓ PASS |
+| `tests/libretro/host.c`, `tests/libretro/tests.cmake` | SAVE-04 | Active; no disabled linked tests | No circular expected-value writer found | SAVE_RAM size/data and per-slot contents checked | ✓ PASS |
+| `tests/fixtures/src/pocketstation_storage.asm`, `tests/fixtures/tests.cmake` | SAVE-05 | Active; no disabled linked tests | Guest checks its bounded transactions and return status | Byte-level guest result and expected exit status | ✓ PASS |
+| `tests/cmake/info_claims.cmake`, `tests/cmake/info_claims_self_test.cmake` | SAVE-04 | Active; no disabled linked tests | Negative controls mutate only the checker input | Required inventory rows and invalid claims asserted | ✓ PASS |
+
+Disabled-test patterns were not found in Phase 8 requirement-linked test paths. The card, runner and guest tests compare against fixed independent byte values, path expectations and guest-visible results; no system-generated expected fixture was identified.
+
+### Decision Coverage
+
+All 10 trackable decisions in `08-CONTEXT.md` are honored by the shipped artifacts. The decision-coverage check was non-blocking and reported no unhonored decisions.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |---|---:|---|---|---|
 
-No unresolved TODO, FIXME, XXX, TBD, placeholder or implementation-stub markers were found in the scanned changed source, test and workflow files.
+No implementation stubs, unreferenced `TBD`/`FIXME`/`XXX` debt markers, empty production paths or user-visible placeholder outputs were found in the Phase 8 implementation and test files. A documentation reference to placeholder registrations describes a configuration case and does not represent an empty implementation.
 
 ### Human Verification Required
 
-None — the Phase 8 behavior is covered by deterministic local tests and automated hosted RetroArch checks. No owner-hardware check is required.
+None. The user-facing runner and host save flows have deterministic integration coverage, and the real RetroArch continuation path is covered by required hosted CI. No hardware-only result is part of the Phase 8 goal.
 
 ### Gaps Summary
 
-No gaps found. Phase 8 meets all five roadmap success criteria and all five SAVE requirements. Phase PR CI and release PR/main CI remain ship-time gates.
-
-### CI Efficiency Review
-
-The exact-head claim-true run completed the required matrix; the BE32 leg remained the critical path at about 65m39s. The stable-state-size preflight ran before the long Linux build/test job and completed in about nine seconds. The report-only perf job skipped on a manual dispatch without a comparison ref; PR perf gating remains enabled. A duplicate act run was not useful because the local CMake workflow and exact-head hosted matrix already covered the reproducible and hosted-only portions. No additional coverage-preserving speed change was supported by these runs; the measured bottleneck and existing preflight are recorded for future CI work.
-
-## Verification Metadata
-
-**Verification approach:** Goal-backward against the five Phase 8 roadmap success criteria, all plan must-haves, and SAVE-01 through SAVE-05.
-**Automated checks:** 24/24 focused tests passed in 5.13 seconds; plan artifact checks passed 40/40; the exact-head required hosted matrix and RetroArch continuation step passed.
-**Human checks required:** None.
-**Total verification time:** Approximately 12 minutes including source tracing and report generation; the focused local command took 5.13 seconds.
+No gaps found. All five roadmap success criteria, the six distinct plan-specific truths, all 40 declared artifacts, all 16 key links and all five SAVE requirements are verified on the released source tree.
 
 ---
-Verified: 2026-11-19T23:04:05Z
-Verifier: Codex, applying the gsd-verifier workflow inline during recovery
+
+_Verified: 2026-11-25T01:56:17Z_
+_Verifier: the gsd-verifier agent_

@@ -55,9 +55,9 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 - [x] **SIO-02**: The mouse protocol reports deterministic frame-latched integer movement and buttons with documented saturation/reset behavior, tested through serial vectors and the libretro input mapping.
 - [x] **SIO-03**: neGcon and Jogcon report their documented serial/configuration modes and frame-latched integer controls with bounded, deterministic protocol tests; unsupported modes fail explicitly.
 - [x] **SIO-04**: Dual Analog flight mode reports its documented analog axes/buttons through the existing size-tagged input boundary and libretro mapping, without changing the behavior of existing digital-pad or DualShock callers.
-- [ ] **SIO-05**: Every delivered controller class uses the official libretro device/subclass identifiers and a public, documented mapping; the host latches input at a frame boundary and does not add device or window code to the deliverables.
-- [ ] **GUN-01**: GunCon and Justifier serial protocols report trigger, reload/offscreen and coordinate state using deterministic GPU beam timestamps and a documented brightness threshold; tests cover bright, dark, edge and offscreen samples plus interrupt timing.
-- [ ] **GUN-02**: Light-gun inputs map through available libretro pointer/lightgun controls; missing host input is reported as unsupported and cannot create a false hit. No physical device or owner hardware capture is required by CI.
+- [x] **SIO-05**: Every delivered controller class uses the official libretro device/subclass identifiers and a public, documented mapping; the host latches input at a frame boundary and does not add device or window code to the deliverables.
+- [x] **GUN-01**: GunCon and Justifier serial protocols report trigger, reload/offscreen and coordinate state using deterministic GPU beam timestamps and a documented brightness threshold; tests cover bright, dark, edge and offscreen samples plus interrupt timing.
+- [x] **GUN-02**: Light-gun inputs map through available libretro pointer/lightgun controls; missing host input is reported as unsupported and cannot create a false hit. No physical device or owner hardware capture is required by CI.
 
 ### ROM-hacker support and compatibility claims
 
@@ -111,9 +111,9 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | SIO-02 | Phase 14 | Complete |
 | SIO-03 | Phase 14 | Complete |
 | SIO-04 | Phase 14 | Complete |
-| GUN-01 | Phase 15 | Pending |
-| GUN-02 | Phase 15 | Pending |
-| SIO-05 | Phase 15 | Pending |
+| GUN-01 | Phase 15 | Complete |
+| GUN-02 | Phase 15 | Complete |
+| SIO-05 | Phase 15 | Complete |
 | PATCH-01 | Phase 16 | Pending |
 | CHEAT-01 | Phase 16 | Pending |
 | COMPAT-01 | Phase 16 | Pending |

@@ -1261,6 +1261,484 @@ static void special_negcon(void)
     negcon_instance_isolation();
 }
 
+static uint32_t gun_tap_count;
+static uint32_t gun_tap_failures;
+
+static void gun_tap_check(int passed, const char *name)
+{
+    gun_tap_count++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_tap_count, name);
+    if (passed == 0) {
+        fprintf(stderr, "gun latch assertion failed: %s\n", name);
+        gun_tap_failures++;
+    }
+}
+
+static int gun_records_equal(const schway_gun_input *actual, const schway_gun_input *expected)
+{
+    return memcmp(actual, expected, sizeof *actual) == 0;
+}
+
+static void seed_gun_observation(schway *inst, uint32_t port)
+{
+    inst->pad.gun_enabled[port] = 1u;
+    inst->pad.gun_result_x[port] = 123u;
+    inst->pad.gun_result_y[port] = 45u;
+    inst->pad.gun_result_valid[port] = 1u;
+    inst->gpu.gun_sensor[port].armed = 1u;
+    inst->gpu.gun_sensor[port].consumed = 1u;
+    inst->gpu.gun_sensor[port].aim_x = 123;
+    inst->gpu.gun_sensor[port].aim_y = 45;
+    inst->gpu.gun_sensor[port].target_line = 34u;
+    inst->gpu.gun_sensor[port].target_clock = 56u;
+    inst->gpu.gun_sensor[port].deadline = inst->ticks + 100u;
+    inst->gpu.gun_sensor[port].phase = 7u;
+}
+
+static int gun_state_cleared(const schway *inst, uint32_t port)
+{
+    const schway_gun_input zero = {0};
+    const struct schway__gpu_gun_sensor *sensor = &inst->gpu.gun_sensor[port];
+    return gun_records_equal(&inst->pad.gun_input[port], &zero) &&
+           inst->pad.gun_enabled[port] == 0u && inst->pad.gun_result_x[port] == 0u &&
+           inst->pad.gun_result_y[port] == 0u && inst->pad.gun_result_valid[port] == 0u &&
+           sensor->armed == 0u && sensor->consumed == 0u && sensor->aim_x == 0 &&
+           sensor->aim_y == 0 && sensor->target_line == 0u && sensor->target_clock == 0u &&
+           sensor->deadline == UINT64_MAX && sensor->phase == 0u;
+}
+
+static int gun_latch(void)
+{
+    gun_tap_count = 0u;
+    gun_tap_failures = 0u;
+    puts("TAP version 13");
+    schway *inst = make();
+    schway *other = make();
+    size_t fixed_state_end = offsetof(struct schway__pad, pending_valid) +
+                             sizeof inst->pad.pending_valid;
+    size_t required_size = fixed_state_end +
+                           2u * sizeof(schway_gun_input) + 2u * sizeof(uint8_t);
+    gun_tap_check(sizeof inst->pad >= required_size,
+                  "pad reserves two fixed gun records and two observation results");
+    size_t gpu_state_end = offsetof(struct schway__gpu, busy_until) +
+                           sizeof inst->gpu.busy_until;
+    size_t sensor_state_bytes = 2u * (7u * sizeof(uint32_t) + sizeof(uint64_t));
+    gun_tap_check(sizeof inst->gpu >= gpu_state_end + sensor_state_bytes,
+                  "GPU reserves fixed event timing state for both direct ports");
+    gun_tap_check(inst->gpu.gun_sensor[0].deadline == UINT64_MAX &&
+                      inst->gpu.gun_sensor[1].deadline == UINT64_MAX,
+                  "both GPU sensor deadlines start inactive");
+    schway_input first;
+    memset(&first, 0, sizeof first);
+    first.size = (uint32_t)sizeof first;
+    first.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    first.device[1] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    first.guns[0].x = 0;
+    first.guns[0].y = 0;
+    first.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    first.guns[1].x = 123;
+    first.guns[1].y = 77;
+    first.guns[1].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_OFFSCREEN;
+    gun_tap_check(schway_set_input(inst, &first) == SCHWAY_STATUS_OK,
+                  "API accepts independent direct-port gun records");
+    gun_tap_check(inst->pad.gun_input[0].flags == 0u &&
+                      inst->pad.device[0] == SCHWAY_INPUT_DEVICE_DIGITAL,
+                  "host submission remains pending before frame start");
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.pending_valid == 0u &&
+                      inst->pad.device[0] == SCHWAY_INPUT_DEVICE_GUNCON &&
+                      inst->pad.device[1] == SCHWAY_INPUT_DEVICE_JUSTIFIER,
+                  "selected gun devices latch with the frame snapshot");
+    gun_tap_check(gun_records_equal(&inst->pad.gun_input[0], &first.guns[0]) &&
+                      gun_records_equal(&inst->pad.gun_input[1], &first.guns[1]),
+                  "coordinates, validity, trigger and offscreen flags latch together");
+    gun_tap_check(inst->pad.gun_result_valid[0] == 0u &&
+                      inst->pad.gun_result_valid[1] == 0u,
+                  "new host snapshot cannot reuse prior pad observations");
+
+    schway_input second = first;
+    second.guns[0].x = 39;
+    second.guns[0].y = 51;
+    second.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    gun_tap_check(schway_set_input(inst, &second) == SCHWAY_STATUS_OK,
+                  "second in-frame host snapshot is accepted");
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.pending_valid != 0u &&
+                      gun_records_equal(&inst->pad.gun_input[0], &first.guns[0]),
+                  "repeated start cannot apply a mid-frame gun update");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.pending_valid == 0u &&
+                      gun_records_equal(&inst->pad.gun_input[0], &second.guns[0]) &&
+                      gun_records_equal(&inst->pad.gun_input[1], &second.guns[1]),
+                  "complete second snapshot applies at the next frame start");
+
+    seed_gun_observation(inst, 0u);
+    schway_input digital;
+    memset(&digital, 0, sizeof digital);
+    digital.size = (uint32_t)sizeof digital;
+    digital.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    gun_tap_check(schway_set_input(inst, &digital) == SCHWAY_STATUS_OK,
+                  "ordinary controller selection is accepted");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(gun_state_cleared(inst, 0u),
+                  "switching to a digital pad clears gun input and result");
+
+    seed_gun_observation(inst, 0u);
+    digital.device[0] = SCHWAY_INPUT_DEVICE_NONE;
+    gun_tap_check(schway_set_input(inst, &digital) == SCHWAY_STATUS_OK,
+                  "empty port selection is accepted");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(gun_state_cleared(inst, 0u),
+                  "switching to no device clears shot and protocol state");
+
+    schway_input valid_again;
+    memset(&valid_again, 0, sizeof valid_again);
+    valid_again.size = (uint32_t)sizeof valid_again;
+    valid_again.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    seed_gun_observation(inst, 0u);
+    gun_tap_check(schway_set_input(inst, &valid_again) == SCHWAY_STATUS_OK,
+                  "gun can be selected again after clearing");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(gun_state_cleared(inst, 0u),
+                  "reselection without valid aim does not replay the previous shot");
+
+    schway_input legacy;
+    memset(&legacy, 0, sizeof legacy);
+    legacy.size = (uint32_t)offsetof(schway_input, guns);
+    legacy.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    seed_gun_observation(inst, 0u);
+    gun_tap_check(schway_set_input(inst, &legacy) == SCHWAY_STATUS_OK,
+                  "frozen API v9 input size remains accepted");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.device[0] == SCHWAY_INPUT_DEVICE_DIGITAL &&
+                      gun_state_cleared(inst, 0u),
+                  "old-size callers clear gun availability");
+
+    schway_input other_input;
+    memset(&other_input, 0, sizeof other_input);
+    other_input.size = (uint32_t)sizeof other_input;
+    other_input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    other_input.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    other_input.guns[0].x = 17;
+    other_input.guns[0].y = 18;
+    other_input.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    other_input.guns[1].x = 91;
+    other_input.guns[1].y = 92;
+    other_input.guns[1].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    gun_tap_check(schway_set_input(other, &other_input) == SCHWAY_STATUS_OK,
+                  "second emulator instance accepts its own records");
+    schway__pad_frame_start(other);
+    gun_tap_check(gun_records_equal(&other->pad.gun_input[0], &other_input.guns[0]) &&
+                      gun_records_equal(&other->pad.gun_input[1], &other_input.guns[1]) &&
+                      inst->pad.gun_input[0].flags == 0u && inst->pad.gun_input[1].flags == 0u,
+                  "ports and emulator instances retain independent snapshots");
+
+    seed_gun_observation(other, 0u);
+    seed_gun_observation(other, 1u);
+    schway__pad_set_connected(other, 0u, 1u);
+    gun_tap_check(gun_state_cleared(other, 0u) &&
+                      other->pad.gun_result_valid[1] == 1u &&
+                      other->gpu.gun_sensor[1].armed == 1u &&
+                      other->gpu.gun_sensor[1].deadline == other->ticks + 100u,
+                  "invalidating one direct port preserves the other sensor");
+
+    seed_gun_observation(other, 1u);
+    gun_tap_check(schway_reset(other, SCHWAY_RESET_POWER) == SCHWAY_STATUS_OK,
+                  "power reset completes");
+    gun_tap_check(gun_state_cleared(other, 1u),
+                  "power reset clears latched input and pad protocol state");
+    schway_destroy(inst);
+    schway_destroy(other);
+    printf("1..%u\n", gun_tap_count);
+    return gun_tap_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
+static uint32_t gun_state_checks;
+static uint32_t gun_state_failures;
+
+static void gun_state_check(int passed, const char *name)
+{
+    gun_state_checks++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_state_checks, name);
+    if (passed == 0) {
+        fprintf(stderr, "gun state assertion failed: %s\n", name);
+        gun_state_failures++;
+    }
+}
+
+static int gun_state(void)
+{
+    gun_state_checks = 0u;
+    gun_state_failures = 0u;
+    puts("TAP version 13");
+    schway *source = make();
+    schway *restored = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.guns[0].x = 31;
+    input.guns[0].y = 45;
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    latch_input(source, &input);
+    configure_sio_port(source, 0u);
+
+    uint64_t byte_start = source->ticks;
+    gun_state_check(exchange(source, 0x01u, 0) == 0xFFu,
+                    "GunCon address byte completes before its pending ACK");
+    size_t state_size = schway_state_size(source);
+    uint8_t *saved = state_size != 0u ? (uint8_t *)malloc(state_size) : NULL;
+    uint8_t *pending_saved = state_size != 0u ? (uint8_t *)malloc(state_size) : NULL;
+    gun_state_check(saved != NULL && pending_saved != NULL,
+                    "state buffers are sized for the active instance");
+    if (source == NULL || restored == NULL || saved == NULL || pending_saved == NULL) {
+        free(saved);
+        free(pending_saved);
+        schway_destroy(source);
+        schway_destroy(restored);
+        printf("1..%u\n", gun_state_checks);
+        return 1;
+    }
+
+    schway_status saved_status = schway_save_state(source, saved, state_size);
+    gun_state_check(saved_status == SCHWAY_STATUS_OK,
+                    "save accepts a GunCon poll during the address ACK window");
+    schway_input pending = input;
+    pending.guns[0].x = 90;
+    gun_state_check(schway_set_input(source, &pending) == SCHWAY_STATUS_OK,
+                    "a new host snapshot can wait while the current poll is active");
+    gun_state_check(schway_save_state(source, pending_saved, state_size) == SCHWAY_STATUS_OK &&
+                        memcmp(saved, pending_saved, state_size) == 0,
+                    "pending host input does not change serialized bytes");
+    schway_status loaded_status = schway_load_state(restored, saved, state_size);
+    gun_state_check(loaded_status == SCHWAY_STATUS_OK,
+                    "load restores the GunCon device and in-flight ACK state");
+    if (saved_status == SCHWAY_STATUS_OK && loaded_status == SCHWAY_STATUS_OK) {
+        advance_to(source, byte_start + 1494u);
+        advance_to(restored, byte_start + 1494u);
+        gun_state_check(read_mmio(source, JOY_STAT, 4u) == read_mmio(restored, JOY_STAT, 4u),
+                        "restored address ACK status matches uninterrupted execution");
+        uint8_t source_id = exchange(source, 0x42u, 0);
+        uint8_t restored_id = exchange(restored, 0x42u, 0);
+        gun_state_check(source_id == 0x63u && restored_id == source_id,
+                        "restored serial continuation returns the same GunCon ID");
+    }
+
+    free(saved);
+    free(pending_saved);
+    schway_destroy(source);
+    schway_destroy(restored);
+    printf("1..%u\n", gun_state_checks);
+    return gun_state_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
+static uint32_t gun_protocol_count;
+static uint32_t gun_protocol_failures;
+
+static void gun_protocol_check(int passed, const char *name)
+{
+    gun_protocol_count++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_protocol_count, name);
+    if (passed == 0) {
+        fprintf(stderr, "Gun protocol assertion failed: %s\n", name);
+        gun_protocol_failures++;
+    }
+}
+
+static void guncon_capture(schway *inst, uint32_t port, const char *label, uint8_t payload[6])
+{
+    char name[96];
+    configure_sio_port(inst, port);
+    gun_protocol_check(exchange(inst, 0x01u, 1) == 0xFFu, "GunCon poll address reply");
+    uint8_t id = exchange(inst, 0x42u, 1);
+    (void)snprintf(name, sizeof name, "%s keeps the GunCon ID", label);
+    gun_protocol_check(id == 0x63u, name);
+    gun_protocol_check(exchange(inst, 0x00u, 1) == 0x5Au, "GunCon poll delimiter");
+    for (uint32_t i = 0u; i < 6u; i++) {
+        payload[i] = exchange(inst, 0u, i < 5u);
+    }
+    (void)snprintf(name, sizeof name, "%s has no final ACK", label);
+    gun_protocol_check((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u, name);
+}
+
+static int gun_guncon(void)
+{
+    gun_protocol_count = 0u;
+    gun_protocol_failures = 0u;
+    puts("TAP version 13");
+
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.buttons[0] = (uint16_t)((1u << 3) | (1u << 14));
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    input.guns[1].flags = SCHWAY_GUN_INPUT_VALID;
+    latch_input(inst, &input);
+    inst->pad.gun_result_valid[0] = 1u;
+    inst->pad.gun_result_x[0] = UINT16_C(0x0123);
+    inst->pad.gun_result_y[0] = UINT16_C(0x0045);
+    inst->pad.gun_result_valid[1] = 1u;
+    inst->pad.gun_result_x[1] = UINT16_C(0xABCD);
+    inst->pad.gun_result_y[1] = UINT16_C(0x1357);
+
+    static const uint8_t expected[2][6] = {
+        {0xF7u, 0x9Fu, 0x23u, 0x01u, 0x45u, 0x00u},
+        {0xFFu, 0xFFu, 0xCDu, 0xABu, 0x57u, 0x13u},
+    };
+    static const char *const names[2][6] = {
+        {"port 1 A button", "port 1 trigger and B buttons", "port 1 X low byte",
+         "port 1 X high byte", "port 1 Y low byte", "port 1 Y high byte"},
+        {"port 2 released buttons", "port 2 released trigger", "port 2 X low byte",
+         "port 2 X high byte", "port 2 Y low byte", "port 2 Y high byte"},
+    };
+
+    for (uint32_t port = 0u; port < 2u; port++) {
+        configure_sio_port(inst, port);
+        gun_protocol_check(exchange(inst, 0x01u, 1) == 0xFFu,
+                           port == 0u ? "port 1 address ACK reply" : "port 2 address ACK reply");
+        gun_protocol_check(exchange(inst, 0x42u, 1) == 0x63u,
+                           port == 0u ? "port 1 GunCon ID" : "port 2 GunCon ID");
+        gun_protocol_check(exchange(inst, 0x00u, 1) == 0x5Au,
+                           port == 0u ? "port 1 poll delimiter" : "port 2 poll delimiter");
+        for (uint32_t i = 0u; i < 6u; i++) {
+            uint8_t actual = exchange(inst, 0u, i < 5u);
+            gun_protocol_check(actual == expected[port][i], names[port][i]);
+        }
+        gun_protocol_check((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u,
+                           port == 0u ? "port 1 final reply has no ACK" :
+                                        "port 2 final reply has no ACK");
+    }
+
+    schway_input no_light;
+    memset(&no_light, 0, sizeof no_light);
+    no_light.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    no_light.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    latch_input(inst, &no_light);
+    uint8_t reply[6];
+    static const uint8_t unavailable_coordinates[4] = {0x01u, 0x00u, 0x0Au, 0x00u};
+    guncon_capture(inst, 0u, "unavailable input", reply);
+    gun_protocol_check(memcmp(&reply[2], unavailable_coordinates,
+                              sizeof unavailable_coordinates) == 0,
+                       "unavailable sensor uses selected deterministic no-light response");
+
+    no_light.guns[0].x = 320;
+    no_light.guns[0].y = 200;
+    no_light.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    latch_input(inst, &no_light);
+    guncon_capture(inst, 0u, "dark valid cursor", reply);
+    gun_protocol_check(memcmp(&reply[2], unavailable_coordinates,
+                              sizeof unavailable_coordinates) == 0,
+                       "valid aim without a light sample returns the no-light response");
+
+    no_light.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER |
+                             SCHWAY_GUN_INPUT_RELOAD;
+    latch_input(inst, &no_light);
+    guncon_capture(inst, 0u, "explicit reload", reply);
+    static const uint8_t reload_payload[6] = {0xFFu, 0xDFu, 0x01u, 0x00u, 0x05u, 0x00u};
+    gun_protocol_check(memcmp(reply, reload_payload, sizeof reload_payload) == 0,
+                       "reload response overrides aim while preserving the pressed trigger");
+    uint8_t repeated[6];
+    guncon_capture(inst, 0u, "repeated reload", repeated);
+    gun_protocol_check(memcmp(reply, repeated, sizeof reply) == 0,
+                       "repeated reload polls return identical bytes");
+
+    configure_sio_port(inst, 0u);
+    (void)exchange(inst, 0x01u, 1);
+    (void)exchange(inst, 0x42u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    schway__pad_abort(inst, 0u);
+    guncon_capture(inst, 0u, "aborted partial poll", repeated);
+    gun_protocol_check(memcmp(reply, repeated, sizeof reply) == 0,
+                       "aborted partial poll cannot leave stale response bytes");
+
+    schway_destroy(inst);
+    printf("1..%u\n", gun_protocol_count);
+    return gun_protocol_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
+static void gun_justifier_begin(schway *inst, int verify_header)
+{
+    configure_sio_port(inst, 0u);
+    (void)exchange(inst, 0x01u, 1);
+    uint8_t id = exchange(inst, 0x42u, 1);
+    uint8_t delimiter = exchange(inst, 0x00u, 1);
+    if (verify_header != 0) {
+        gun_protocol_check(id == 0x31u, "Justifier reports ID 31h");
+        gun_protocol_check(delimiter == 0x5Au, "Justifier poll delimiter");
+    }
+}
+
+static int gun_justifier(void)
+{
+    gun_protocol_count = 0u;
+    gun_protocol_failures = 0u;
+    puts("TAP version 13");
+
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    input.buttons[0] = (uint16_t)((1u << 3) | (1u << 14));
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    latch_input(inst, &input);
+
+    gun_justifier_begin(inst, 1);
+    uint8_t low = exchange(inst, 0x00u, 1);
+    uint8_t high = exchange(inst, 0x00u, 0);
+    gun_protocol_check(low == 0xF7u && high == 0x3Fu,
+                       "Justifier reports active-low start, back and trigger bits");
+    gun_protocol_check((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u,
+                       "Justifier button word has no final ACK");
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "Justifier sensing starts disabled");
+
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x10u, 1);
+    schway__pad_abort(inst, 0u);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "partial enable poll does not commit sensing");
+
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x10u, 1);
+    (void)exchange(inst, 0x00u, 0);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 1u,
+                       "complete 10h poll enables sensing");
+
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 0);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "complete zero-control poll disables sensing");
+
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "power reset clears Justifier sensing");
+    latch_input(inst, &input);
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x10u, 1);
+    (void)exchange(inst, 0x00u, 0);
+    schway_input digital;
+    memset(&digital, 0, sizeof digital);
+    digital.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    latch_input(inst, &digital);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u &&
+                           inst->gpu.gun_sensor[0].armed == 0u &&
+                           inst->pad.gun_result_valid[0] == 0u,
+                       "device change clears Justifier sensing and stale shot state");
+
+    schway_destroy(inst);
+    printf("1..%u\n", gun_protocol_count);
+    return gun_protocol_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -1287,6 +1765,14 @@ int main(int argc, char **argv)
         special_flight();
     } else if (strcmp(argv[1], "special_jogcon") == 0) {
         special_jogcon();
+    } else if (strcmp(argv[1], "gun_latch") == 0) {
+        return gun_latch();
+    } else if (strcmp(argv[1], "gun_state") == 0) {
+        return gun_state();
+    } else if (strcmp(argv[1], "gun_guncon") == 0) {
+        return gun_guncon();
+    } else if (strcmp(argv[1], "gun_justifier") == 0) {
+        return gun_justifier();
     } else {
         return 2;
     }

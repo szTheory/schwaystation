@@ -1,7 +1,9 @@
 # Controllers and multitap
 
 The libretro core accepts the standard DualShock (ANALOG), PlayStation Controller (JOYPAD), and None devices.
-Its two multitap options are disabled by default and take effect when content is loaded or reloaded:
+It also offers GunCon and Justifier on direct physical ports. Their choices are omitted on a port with a
+multitap, including its socket A. The multitap options are disabled by default and take effect when content
+is loaded or reloaded:
 
 | Core option | Values | Default | Effect |
 | --- | --- | --- | --- |
@@ -34,6 +36,21 @@ subclasses use the vendored libretro formula `RETRO_DEVICE_SUBCLASS(RETRO_DEVICE
 | Mouse | Mouse X/Y are relative signed values and left/right buttons map to the PS1 mouse buttons. The adapter preserves each signed callback value; the core saturates movement to the device's −128 to +127 report range. A missing callback supplies zero movement and released buttons. |
 | neGcon | RetroPad Start, D-pad, R shoulder, B face button, and A face button map to the neGcon button word. Left-stick X maps linearly across 0–255 to twist. The positive side of right-stick Y, inverted, drives I pressure; the positive side of right-stick X drives II pressure. L2 drives L as 0 or 255. Pressure inputs have no extra curve or deadzone. |
 | Jogcon | Uses the neGcon button mapping. Left-stick X supplies the raw signed dial word: its 16-bit pattern is retained with bit 0 cleared, and a negative or positive value sets the corresponding direction flag. Zero clears both flags. No force-feedback behavior is inferred. |
+| GunCon (`RETRO_DEVICE_LIGHTGUN`) | Polls base LIGHTGUN Screen X/Y, Trigger, Offscreen, Reload, AUX A and AUX B once per frame. AUX A/B drive the GunCon A/B bits. Coordinates map signed libretro screen positions to the current active output pixels; `(0, 0)` is the center. |
+| Justifier (`RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2)`) | Polls the same base LIGHTGUN device. Trigger drives the trigger bit, Start drives Start, and Select drives Back. Reload and Offscreen remain distinct from aim. |
+
+When the frontend does not advertise LIGHTGUN but does advertise POINTER, either gun choice uses base POINTER
+X/Y, PRESSED and IS_OFFSCREEN. LIGHTGUN takes precedence when both device types are available. POINTER PRESSED
+maps to the trigger; POINTER IS_OFFSCREEN invalidates aim, and POINTER has no separate forced-reload control.
+The LIGHTGUN range `−32768…32767` and POINTER range `−32767…32767` map with integer nearest rounding onto
+pixel coordinates `0…extent−1`. The adapter keeps aim, selected gun, trigger and offscreen/reload flags in one
+frame-latched input snapshot.
+
+The frontend must provide `input_state` and advertise LIGHTGUN or POINTER. Without either, the core logs an
+unsupported transition when a log interface is available, submits no valid gun input, and cannot register a
+sensor hit. Libretro's capability bit covers device types only; it does not say which individual controls are
+present. A zero from `input_state` therefore means neutral and cannot identify an absent control. Zero X/Y
+remains valid centered aim when the device type is supported, while a zero trigger is released.
 
 These mappings are host controls chosen for remapping convenience. The emulated core receives integer values and
 does not apply additional curves, deadzones, or physical-dial response models.

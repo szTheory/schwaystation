@@ -48,10 +48,53 @@ static const char name_watchdogs[SCHWAY__PAD_ENDPOINT_COUNT][sizeof "pad.watchdo
     "pad.watchdog0", "pad.watchdog1", "pad.watchdog2", "pad.watchdog3",
     "pad.watchdog4", "pad.watchdog5", "pad.watchdog6", "pad.watchdog7"};
 static const char name_transfers[] = "pad.transfers";
+static const char name_gun_x[2][sizeof "pad.gun0.x"] = {"pad.gun0.x", "pad.gun1.x"};
+static const char name_gun_y[2][sizeof "pad.gun0.y"] = {"pad.gun0.y", "pad.gun1.y"};
+static const char name_gun_flags[2][sizeof "pad.gun0.flags"] = {
+    "pad.gun0.flags", "pad.gun1.flags"};
+static const char name_gun_reserved[2][sizeof "pad.gun0.reserved"] = {
+    "pad.gun0.reserved", "pad.gun1.reserved"};
+static const char name_gun_result_x[] = "pad.gun_result_x";
+static const char name_gun_result_y[] = "pad.gun_result_y";
+static const char name_gun_result_valid[] = "pad.gun_valid";
+static const char name_gun_enabled[] = "pad.gun_enabled";
+
+static int32_t state_i32(struct schway__state_io *io, const char *name, int32_t *value)
+{
+    if (io->mode == SCHWAY__STATE_VISIT) {
+        io->visitor(io->user, name, value, 1u, 4u);
+        return *value;
+    }
+    uint32_t raw;
+    memcpy(&raw, value, sizeof raw);
+    raw = schway__state_u32(io, name, &raw, 0u, UINT32_MAX);
+    int32_t decoded;
+    memcpy(&decoded, &raw, sizeof decoded);
+    if (io->mode == SCHWAY__STATE_APPLY) {
+        memcpy(value, &raw, sizeof raw);
+    }
+    return decoded;
+}
 
 static uint64_t deadline_after(uint64_t now, uint64_t delta)
 {
     return now > SCHWAY__STATE_TICKS_MAX - delta ? SCHWAY__STATE_TICKS_MAX : now + delta;
+}
+
+static void pad_clear_gun_observation(schway *inst, uint32_t port)
+{
+    inst->pad.gun_result_x[port] = 0u;
+    inst->pad.gun_result_y[port] = 0u;
+    inst->pad.gun_result_valid[port] = 0u;
+    memset(&inst->gpu.gun_sensor[port], 0, sizeof inst->gpu.gun_sensor[port]);
+    inst->gpu.gun_sensor[port].deadline = UINT64_MAX;
+}
+
+static void pad_clear_gun(schway *inst, uint32_t port)
+{
+    memset(&inst->pad.gun_input[port], 0, sizeof inst->pad.gun_input[port]);
+    inst->pad.gun_enabled[port] = 0u;
+    pad_clear_gun_observation(inst, port);
 }
 
 void schway__pad_reset(schway *inst)
@@ -70,6 +113,9 @@ void schway__pad_reset(schway *inst)
             inst->pad.rumble_map[index] = 0xFFu;
             inst->pad.rumble_map_stage[index] = 0xFFu;
         }
+    }
+    for (uint32_t port = 0u; port < 2u; port++) {
+        pad_clear_gun(inst, port);
     }
 }
 
@@ -104,6 +150,9 @@ void schway__pad_set_buttons(schway *inst, uint32_t port, uint16_t buttons)
 void schway__pad_set_connected(schway *inst, uint32_t port, uint32_t connected)
 {
     if (port < SCHWAY__PAD_ENDPOINT_COUNT) {
+        if (port < 2u) {
+            pad_clear_gun(inst, port);
+        }
         inst->pad.present[port] = connected != 0u ? 1u : 0u;
         inst->pad.device[port] = connected != 0u ? SCHWAY_INPUT_DEVICE_DIGITAL
                                                  : SCHWAY_INPUT_DEVICE_NONE;
@@ -138,6 +187,20 @@ void schway__pad_frame_start(schway *inst)
     if (inst->pad.pending_valid != 0u) {
         for (uint32_t port = 0u; port < 2u; port++) {
             inst->pad.multitap[port] = (uint8_t)inst->pad.pending_input.multitap[port];
+            uint32_t input_device = inst->pad.multitap[port] != 0u
+                                        ? inst->pad.pending_input.controllers[port][0].device
+                                        : inst->pad.pending_input.device[port];
+            if (inst->pad.multitap[port] == 0u &&
+                (input_device == SCHWAY_INPUT_DEVICE_GUNCON ||
+                 input_device == SCHWAY_INPUT_DEVICE_JUSTIFIER)) {
+                if (inst->pad.device[port] != input_device) {
+                    inst->pad.gun_enabled[port] = 0u;
+                }
+                inst->pad.gun_input[port] = inst->pad.pending_input.guns[port];
+                pad_clear_gun_observation(inst, port);
+            } else {
+                pad_clear_gun(inst, port);
+            }
             for (uint32_t socket = 0u; socket < 4u; socket++) {
                 uint32_t endpoint = socket == 0u ? port : 2u + port * 3u + socket - 1u;
                 const schway_controller_input *controller =
@@ -263,6 +326,14 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     uint8_t saved_analog[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_mouse_startup_ack[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_multitap[2];
+    int32_t saved_gun_x[2];
+    int32_t saved_gun_y[2];
+    uint32_t saved_gun_flags[2];
+    uint32_t saved_gun_reserved[2];
+    uint16_t saved_gun_result_x[2];
+    uint16_t saved_gun_result_y[2];
+    uint8_t saved_gun_result_valid[2];
+    uint8_t saved_gun_enabled[2];
     uint8_t saved_map[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     uint8_t saved_map_stage[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     const uint8_t *read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
@@ -316,7 +387,7 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_device, inst->pad.device,
                            SCHWAY__PAD_ENDPOINT_COUNT, SCHWAY_INPUT_DEVICE_NONE,
-                           SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT);
+                           SCHWAY_INPUT_DEVICE_JUSTIFIER);
     if (read_bytes != NULL) {
         memcpy(saved_device, read_bytes, sizeof saved_device);
     }
@@ -406,6 +477,44 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     }
     (void)schway__state_u64(io, name_transfers, &inst->pad.transfers, 0u,
                             SCHWAY__STATE_TICKS_MAX);
+    for (uint32_t port = 0u; port < 2u; port++) {
+        saved_gun_x[port] = state_i32(io, name_gun_x[port], &inst->pad.gun_input[port].x);
+        saved_gun_y[port] = state_i32(io, name_gun_y[port], &inst->pad.gun_input[port].y);
+        saved_gun_flags[port] = schway__state_u32(
+            io, name_gun_flags[port], &inst->pad.gun_input[port].flags, 0u,
+            SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER |
+                SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD);
+        saved_gun_reserved[port] = schway__state_u32(
+            io, name_gun_reserved[port], &inst->pad.gun_input[port].reserved0, 0u, 0u);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u16_array(io, name_gun_result_x, inst->pad.gun_result_x, 2u, 0u, UINT16_MAX);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_result_x, read_bytes, sizeof saved_gun_result_x);
+    } else {
+        memcpy(saved_gun_result_x, inst->pad.gun_result_x, sizeof saved_gun_result_x);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u16_array(io, name_gun_result_y, inst->pad.gun_result_y, 2u, 0u, UINT16_MAX);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_result_y, read_bytes, sizeof saved_gun_result_y);
+    } else {
+        memcpy(saved_gun_result_y, inst->pad.gun_result_y, sizeof saved_gun_result_y);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u8_array(io, name_gun_result_valid, inst->pad.gun_result_valid, 2u, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_result_valid, read_bytes, sizeof saved_gun_result_valid);
+    } else {
+        memcpy(saved_gun_result_valid, inst->pad.gun_result_valid, sizeof saved_gun_result_valid);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u8_array(io, name_gun_enabled, inst->pad.gun_enabled, 2u, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_enabled, read_bytes, sizeof saved_gun_enabled);
+    } else {
+        memcpy(saved_gun_enabled, inst->pad.gun_enabled, sizeof saved_gun_enabled);
+    }
     for (uint32_t port = 0u; port < SCHWAY__PAD_ENDPOINT_COUNT; port++) {
         uint32_t physical_port = port < 2u ? port : (port < 5u ? 0u : 1u);
         int tap_socket = port >= 2u;
@@ -417,6 +526,27 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
         }
         schway__state_check(io, saved_present[port] ==
                                     (saved_device[port] != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u));
+        if (tap_socket != 0) {
+            schway__state_check(io, saved_device[port] != SCHWAY_INPUT_DEVICE_GUNCON &&
+                                       saved_device[port] != SCHWAY_INPUT_DEVICE_JUSTIFIER);
+        }
+        if (port < 2u) {
+            uint32_t flags = saved_gun_flags[port];
+            schway__state_check(io, (flags & SCHWAY_GUN_INPUT_VALID) == 0u ||
+                                       (flags & (SCHWAY_GUN_INPUT_OFFSCREEN |
+                                                 SCHWAY_GUN_INPUT_RELOAD)) != 0u ||
+                                       (saved_gun_x[port] >= 0 && saved_gun_y[port] >= 0));
+            uint32_t is_gun = saved_device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
+                              saved_device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER;
+            schway__state_check(io, is_gun != 0u ||
+                                       (flags == 0u && saved_gun_reserved[port] == 0u &&
+                                        saved_gun_result_x[port] == 0u &&
+                                        saved_gun_result_y[port] == 0u &&
+                                        saved_gun_result_valid[port] == 0u &&
+                                        saved_gun_enabled[port] == 0u));
+            schway__state_check(io, saved_gun_enabled[port] == 0u ||
+                                       saved_device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER);
+        }
         schway__state_check(io, saved_mouse_startup_ack[port] == 0u ||
                                     saved_device[port] == SCHWAY_INPUT_DEVICE_MOUSE);
         schway__state_check(io, saved_config[port] == 0u ||
@@ -465,6 +595,12 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
 
 static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
 {
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON) {
+        return 0x63u;
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+        return 0x31u;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 0x53u;
     }
@@ -491,6 +627,7 @@ static uint8_t poll_size(const struct schway__pad *pad, uint32_t port)
          pad->analog_mode[port] != 0u) ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_JOGCON ||
+        pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 6u;
     }
@@ -506,6 +643,57 @@ static void refresh_watchdog(schway *inst, uint32_t port, uint64_t now)
 
 static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t index)
 {
+    if (port >= 2u &&
+        (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER ||
+         pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON)) {
+        return UINT8_MAX;
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+        enum { JUSTIFIER_START = 1u << 3, JUSTIFIER_BACK = 1u << 14,
+               JUSTIFIER_TRIGGER = 1u << 15 };
+        uint16_t buttons = (uint16_t)(pad->buttons[port] |
+                                      (uint16_t)~(JUSTIFIER_START | JUSTIFIER_BACK |
+                                                  JUSTIFIER_TRIGGER));
+        if ((pad->gun_input[port].flags & SCHWAY_GUN_INPUT_TRIGGER) != 0u) {
+            buttons = (uint16_t)(buttons & (uint16_t)~JUSTIFIER_TRIGGER);
+        } else {
+            buttons = (uint16_t)(buttons | JUSTIFIER_TRIGGER);
+        }
+        return index == 0u ? (uint8_t)buttons : (uint8_t)(buttons >> 8);
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON) {
+        /* GunCon 42h fields follow the button and coordinate table in docs/hardware/sio.md. */
+        enum { GUNCON_A = 1u << 3, GUNCON_TRIGGER = 1u << 13, GUNCON_B = 1u << 14 };
+        uint16_t buttons = (uint16_t)(pad->buttons[port] |
+                                      (uint16_t)~(GUNCON_A | GUNCON_TRIGGER | GUNCON_B));
+        if ((pad->gun_input[port].flags & SCHWAY_GUN_INPUT_TRIGGER) != 0u) {
+            buttons = (uint16_t)(buttons & (uint16_t)~GUNCON_TRIGGER);
+        } else {
+            buttons = (uint16_t)(buttons | GUNCON_TRIGGER);
+        }
+        if (index == 0u) {
+            return (uint8_t)buttons;
+        }
+        if (index == 1u) {
+            return (uint8_t)(buttons >> 8);
+        }
+        uint16_t x = pad->gun_result_x[port];
+        uint16_t y = pad->gun_result_y[port];
+        uint32_t flags = pad->gun_input[port].flags;
+        if ((flags & (SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD)) != 0u) {
+            x = 1u;
+            y = 5u;
+        } else if ((flags & SCHWAY_GUN_INPUT_VALID) == 0u ||
+                   pad->gun_result_valid[port] == 0u) {
+            x = 1u;
+            y = 10u;
+        }
+        uint16_t coordinate = index < 4u ? x : y;
+        if (index == 2u || index == 4u) {
+            return (uint8_t)coordinate;
+        }
+        return (uint8_t)(coordinate >> 8);
+    }
     if (index == 0u) {
         return (uint8_t)(pad->buttons[port] & 0xFFu);
     }
@@ -613,6 +801,9 @@ static void finish_payload(schway *inst, uint32_t port, uint64_t now)
     struct schway__pad *pad = &inst->pad;
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
+        if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+            pad->gun_enabled[port] = pad->rumble_stage_small[port];
+        }
         if (pad->rumble_locked[port] == 0u && pad->config_mode[port] != 0u) {
             pad->rumble_large[port] = pad->rumble_stage_large[port];
             pad->rumble_small[port] = pad->rumble_stage_small[port];
@@ -651,7 +842,10 @@ static uint8_t pad_payload(schway *inst, uint32_t port, uint8_t sent, uint64_t n
     uint8_t received = command_reply(pad, port, index);
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
-        if (pad->config_mode[port] != 0u) {
+        if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER && index == 0u) {
+            /* Reuse the saved byte staging lane; the enable bit commits with the full poll. */
+            pad->rumble_stage_small[port] = (sent & 0x10u) != 0u ? 1u : 0u;
+        } else if (pad->config_mode[port] != 0u) {
             uint8_t mapping = pad->rumble_map[port * 6u + index];
             if (mapping == 0u) {
                 pad->rumble_stage_small[port] = sent & 1u;
@@ -738,6 +932,9 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
             pad->response_mode[port] = pad->config_mode[port];
             pad->rumble_stage_large[port] = 0u;
             pad->rumble_stage_small[port] = 0u;
+            if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+                pad->rumble_stage_small[port] = pad->gun_enabled[port];
+            }
             *received = pad->config_mode[port] != 0u ? 0xF3u : normal_id(pad, port);
             pad->phase[port] = PAD_ID_END;
             if (pad->config_mode[port] != 0u) {

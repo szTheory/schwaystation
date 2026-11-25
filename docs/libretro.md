@@ -33,6 +33,17 @@ marker; if none is known it uses NTSC-U/C. Conflicting hints are reported throug
 NTSC-J, or PAL overrides the inferred region. Machine and region are independent choices, and both take effect when
 content is loaded or reloaded. Region selection does not establish title compatibility.
 
+## Controller input
+
+Supported controllers, including GunCon and Justifier mappings, are documented in [controllers](controllers.md).
+Lightguns require the frontend's `input_state` callback and either `LIGHTGUN` or `POINTER` device-type capability.
+`LIGHTGUN` takes precedence when both are advertised; the POINTER fallback uses only X/Y, PRESSED and IS_OFFSCREEN,
+so it cannot express forced reload. Libretro does not report support for individual controls, so a neutral zero
+cannot distinguish a missing control from a released one. When neither host device type is available, the core
+logs the transition when a log interface is available and supplies no valid gun aim.
+GunCon and Justifier selections are available only on direct physical ports; multitap sockets do not accept guns.
+The Justifier subclass is a single-player controller mapping and does not claim two-player Justifier support.
+
 ## Disc changes
 
 M3U playlists expose the libretro extended disk-control interface. Ejecting opens the emulated tray; selecting a

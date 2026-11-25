@@ -178,6 +178,24 @@ These constants and edge positions are the documented model derived from PSX-SPX
 choices in `.planning/preparation/DECISIONS.md` (DEC.09 and DEC.10), with architecture details in
 `.planning/preparation/ARCHITECTURE.md`, section one. They are doc/derived, not measured hardware results.
 
+## Light-gun beam sample
+
+A valid direct-port aim schedules one GPU event at its active display pixel. The scheduler advances to that beam
+position and reads the current VRAM pixel there, so a write before the deadline can affect the reading and a later
+write cannot. RGB555 sums the three five-bit channels and ignores bit 15. RGB24 reconstructs the same three packed
+bytes as scanout, reduces each channel by shifting right three bits, then applies the same sum. Both formats report
+light at 48 or above.
+This integer threshold is a deterministic model choice, not a measurement of the optical sensor or a claim of
+retail-game calibration. PSX peripherals notes describe GunCon X as 8 MHz clocks since HSYNC and Y as scanlines since
+VSYNC, but provide no numeric brightness threshold (see `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, section
+2.7).
+
+The output X coordinate is `floor(target_gpu_clock * 107520 / gpu_clock_num(region))`; Y is the target beam line.
+The integer conversion truncates toward zero and uses the same regional GPU clock rates as the beam scheduler. The
+aim must land inside the unpadded active range and the display must be enabled. Rounded scanout row padding does not
+represent additional emitted pixels. These rules describe the current synthetic core model and do not establish
+physical timing accuracy.
+
 ## GPUSTAT field and line status
 
 GPUSTAT bit 13 reports the saved field phase on v2 and reads as zero on v0. A full GPU reset starts the v2 phase at

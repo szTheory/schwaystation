@@ -6,6 +6,7 @@ ci.title.self_test	hygiene
 hygiene.no_bios_bytes.self_test	hygiene
 hygiene.no_float	hygiene
 hygiene.no_float.self_test	hygiene
+hygiene.pre_push_scope	hygiene
 hygiene.timeout_comments	hygiene
 hygiene.timeout_comments.self_test	hygiene
 hygiene.tree	hygiene

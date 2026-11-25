@@ -52,6 +52,22 @@ static const char name_clut_y[] = "gpu.clut_y";
 static const char name_clut_count[] = "gpu.clut_count";
 static const char name_clut_valid[] = "gpu.clut_valid";
 static const char name_busy_until[] = "gpu.busy_until";
+static const char name_gun_armed[2][sizeof "gpu.gun0.armed"] = {
+    "gpu.gun0.armed", "gpu.gun1.armed"};
+static const char name_gun_consumed[2][sizeof "gpu.gun0.consumed"] = {
+    "gpu.gun0.consumed", "gpu.gun1.consumed"};
+static const char name_gun_aim_x[2][sizeof "gpu.gun0.aim_x"] = {
+    "gpu.gun0.aim_x", "gpu.gun1.aim_x"};
+static const char name_gun_aim_y[2][sizeof "gpu.gun0.aim_y"] = {
+    "gpu.gun0.aim_y", "gpu.gun1.aim_y"};
+static const char name_gun_target_line[2][sizeof "gpu.gun0.target_line"] = {
+    "gpu.gun0.target_line", "gpu.gun1.target_line"};
+static const char name_gun_target_clock[2][sizeof "gpu.gun0.target_clock"] = {
+    "gpu.gun0.target_clock", "gpu.gun1.target_clock"};
+static const char name_gun_deadline[2][sizeof "gpu.gun0.deadline"] = {
+    "gpu.gun0.deadline", "gpu.gun1.deadline"};
+static const char name_gun_phase[2][sizeof "gpu.gun0.phase"] = {
+    "gpu.gun0.phase", "gpu.gun1.phase"};
 
 #define GPU_IRQ_BIT 1u
 #define GPU_IRQ_MASK (UINT32_C(1) << GPU_IRQ_BIT)
@@ -78,6 +94,23 @@ static uint32_t gpu_line_clocks(uint32_t region)
 static uint32_t gpu_lines(uint32_t region)
 {
     return region == SCHWAY_REGION_PAL ? 314u : 263u;
+}
+
+static int32_t state_i32(struct schway__state_io *io, const char *name, int32_t *value)
+{
+    if (io->mode == SCHWAY__STATE_VISIT) {
+        io->visitor(io->user, name, value, 1u, 4u);
+        return *value;
+    }
+    uint32_t raw;
+    memcpy(&raw, value, sizeof raw);
+    raw = schway__state_u32(io, name, &raw, 0u, UINT32_MAX);
+    int32_t decoded;
+    memcpy(&decoded, &raw, sizeof decoded);
+    if (io->mode == SCHWAY__STATE_APPLY) {
+        memcpy(value, &raw, sizeof raw);
+    }
+    return decoded;
 }
 
 static uint32_t gpu_dot_divisor(uint32_t mode)
@@ -133,6 +166,134 @@ static uint64_t gpu_clocks_for_ticks(const struct schway__gpu *g, uint32_t regio
     return whole + part / GPU_RATIO_DEN;
 }
 
+static uint32_t gpu_gun_active(const schway *inst, uint32_t port)
+{
+    const schway_gun_input *input = &inst->pad.gun_input[port];
+    const uint32_t invalid = SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD;
+    return (inst->pad.device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
+            inst->pad.device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) &&
+           (input->flags & SCHWAY_GUN_INPUT_VALID) != 0u &&
+           (input->flags & invalid) == 0u && input->x >= 0 && input->y >= 0;
+}
+
+static uint64_t gpu_gun_clocks_to_target(const schway *inst,
+                                        const struct schway__gpu_gun_sensor *sensor)
+{
+    uint64_t line_clocks = gpu_line_clocks(inst->region);
+    uint64_t field_clocks = line_clocks * gpu_lines(inst->region);
+    uint64_t current = (uint64_t)inst->gpu.beam_line * line_clocks +
+                       inst->gpu.beam_line_clock;
+    uint64_t target = (uint64_t)sensor->target_line * line_clocks +
+                      sensor->target_clock;
+    return target >= current ? target - current : field_clocks - current + target;
+}
+
+static void gpu_gun_arm(schway *inst)
+{
+    struct schway__gpu *g = &inst->gpu;
+    struct schway__display display;
+    schway__gpu_display(inst, &display);
+    if (display.enabled == 0u || display.x2 <= display.x1 || display.y2 <= display.y1 ||
+        display.dot_div == 0u) {
+        return;
+    }
+    uint32_t width = (display.x2 - display.x1) / display.dot_div;
+    uint32_t height = display.y2 - display.y1;
+    uint32_t line_clocks = gpu_line_clocks(inst->region);
+    uint32_t lines = gpu_lines(inst->region);
+    for (uint32_t port = 0u; port < 2u; port++) {
+        struct schway__gpu_gun_sensor *sensor = &g->gun_sensor[port];
+        const schway_gun_input *input = &inst->pad.gun_input[port];
+        if (sensor->armed != 0u || sensor->consumed != 0u ||
+            gpu_gun_active(inst, port) == 0u || (uint32_t)input->x >= width ||
+            (uint32_t)input->y >= height) {
+            continue;
+        }
+        uint64_t target_line = (uint64_t)display.y1 + (uint32_t)input->y;
+        uint64_t target_clock = (uint64_t)display.x1 +
+                                (uint64_t)(uint32_t)input->x * display.dot_div;
+        if (target_line >= lines || target_clock >= line_clocks) {
+            continue;
+        }
+        sensor->aim_x = input->x;
+        sensor->aim_y = input->y;
+        sensor->target_line = (uint32_t)target_line;
+        sensor->target_clock = (uint32_t)target_clock;
+        uint64_t clocks = gpu_gun_clocks_to_target(inst, sensor);
+        uint64_t ticks = gpu_ticks_for_clocks(g, inst->region, clocks);
+        if (UINT64_MAX - g->beam_tick < ticks) {
+            continue;
+        }
+        sensor->deadline = g->beam_tick + ticks;
+        sensor->armed = 1u;
+        sensor->phase = 1u;
+    }
+}
+
+static void gpu_gun_retarget(schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        struct schway__gpu_gun_sensor *sensor = &inst->gpu.gun_sensor[port];
+        if (sensor->armed != 0u && sensor->consumed == 0u) {
+            sensor->armed = 0u;
+            sensor->deadline = UINT64_MAX;
+            sensor->phase = 0u;
+        }
+    }
+    gpu_gun_arm(inst);
+}
+
+static void gpu_gun_sample(schway *inst, uint32_t port)
+{
+    struct schway__gpu *g = &inst->gpu;
+    struct schway__gpu_gun_sensor *sensor = &g->gun_sensor[port];
+    struct schway__display display;
+    schway__gpu_display(inst, &display);
+    uint32_t x = (display.start_x + (uint32_t)sensor->aim_x) & 1023u;
+    uint32_t y = (display.start_y + (uint32_t)sensor->aim_y) & 511u;
+    uint32_t brightness = 0u;
+    if (display.rgb24 != 0u) {
+        for (uint32_t channel = 0u; channel < 3u; channel++) {
+            uint32_t byte_x = (display.start_x * 2u +
+                               (uint32_t)sensor->aim_x * 3u + channel) %
+                              (SCHWAY__VRAM_W * 2u);
+            uint16_t word = inst->vram[y][byte_x / 2u];
+            uint32_t component = (word >> ((byte_x & 1u) * 8u)) & 0xFFu;
+            brightness += component >> 3;
+        }
+    } else {
+        uint16_t pixel = inst->vram[y][x] & UINT16_C(0x7FFF);
+        brightness = (uint32_t)(pixel & 31u) +
+                     (uint32_t)((pixel >> 5) & 31u) +
+                     (uint32_t)((pixel >> 10) & 31u);
+    }
+    if (display.enabled != 0u && brightness >= 48u) {
+        uint64_t x8 = (uint64_t)sensor->target_clock * UINT64_C(107520) /
+                      gpu_clock_num(inst->region);
+        inst->pad.gun_result_x[port] = (uint16_t)x8;
+        inst->pad.gun_result_y[port] = (uint16_t)sensor->target_line;
+        inst->pad.gun_result_valid[port] = 1u;
+        if (inst->pad.device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER &&
+            inst->pad.gun_enabled[port] != 0u) {
+            schway__irq_raise(inst, 10u);
+        }
+    }
+    sensor->armed = 0u;
+    sensor->consumed = 1u;
+    sensor->deadline = UINT64_MAX;
+    sensor->phase = 2u;
+}
+
+static void gpu_gun_due(schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        struct schway__gpu_gun_sensor *sensor = &inst->gpu.gun_sensor[port];
+        if (sensor->armed != 0u && sensor->deadline <= inst->gpu.beam_tick) {
+            gpu_gun_sample(inst, port);
+        }
+    }
+}
+
 static uint32_t min_u32(uint32_t a, uint32_t b)
 {
     return a < b ? a : b;
@@ -180,11 +341,25 @@ void schway__gpu_reset(schway *inst)
     g->vertical_range = 0x00040010u;
     g->field_status = 1u;
     g->beam_tick = inst->ticks;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        g->gun_sensor[port].deadline = UINT64_MAX;
+    }
 }
 
 static int gpu_beam_active(const schway *inst)
 {
     return inst->exe_loaded != 0u || inst->gpu.display_mode != 0u;
+}
+
+/* Keep the generic BIOS beam schedule unchanged. A queued gun shot temporarily
+   needs beam progress even when the guest has not loaded an executable and the
+   display mode is zero. */
+static int gpu_beam_timing_active(const schway *inst)
+{
+    if (gpu_beam_active(inst)) {
+        return 1;
+    }
+    return inst->gpu.gun_sensor[0].armed != 0u || inst->gpu.gun_sensor[1].armed != 0u;
 }
 
 /* Push a span of GPU clocks to Timer 0 without polling individual dots. */
@@ -250,12 +425,18 @@ static int gpu_beam_edges(schway *inst)
     return changed;
 }
 
-/* The next display edge, line end, or enabled Timer 0 dot-source IRQ. */
+/* The next display edge, line end, timer dot, or light-sensor sample. */
 uint64_t schway__gpu_next(const schway *inst)
 {
     const struct schway__gpu *g = &inst->gpu;
     uint64_t next = g->busy_until != 0u ? g->busy_until : UINT64_MAX;
-    if (!gpu_beam_active(inst)) {
+    for (uint32_t port = 0u; port < 2u; port++) {
+        const struct schway__gpu_gun_sensor *sensor = &g->gun_sensor[port];
+        if (sensor->armed != 0u && sensor->deadline < next) {
+            next = sensor->deadline;
+        }
+    }
+    if (!gpu_beam_timing_active(inst)) {
         return next;
     }
     uint32_t line_clocks = gpu_line_clocks(inst->region);
@@ -287,17 +468,20 @@ uint64_t schway__gpu_next(const schway *inst)
     return beam < next ? beam : next;
 }
 
-/* Lazy catch-up splits only at a line/display edge or a derived dot-target deadline. */
+/* Lazy catch-up splits only at a beam edge, dot target, or light-sensor sample. */
 void schway__gpu_sync(schway *inst, uint64_t now)
 {
     struct schway__gpu *g = &inst->gpu;
-    if (!gpu_beam_active(inst)) {
-        if (g->busy_until != 0u && g->busy_until <= now) {
-            g->busy_until = 0u;
-            gpu_update_dreq(inst);
-            gpu_dma_resume(inst, now);
+    if (!gpu_beam_timing_active(inst)) {
+        gpu_gun_arm(inst);
+        if (!gpu_beam_timing_active(inst)) {
+            if (g->busy_until != 0u && g->busy_until <= now) {
+                g->busy_until = 0u;
+                gpu_update_dreq(inst);
+                gpu_dma_resume(inst, now);
+            }
+            return;
         }
-        return;
     }
     if (now < g->beam_tick) {
         return;
@@ -306,6 +490,7 @@ void schway__gpu_sync(schway *inst, uint64_t now)
         if (gpu_beam_edges(inst) != 0) {
             continue;
         }
+        gpu_gun_due(inst);
         if (g->beam_tick == now) {
             break;
         }
@@ -325,6 +510,15 @@ void schway__gpu_sync(schway *inst, uint64_t now)
                 to_event = dot_clocks;
             }
         }
+        for (uint32_t port = 0u; port < 2u; port++) {
+            const struct schway__gpu_gun_sensor *sensor = &g->gun_sensor[port];
+            if (sensor->armed != 0u) {
+                uint64_t gun_clocks = gpu_gun_clocks_to_target(inst, sensor);
+                if (gun_clocks < to_event) {
+                    to_event = gun_clocks;
+                }
+            }
+        }
 
         uint64_t elapsed = gpu_ticks_for_clocks(g, inst->region, to_event);
         uint64_t event_tick = g->beam_tick + elapsed;
@@ -335,6 +529,9 @@ void schway__gpu_sync(schway *inst, uint64_t now)
         gpu_beam_advance(inst, event_tick, elapsed);
     }
     schway__timers_sync(inst, now);
+    gpu_gun_due(inst);
+    gpu_gun_arm(inst);
+    gpu_gun_due(inst);
     if (g->busy_until != 0u && g->busy_until <= now) {
         g->busy_until = 0u;
         gpu_update_dreq(inst);
@@ -1189,18 +1386,22 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         break;
     case 0x03u:
         g->display_disabled = value & 1u;
+        gpu_gun_retarget(inst);
         break;
     case 0x04u:
         g->dma_direction = value & 3u;
         break;
     case 0x05u:
         g->display_start = value & 0x0007FFFFu;
+        gpu_gun_retarget(inst);
         break;
     case 0x06u:
         g->horizontal_range = value & 0x00FFFFFFu;
+        gpu_gun_retarget(inst);
         break;
     case 0x07u:
         g->vertical_range = value & 0x000FFFFFu;
+        gpu_gun_retarget(inst);
         break;
     case 0x08u:
     {
@@ -1212,6 +1413,7 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         }
         g->display_mode = mode;
         g->beam_dot_phase %= gpu_dot_divisor(g->display_mode);
+        gpu_gun_retarget(inst);
         break;
     }
     case 0x09u:
@@ -1374,6 +1576,27 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t st
                             : state_ticks + GPU_BUSY_MAX;
     uint64_t busy_until = schway__state_u64(io, name_busy_until, &g->busy_until, 0u, busy_max);
     (void)schway__state_u32(io, name_field_status, &g->field_status, 0u, 1u);
+    uint32_t gun_armed[2];
+    uint32_t gun_consumed[2];
+    int32_t gun_aim_x[2];
+    int32_t gun_aim_y[2];
+    uint64_t gun_deadline[2];
+    uint32_t gun_phase[2];
+    for (uint32_t port = 0u; port < 2u; port++) {
+        struct schway__gpu_gun_sensor *sensor = &g->gun_sensor[port];
+        gun_armed[port] = schway__state_u32(io, name_gun_armed[port], &sensor->armed, 0u, 1u);
+        gun_consumed[port] = schway__state_u32(io, name_gun_consumed[port],
+                                               &sensor->consumed, 0u, 1u);
+        gun_aim_x[port] = state_i32(io, name_gun_aim_x[port], &sensor->aim_x);
+        gun_aim_y[port] = state_i32(io, name_gun_aim_y[port], &sensor->aim_y);
+        (void)schway__state_u32(io, name_gun_target_line[port], &sensor->target_line, 0u,
+                                gpu_lines(inst->region) - 1u);
+        (void)schway__state_u32(io, name_gun_target_clock[port], &sensor->target_clock, 0u,
+                                gpu_line_clocks(inst->region) - 1u);
+        gun_deadline[port] = schway__state_u64(io, name_gun_deadline[port],
+                                               &sensor->deadline, 0u, UINT64_MAX);
+        gun_phase[port] = schway__state_u32(io, name_gun_phase[port], &sensor->phase, 0u, 2u);
+    }
 
     schway__state_check(io, beam_tick <= state_ticks);
     schway__state_check(io, beam_line_clock < gpu_line_clocks(inst->region));
@@ -1381,6 +1604,28 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t st
     schway__state_check(io, beam_ratio_remainder < GPU_RATIO_DEN);
     schway__state_check(io, beam_dot_phase < gpu_dot_divisor(display_mode));
     schway__state_check(io, busy_until == 0u || busy_until > state_ticks);
+    uint64_t field_clocks = (uint64_t)gpu_line_clocks(inst->region) * gpu_lines(inst->region);
+    uint64_t field_ticks =
+        (field_clocks * GPU_RATIO_DEN + gpu_clock_num(inst->region) - 1u) /
+        gpu_clock_num(inst->region);
+    uint64_t gun_deadline_max = state_ticks > UINT64_MAX - field_ticks
+                                    ? UINT64_MAX
+                                    : state_ticks + field_ticks;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        schway__state_check(io, gun_aim_x[port] >= 0 && gun_aim_y[port] >= 0);
+        if (gun_armed[port] != 0u) {
+            schway__state_check(io, gun_consumed[port] == 0u && gun_phase[port] == 1u &&
+                                       gun_deadline[port] != UINT64_MAX &&
+                                       gun_deadline[port] > beam_tick &&
+                                       gun_deadline[port] <= gun_deadline_max);
+        } else if (gun_consumed[port] != 0u) {
+            schway__state_check(io, gun_phase[port] == 2u &&
+                                       gun_deadline[port] == UINT64_MAX);
+        } else {
+            schway__state_check(io, gun_phase[port] == 0u &&
+                                       gun_deadline[port] == UINT64_MAX);
+        }
+    }
 
     schway__state_check(io, phase != SCHWAY__GPU_PACKET ||
                                 (fifo_count != 0u && packet_words > fifo_count &&

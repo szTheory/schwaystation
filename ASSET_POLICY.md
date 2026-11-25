@@ -137,7 +137,7 @@ when supplied as exact-size images, but the loader reports no retail match. The 
 code identified by the digest in `tests/built/expected.txt`, never a Sony image.
 
 ## 6. How this is checked
-- `scripts/hygiene.sh` runs at pre-commit (`--staged`), at pre-push over all outgoing history (`--history`), and
+- `scripts/hygiene.sh` runs at pre-commit (`--staged`), at pre-push over the refs being pushed (`--history`), and
   in CI (`--tree`). Unless `tests/fixtures/manifest.txt` lists the file, it rejects: disc, executable, BIOS,
   card and save extensions by name (`.bin .cue .iso .img .chd .pbp .ecm .mcr .mcd .gme .exe .psexe .psx .sbi .m3u
   .ccd .sub .mds .mdf .sav .state`, as in `.gitignore`); the 8-byte `PS-X EXE` signature at offset 0; the 5-byte

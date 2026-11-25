@@ -1134,6 +1134,14 @@ static void test_size_tags(void)
             expect_status(inputs[i].what, accepted[k], inputs[i].call(b), SCHWAY_STATUS_OK);
         }
     }
+    /* Each byte boundary in the appended gun records remains a valid
+       caller-sized prefix and is normalized from only the bytes supplied. */
+    for (uint32_t size = (uint32_t)offsetof(schway_input, guns);
+         size < (uint32_t)sizeof input; size++) {
+        memset(b, 0, TAG_BUF);
+        set_tag(b, size);
+        expect_status("input partial gun extension", size, call_input(b), SCHWAY_STATUS_OK);
+    }
     CHECK_EQ_U64(info_of(shared).region, SCHWAY_REGION_PAL);
 
     /* Outputs: refused below the first size with the buffer untouched;
@@ -1365,6 +1373,8 @@ static void test_no_alloc_after_load(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(v.state_format, SCHWAY__STATE_FORMAT);
+    CHECK_EQ_U64(v.behaviour_revision, SCHWAY__BEHAVIOUR_REVISION);
     schway_info info;
     memset(&info, 0, sizeof info);
     info.size = (uint32_t)sizeof info;

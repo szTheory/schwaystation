@@ -36,6 +36,17 @@ void schway__frame_gpu_reset(schway *inst, uint64_t tick)
     }
 }
 
+static int frame_has_direct_gun(const schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        if (inst->pad.device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
+            inst->pad.device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Moves the instance forward by at most limit cycles. The SPU queues one pair
    per 768-cycle boundary crossed when caught up at bus accesses and the public
    run boundary. No-content calls stop at the synthetic
@@ -72,7 +83,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             inst->run_active = 0u;
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        int had_direct_gun = frame_has_direct_gun(inst);
         schway__pad_frame_start(inst);
+        if (had_direct_gun != 0 || frame_has_direct_gun(inst) != 0) {
+            schway__sched_sync(inst);
+        }
         inst->profile_locked = 1u;
         *stop = schway__cpu_run(inst, cycles, flags);
         *done = inst->frame != starting_frame;
@@ -83,7 +98,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             inst->run_active = 0u;
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        int had_direct_gun = frame_has_direct_gun(inst);
         schway__pad_frame_start(inst);
+        if (had_direct_gun != 0 || frame_has_direct_gun(inst) != 0) {
+            schway__sched_sync(inst);
+        }
         /* No program runs and no device is stepped; only an event already due
            runs, at its own deadline, and with none armed the loop is one
            compare. */
@@ -171,16 +190,35 @@ schway_status schway_set_input(schway *inst, const schway_input *input)
     if (normalized.reserved0 != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
+    const uint32_t gun_flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER |
+                               SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD;
     for (uint32_t port = 0u; port < 2u; port++) {
-        if (normalized.device[port] > SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT ||
+        if (normalized.device[port] > SCHWAY_INPUT_DEVICE_JUSTIFIER ||
             normalized.analog_button[port] > 1u || normalized.multitap[port] > 1u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+        if (normalized.device[port] >= SCHWAY_INPUT_DEVICE_GUNCON &&
+            normalized.multitap[port] != 0u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+        const schway_gun_input *gun = &normalized.guns[port];
+        if ((gun->flags & ~gun_flags) != 0u || gun->reserved0 != 0u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+        if ((gun->flags & SCHWAY_GUN_INPUT_VALID) != 0u &&
+            (gun->flags & (SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD)) == 0u &&
+            (gun->x < 0 || gun->y < 0)) {
             return SCHWAY_STATUS_ERR_ARGUMENT;
         }
         for (uint32_t socket = 0u; socket < 4u; socket++) {
             const schway_controller_input *controller = &normalized.controllers[port][socket];
-            if (controller->device > SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT ||
+            if (controller->device > SCHWAY_INPUT_DEVICE_JUSTIFIER ||
                 controller->analog_button > 1u || controller->reserved0 != 0u ||
                 (controller->jogcon_flags & (uint16_t)~UINT16_C(0x0003)) != 0u) {
+                return SCHWAY_STATUS_ERR_ARGUMENT;
+            }
+            if (normalized.multitap[port] != 0u &&
+                controller->device >= SCHWAY_INPUT_DEVICE_GUNCON) {
                 return SCHWAY_STATUS_ERR_ARGUMENT;
             }
         }

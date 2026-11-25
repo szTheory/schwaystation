@@ -15,6 +15,10 @@ gpu.display.native15_wrap	gpu,portable
 gpu.display.native24_wrap	gpu,portable
 gpu.display.width_modes	gpu,portable
 gpu.dma.ready_budget	gpu,portable
+gpu.gun.geometry	gpu,portable
+gpu.gun.irq_order	gpu,portable
+gpu.gun.sample	gpu,portable
+gpu.gun.state	gpu,portable
 gpu.pixel.arithmetic	gpu,portable
 gpu.pixel.palette_wrap	gpu,portable
 gpu.pixel.textured_rectangle_mmio	gpu,portable

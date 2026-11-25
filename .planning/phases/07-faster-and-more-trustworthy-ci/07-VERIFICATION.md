@@ -1,13 +1,14 @@
 ---
 phase: 07-faster-and-more-trustworthy-ci
-verified: 2026-11-20T02:09:50Z
+verified: 2026-11-25T01:57:35Z
 status: passed
-score: 5/5 implementation truths verified; ship evidence complete
+score: 11/11 must-haves verified
 covered_files:
   - .github/workflows/ci.yml
   - .github/workflows/nightly.yml
   - .github/workflows/release.yml
   - .github/workflows/triage.yml
+  - .planning/PRODUCT-ROADMAP.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-01-PLAN.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-01-SUMMARY.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-02-PLAN.md
@@ -30,14 +31,9 @@ covered_files:
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-10-SUMMARY.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md
-  - .planning/phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-QUALITY-REVIEW.md
-  - .planning/phases/07-faster-and-more-trustworthy-ci/07-RESEARCH.md
-  - .planning/phases/07-faster-and-more-trustworthy-ci/07-REVIEW.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-UPGRADE-AUDIT.md
-  - .planning/preparation/ARCHITECTURE.md
-  - .planning/preparation/ENGINEERING.md
   - .planning/preparation/PROMPT-COVERAGE.md
   - README.md
   - docs/maintaining.md
@@ -55,164 +51,157 @@ covered_files:
   - tests/hygiene/tests.cmake
   - tests/policy/inventory.txt
   - tests/policy/tests.cmake
-covered_digest: "v4:sha256:a6bba507469dcb2b1a0c80573085fb5f8935c928708a54888edfecdf9cf47d79"
+covered_digest: "v4:sha256:e65dbf9f566c3f75b8a2b9cc30c8a4627f1eedf51b9456f026fb0015d522c576"
 behavior_unverified: 0
 overrides_applied: 0
-re_verification:
-  previous_status: passed
-  gaps_closed: []
-  gaps_remaining: []
-  regressions: []
 decision_coverage:
   honored: 0
   total: 0
   not_honored: []
-human_verification: []
-ship_evidence_pending: []
+re_verification:
+  previous_status: gaps_found
+  previous_score: 10/11
+  gaps_closed:
+    - "Maintainers can trace current settings, pin and runner checks, device and documentation budgets, install instructions, and roadmap and prompt coverage to evidence."
+  gaps_remaining: []
+  regressions: []
+advisory: []
 ---
 
-# Phase 7: Faster and more trustworthy CI — Verification
+# Phase 7: Faster and more trustworthy CI — Verification Report
 
 **Phase Goal:** Maintainers can see where CI time goes, find work that needs attention, and verify that the pipeline and published guidance meet measured quality targets.
 
-**Verified:** 2026-11-20T02:09:50Z
+**Verified:** 2026-11-25T01:57:35Z
 **Status:** passed
-**Verification refresh:** Phase 8 updated shared quality inputs and state code. The exact current head has successful Main CI and Release runs; this refresh reuses those hosted results and does not rerun the full suite.
+**Re-verification:** Yes — after closing the prior documentation and coverage gap. The existing must-haves were retained.
 
 ## Goal Achievement
 
+The five roadmap truths remain the phase contract. Plan truths that add implementation or delivery detail are included below, with direct restatements merged into the roadmap rows.
+
 ### Observable Truths
 
-| # | Roadmap truth | Status | Evidence |
+| # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | The weekly workflow produces a sanitized triage artifact for open issues and current run status, with read-only project access and no messages. | ✓ VERIFIED | The scheduled/manual workflow grants only read permissions, calls the production collector, and uploads only its sanitized JSON output. `ci.triage` exercises the production transform, privacy/schema rules, and API-failure behavior. Default-branch run 44486437761 uploaded an artifact that passed schema validation, reported zero open issues without truncation, and contained no untrusted issue body or log text. |
-| 2 | The CI report compares up to 40 runs, identifies the measured path, duplication, core use and caching, ties timeouts to matching runs, and makes no unsupported speed claim. | ✓ VERIFIED | The report records 40 run rows, 573 job records, 25 comparable completed runs across 20 workload groups, critical paths, duplicated work, core/cache evidence, flaky-check dispositions, timeout arithmetic and run links. Release-App PR #29 retained `CI required` with the observed metadata-only route; because the baseline merge SHA is unavailable, the report makes no exact-fingerprint or speedup claim. |
-| 3 | The seven-dimension review selects the weakest dimension and verifies one bounded improvement. | ✓ VERIFIED | The review scores all seven dimensions before selection, explains the documentation/README tie-break, and records the single README correction. The obsolete claim is absent; the README aligns with the runner guide and fixture-scoped compatibility ledger. |
-| 4 | The quality registry and CI cover the required metrics, enforce measured applicable bounds, and represent unmeasured or incomparable values without inventing a bound. | ✓ VERIFIED | `quality.json` records measured Cachegrind, state-byte (3,755,328 bytes), WASI-size (608,540 bytes) and historical push-timing bounds. The exact current-head Main CI run passed on `830bf4c`; the PR route remains explicitly unbaselined against the different push/main fingerprint. Lesson uniqueness rejects duplicate IDs and normalized text. |
-| 5 | Maintainers can trace settings, pins, runner and device/documentation budgets, install guidance, roadmap and prompt coverage to evidence. | ✓ VERIFIED | The upgrade audit, metric baselines, maintainer/testing docs, prompt coverage, product roadmap and README provide the evidence trail. Focused pin, timeout, 3,901-line repository-budget and 300-line RetroArch-budget checks passed; the v0.7.0 release passed `install-line-latest`. |
+| 1 | A scheduled weekly workflow produces a sanitized triage artifact for open issues and current run status, with read-only project access and no messages. | VERIFIED | Current triage workflow schedules Saturday and supports manual dispatch; its job grants only Actions, contents and issues read permissions, calls the production collector, and uploads one seven-day JSON artifact. The collector only GETs issue and workflow metadata and writes the sanitized schema. Current exact-head CI run 45442543076 passed ci.triage against trusted, hostile, empty, capped and API-failure fixtures. Historical default-branch run 44486437761 completed successfully and uploaded the artifact; its seven-day artifact has expired. |
+| 2 | CTest exercises the production triage transform and checks privacy, schema bounds, stable output and API-failure behavior. | VERIFIED | tests/policy/tests.cmake registers ci.triage against tests/cmake/triage_controls.cmake, which invokes scripts/triage-report.sh through a stub gh client with fixed fixture inputs and checks output and failures. The exact-head Main CI log records ci.triage passed in 1.12s. |
+| 3 | A CI report compares up to 40 runs, identifies the measured path, duplicate work, core use and caching, links timeout calculations and flaky-check dispositions, and avoids unsupported speed claims. | VERIFIED | 07-CI-EFFICIENCY.md contains 40 run rows, 573 job records, 25 completed comparable runs across 20 workload groups, critical-path/DAG and duplicate-work analysis, cache/core limits, run-linked timeout arithmetic and failure dispositions. The captured release-App comparison explicitly disclaims a speedup because the baseline merge SHA is missing. The current Phase 14 PR CI run measured 3,921s but emitted “unbaselined workload” because fingerprint f0dd7d5c8854fb539e0528ff4fdec70b799d9214d2cdf0c6a2870039686c6c55 differs from the recorded 316f86729c5129fc618ae0acf71014a5b18784d9e7a4f6c03ff067d0b4326ed8; the gate did not claim a comparison. |
+| 4 | The exact release-App generated-metadata PR route is the only path that skips heavy CI; uncertain lists, other changes, renames and release inputs fail closed to heavy checks. | VERIFIED | ci.yml verifies the PR metadata against the GitHub API before and after enumerating files, authenticates the release App bot, and requires exactly the three generated files. The production classifier routes other/invalid paths to heavy checks. ci.classify_policy passed in the exact-head Main CI run; hygiene route tests also passed. |
+| 5 | The seven-dimension quality review identifies the weakest dimension and verifies one bounded improvement. | VERIFIED | 07-QUALITY-REVIEW.md scores all seven dimensions, records the documentation/README tie-break and selects only the false BIOS/disc README claim. Current README no longer contains that claim and states the fixture-scoped compatibility limit. |
+| 6 | quality.json covers the measured performance, Wasm, state and comparable CI metrics; CI enforces applicable bounds, and lesson uniqueness rejects duplicate IDs and duplicate normalized text. | VERIFIED | Current quality.json carries Cachegrind bounds 1,620,101 and 138,319,540 Ir/frame, linked WASI size 947,969 bytes, state size 3,757,638 bytes, and the explicitly fingerprinted 2,249–3,293s CI range. ci.yml measures live producers and passes them to tests/cmake/quality.cmake. The current exact-head run passed perf, wasm32, core.state.stable_bytes, policy.quality_metrics, policy.lessons_unique and its negative control. Its CI timing sample was correctly marked unbaselined on fingerprint mismatch. |
+| 7 | The repository-check budget’s progression is measured and documented, the final gate matches the measured 3,901-line shipping inventory, and the RetroArch budget remains 300 lines. | VERIFIED | Phase 7 baseline and delivery evidence record the 3,300-line initial cap, the later justified 3,900-line working cap, and the final 3,901-line ratchet. Current tests/hygiene/tests.cmake registers 3,901, the independent RetroArch cap is 300, and both current CI hygiene checks passed. |
+| 8 | The relative performance regression gate and native/portable test coverage remain connected to the workflow. | VERIFIED | ci.yml retains the head/base Cachegrind comparison and the 1% regression guard. The exact-head run’s perf job passed, and its Linux build reported all 705 CI tests passing; the WASI lane also completed its portable test inventory. |
+| 9 | Maintainers can trace current settings, pin and runner checks, device and documentation budgets, install instructions, and roadmap and prompt coverage to evidence. | VERIFIED | `docs/testing.md` now documents the measured 3,901-line cap and command; the Phase 7 product-roadmap section records completion and 947,969-byte WASI evidence; prompt coverage records measured WASI and release-App route evidence while preserving the missing merge-ref SHA limitation. The docs size budget passes at 61,432 bytes (<61,440); repository-check and RetroArch inventories pass at 3,901/3,901 and 300/300. |
+| 10 | Every Phase 7 requirement has a focused result or an explicit ship-only evidence locator. | VERIFIED | TUNE-01 through TUNE-06 are all mapped in the requirements table below. 07-DELIVERY-EVIDENCE.md distinguishes local checks, hosted evidence and ship-only outcomes rather than treating pending checks as completed. |
+| 11 | The reviewed Phase 7 PR, generated release PR, post-merge CI and release provide the promised ship evidence. | VERIFIED | GitHub reports success for Phase PR CI/Nightly 44468099352/44468099361, generated release PR CI 44476990492, post-merge Main CI/Release 44477155668/44477155670, and triage run 44486437761. Current-source Phase 14 PR CI 45442543076 passed all heavy lanes; post-merge Main CI 45455115354 and Release 45455115400 also succeeded on f08fc08d40a1ebcb42708e0a31be3111e3eed711. |
 
-**Score:** 5/5 implementation truths verified (0 behavior-unverified); all ship evidence is recorded below.
+**Score:** 11/11 must-haves verified (0 present, behavior-unverified). The prior documentation and coverage drift gap is closed.
 
 ### Required Artifacts
 
-All plan-frontmatter artifact checks passed: 27/27 artifacts across Plans 07-01 through 07-10 exist and are substantive.
-
-| Artifact | Expected | Status | Details |
+| Plan | Declared artifacts | Result | Details |
 |---|---|---|---|
-| .github/workflows/triage.yml and scripts/triage-report.sh | Scheduled/manual workflow and bounded sanitizer | ✓ VERIFIED | Workflow wiring and permissions are present; ci.triage exercises the real transform and failure behavior. |
-| .planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md | Matched-run CI report | ✓ VERIFIED | Contains captured runs/jobs, comparable cohorts, DAG results, timeout evidence and explicit unknowns. |
-| quality.json, tests/cmake/quality.cmake, .github/workflows/ci.yml | Registry, comparator and measurement producers | ✓ VERIFIED | Comparator and producers are wired and fixture-tested. The current exact-head CI is green with the registry's 608,540-byte linked-WASI and 3,755,328-byte serialized-state bounds; the incomparable PR timing route remains explicitly unbaselined. |
-| .planning/phases/07-faster-and-more-trustworthy-ci/07-QUALITY-REVIEW.md | Seven scores and selected improvement | ✓ VERIFIED | Contains all dimensions, evidence, selection rationale and verified README correction. |
-| docs/maintaining.md, docs/testing.md, README.md | Current maintainer and user guidance | ✓ VERIFIED | The README no longer makes the false BIOS/disc claim; detailed operational guidance stays in docs. |
+| 07-01 | tests/policy/tests.cmake; tests/policy/inventory.txt; tests/cmake/quality.cmake; tests/cmake/lessons_unique.cmake; scripts/triage-report.sh | 5/5 verified | All exist and are substantive; current CI tests exercise their production wiring. |
+| 07-02 | 07-CI-EFFICIENCY.md | 1/1 verified | Contains captured runs, comparable cohorts, DAG, timeouts, failure dispositions and explicit unknowns. |
+| 07-03 | tests/hygiene/tests.cmake; 07-BASELINES.md; 07-UPGRADE-AUDIT.md | 3/3 verified | Present and substantive; the budget history and audit evidence are traceable. |
+| 07-04 | 07-QUALITY-REVIEW.md | 1/1 verified | Seven scores, tie-break, selected change and measurable outcome are present. |
+| 07-05 | .github/workflows/triage.yml; scripts/triage-report.sh | 2/2 verified | Workflow-to-collector link is direct; current CI passes the production transform controls. |
+| 07-06 | scripts/classify-changes.sh; .github/workflows/ci.yml; tests/hygiene/tests.cmake | 3/3 verified | Workflow-authenticated route calls the classifier; production route controls pass. |
+| 07-07 | quality.json; .github/workflows/ci.yml; tests/core/test_state.c | 3/3 verified | Current producer values match the registry; test and quality controls pass on hosted CI. |
+| 07-08 | scripts/ci-critical-path.sh; .github/workflows/ci.yml; quality.json | 3/3 verified | Exact-attempt job data, workload fingerprint and comparator are connected. |
+| 07-09 | docs/maintaining.md; docs/testing.md; PROMPT-COVERAGE.md; PRODUCT-ROADMAP.md | 4/4 verified | Maintainer guidance matches the 3,901-line gate; the product roadmap records measured WASI size and completed Phase 7; prompt coverage records current CI and release-route evidence, including the limitation on exact speedup comparison. |
+| 07-10 | 07-DELIVERY-EVIDENCE.md; 07-QUALITY-REVIEW.md | 2/2 verified | Focused outcomes and hosted shipment locators are recorded. |
 
-**Artifacts:** 27/27 plan artifacts passed existence/substance checks.
+The plan artifact query found 27/27 artifacts present with no structural stub issues. The two artifact checks marked “current” under Plan 07-09 fail on content accuracy, despite passing existence and substance checks.
 
 ### Key Link Verification
 
-The generic path-string key-link query returned lexical false negatives for several indirect CMake and documentation links. Manual traces confirmed the production connections below; the Plan 04 CI-analysis link was conditional on choosing a CI improvement and does not apply because the evidence-selected change was the README correction.
+The automated key-link query found lexical false negatives for several indirect CMake, workflow-marker and documentation links. Manual source traces confirmed these connections:
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| tests/policy/tests.cmake | tests/cmake/triage_controls.cmake → scripts/triage-report.sh | ci.triage registered CTest control | ✓ WIRED | The control invokes the production script with successful and malformed/API-failure fixtures. |
-| tests/policy/tests.cmake | tests/cmake/quality_controls.cmake → tests/cmake/quality.cmake → quality.json | policy.quality_metrics and QUALITY_FILE | ✓ WIRED | The helper executes production measurement blocks and comparator calls; matching, over-bound and unbaselined cases remain. |
-| tests/policy/tests.cmake | tests/cmake/lessons_unique.cmake | policy.lessons_unique | ✓ WIRED | The registered test checks the real ledger; the self-test rejects duplicate IDs and normalized text. |
-| .github/workflows/ci.yml | scripts/ci-critical-path.sh | Current-attempt jobs API and PR head SHA | ✓ WIRED | Required CI reads the paginated attempt endpoint and passes PR head separately from merge SHA; release-input route is fingerprinted. |
-| .github/workflows/ci.yml | tests/cmake/quality.cmake | Cachegrind, state-byte and WASI measurement blocks | ✓ WIRED | Workflow measurement outputs reach the shared comparator; current exact-head CI passed the 608,540-byte WASI and 3,755,328-byte state bounds. |
-| tests/hygiene/tests.cmake | tests/cmake/line_budget.cmake | Repository/E2E budget selectors | ✓ WIRED | Focused CTest controls enforce the ratcheted 3,901-line repository budget and 300-line RetroArch budget with over-limit negative controls. |
-| 07-BASELINES.md | quality.json | Measured bounds and source evidence | ✓ WIRED | The baseline table now matches current registry values and cites the Phase 8 producer runs; previous Phase 7 measurements are labeled as superseded. |
-| 07-DELIVERY-EVIDENCE.md | 07-CI-EFFICIENCY.md | Before/after and ship evidence locator | ✓ WIRED | The delivery record links the observed PR #29 route, required-check parity, run URL and the missing-baseline-SHA limitation. |
+| .github/workflows/triage.yml | scripts/triage-report.sh | scheduled/manual collector step | WIRED | Read-only scope, collector invocation and artifact upload verified. |
+| tests/policy/tests.cmake | triage_controls.cmake; quality_controls.cmake; lessons_unique.cmake; ci_route_controls.cmake | registered CTest cases | WIRED | Current run logs show the linked behavior tests passed. |
+| .github/workflows/ci.yml | scripts/classify-changes.sh | metadata validation and route classification | WIRED | Exact PR identity and path set are validated before the classifier opt-in; failure path is heavy. |
+| .github/workflows/ci.yml | tests/cmake/quality.cmake | real Cachegrind, state, Wasm and CI timing producers | WIRED | Current CI job calls are present and the real producers passed. |
+| scripts/ci-critical-path.sh | quality.json via tests/cmake/quality.cmake | current attempt jobs, DAG seconds and workload hash | WIRED | Current PR run records 3,921s as unbaselined because the workload hash differs. |
+| .github/workflows/release.yml | .github/workflows/ci.yml | release-please reusable CI, then publish | WIRED | Release run 45455115400 passed its reusable CI, publish and install-line-latest jobs. |
+| docs/testing.md | quality.json; tests/hygiene/tests.cmake | documented producers and budget preflight | WIRED | Current quality values and the measured 3,901-line gate match their producers; the strict documentation byte budget also passes. |
+| .planning/phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md | .planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md | linked before/after and ship evidence | WIRED | The report records comparable limits, actual route outcomes and the missing baseline SHA. |
 
 ### Data-Flow Trace
 
 | Artifact | Data variable | Source | Produces real data | Status |
 |---|---|---|---|---|
-| scripts/triage-report.sh | issue and workflow records | GitHub Issues and Actions APIs via gh api | Yes; response schemas are checked and scrubbed before atomic publish | ✓ FLOWING; uploaded artifact inspected in run 44486437761 |
-| .github/workflows/ci.yml | instruction totals | Cachegrind output from two registered workloads | Yes; comparator consumes parsed integer counts | ✓ FLOWING |
-| .github/workflows/ci.yml | serialized state bytes | state.stable_bytes output from the C test binary | Yes; exactly one positive integer is required | ✓ FLOWING; current checked-in bound is 3,755,328 bytes |
-| .github/workflows/ci.yml | WASI module bytes | Linked build/wasm32/schwaystation-run file | Yes; the producer validates the module and reads its byte count when run | ✓ FLOWING; current checked-in bound is 608,540 bytes |
-| .github/workflows/ci.yml | CI path duration | Current attempt job timestamps and runner labels | Yes; merge SHA and PR head SHA are checked independently | ✓ FLOWING; hosted release-App route passed; exact historical fingerprint comparison is unavailable and remains unbaselined |
+| scripts/triage-report.sh | issue and workflow records | GitHub Issues and Actions APIs through gh api | Yes; schema checks and scrub rules produce bounded JSON | FLOWING; current CTest controls pass; historical upload run 44486437761 succeeded (artifact expired after seven days). |
+| .github/workflows/ci.yml | instructions per frame | Cachegrind output from real runner workloads | Yes; integer counts flow through the quality comparator | FLOWING; current perf job passed. |
+| .github/workflows/ci.yml | serialized state bytes | state.stable_bytes from the test binary and public serialization path | Yes; exactly one positive integer is checked | FLOWING; current test and quality jobs passed at 3,757,638 bytes. |
+| .github/workflows/ci.yml | linked WASI module bytes | build/wasm32/schwaystation-run | Yes; module is validated and sized after linking | FLOWING; current WASI job passed at 947,969 bytes. |
+| .github/workflows/ci.yml | current CI critical path | paginated current-attempt Actions jobs with start/end timestamps | Yes; helper verifies job identities and computes the dependency path | FLOWING; current PR sample was 3,921s and correctly reported unbaselined, not compared to the old fingerprint. |
 
 ### Behavioral Spot-Checks
 
-| Behavior | Command | Result | Status |
+These results reuse read-only GitHub Actions evidence; no local suite was rerun.
+
+| Behavior | Command/evidence | Result | Status |
 |---|---|---|---|
-| Classifier, triage transform and lesson identity/text checks | ctest --preset ci --no-tests=error -R '^(ci[.]classify_policy|ci[.]triage|policy[.]lessons_unique|policy[.]lessons_unique[.]self_test)$' --output-on-failure --parallel 1 | Exit 0; 4/4 passed in 0.51s | ✓ PASS |
-| Production quality measurement/control path | ctest --preset ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1 | Exit 0; 1/1 passed in 37.22s after review fixes | ✓ PASS |
-| No-skipped-tests and failure-direction control | ctest --preset ci --no-tests=error -R '^policy[.]no_skip([.]self_test)?$' --output-on-failure --parallel 1 | Exit 0; 2/2 passed in 0.22s | ✓ PASS |
-| Budget, pin and timeout controls after refreshing stale generated config | cmake --preset hygiene, then focused CTest for gate budget, E2E budget, action pins, and timeout comments | Configure exit 0; CTest exit 0; 4/4 passed in 0.03s | ✓ PASS |
-| Exact current-head hosted CI and Release | GitHub Actions runs 44645037841 and 44645037923 on `830bf4cfe74aca92930e34fdf9667c5c1b24c370` | Both runs completed successfully; no broad local rerun was needed | ✓ PASS |
-
-These local runs were targeted checks, not a broad suite. An initial hygiene run used stale generated configuration with a 3,890-line registration and failed immediately. After cmake --preset hygiene refreshed it, the same four selectors passed. Plan 10 recorded 3,901 counted lines after the Windows timing portability fix and ratcheted the budget; the exact current-head hosted run is fresh evidence, so no full suite was repeated for bookkeeping.
-
-The current CTest inventory lists all 24 focused Phase 8 selectors previously reported passing (24/24 in 5.13s); Phase 7 still has five CI-policy and four hygiene selectors registered. This was an inventory check only, not a test rerun.
+| Current Phase 14 final-head CI on 75beb849f4b9e8a9a3bd023cc5c80632e4c74d56 | [Main CI run 45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) | All heavy platform, perf, hygiene, hash, RetroArch and required jobs succeeded; Linux reported 705/705 CI tests. | PASS |
+| Triage, classifier, quality and lesson production controls | Main CI run 45442543076 Linux build logs | ci.triage, ci.classify_policy, policy.quality_metrics, policy.lessons_unique and its self-test passed. | PASS |
+| Repository and E2E budget, route and timeout controls | Main CI run 45442543076 hygiene job | policy.gate_budget, policy.e2e_budget, ci.classify, and hygiene.timeout_comments including self-test passed. | PASS |
+| Current attempt timing policy | Main CI run 45442543076 CI required job | Measured 3,921s; fingerprint mismatch emitted the explicit unbaselined result and deferred comparison. | PASS |
+| Post-merge Main CI on f08fc08d40a1ebcb42708e0a31be3111e3eed711 | [Main CI run 45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) | Succeeded; planning/release-metadata-only route skipped heavy jobs as allowed. | PASS |
+| Published Release path on f08fc08d40a1ebcb42708e0a31be3111e3eed711 | [Release run 45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) | Reusable release CI, hash-equality, publication and install-line-latest succeeded. | PASS |
 
 ### Probe Execution
 
-No probe scripts are declared in the Phase 7 plans or summaries.
+No probes are declared in the Phase 7 plans or summaries, and no conventional scripts/*/tests/probe-*.sh file applies to this CI-tooling phase.
 
 ### Requirements Coverage
 
-| Requirement | Status | Evidence |
-|---|---|---|
-| TUNE-01 | Satisfied | Workflow wiring and read-only scopes pass; default-branch run 44486437761 uploaded a schema-valid artifact with zero open issues and no truncation. |
-| TUNE-02 | Satisfied | The report records PR #29's exact three-file path list, passing `CI required`, observed route and run 44476990492; it documents the missing baseline SHA and claims no unsupported speedup. |
-| TUNE-03 | Satisfied | Sampled timeout formulas and flaky-signal dispositions cite runs; Windows ARM64 completed the quality control in 116.03s under its 180s cap. |
-| TUNE-04 | Satisfied | Seven-score review and one README correction are verified. |
-| TUNE-05 | Satisfied | Cachegrind/state bounds and duplicate checks pass; Phase 8 producer runs measured 608,540 WASI bytes and 3,755,328 state bytes, and current exact-head CI passed. PR timing stays explicitly unbaselined against the push/main fingerprint. |
-| TUNE-06 | Satisfied | Settings/pins/runner audits, documentation, and 3,901/300 line checks are verified; release 44477155670 passed `install-line-latest`. |
+| Requirement | Source plan | Status | Evidence |
+|---|---|---|---|
+| TUNE-01 | 07-01, 07-05, 07-10 | Satisfied | Read-only scheduled/manual workflow, sanitizer and fixture controls, historical uploaded artifact. |
+| TUNE-02 | 07-01, 07-02, 07-06, 07-08, 07-10 | Satisfied | 40-run report, path classifier, exact-attempt timing helper and correct unbaselined behavior. |
+| TUNE-03 | 07-02, 07-06, 07-10 | Satisfied | Run-linked timeout arithmetic and flaky-check dispositions; production CI route and required roll-up controls pass. |
+| TUNE-04 | 07-04, 07-09, 07-10 | Satisfied | Seven-dimension review and the selected README correction are verified. |
+| TUNE-05 | 07-01, 07-03, 07-07, 07-08, 07-10 | Satisfied | Current quality producers and bounds pass; lesson duplicate identity/text negative controls pass. |
+| TUNE-06 | 07-03, 07-09, 07-10 | SATISFIED | Current maintainer guidance, product roadmap and prompt coverage agree with the measured budget and shipped evidence; release run 45455115400 passed install-line-latest. |
+
+All six requirement IDs declared by plans are covered by the roadmap requirement list; no orphaned requirement was found.
 
 ### Test Quality Audit
 
-| Test File | Linked Req | Active checks | Skipped | Circular | Assertion level | Verdict |
+| Test file | Linked requirement | Active | Skipped | Circular | Assertion level | Verdict |
 |---|---|---:|---:|---|---|---|
-| tests/cmake/triage_controls.cmake | TUNE-01 | 1 registered; passed | 0 | No | Behavioral schema, scrub and failure-output assertions | PASS |
-| tests/cmake/ci_route_controls.cmake | TUNE-02/03 | 1 registered; passed | 0 | No | Production classifier routes and exact expected outputs | PASS |
-| tests/cmake/quality_controls.cmake | TUNE-05 | 1 registered; passed | 0 | No | Production blocks, exact fixture bounds, missing/over-bound and route assertions | PASS |
-| tests/cmake/lessons_unique.cmake | TUNE-05 | 2 registered; passed | 0 | No | Real ledger plus known duplicate-ID/text failures | PASS |
-| tests/hygiene/tests.cmake | TUNE-05/06 | 4 selected; passed | 0 | No | Exact cap boundaries and timeout/pin checks with negative controls | PASS |
+| tests/cmake/triage_controls.cmake | TUNE-01 | Yes | 0 | No | Behavioral privacy, schema, bounds, determinism and API-failure assertions | PASS |
+| tests/cmake/ci_route_controls.cmake | TUNE-02/03 | Yes | 0 | No | Production routing cases with exact expected outputs and fail-closed cases | PASS |
+| tests/cmake/quality_controls.cmake | TUNE-05 | Yes | 0 | No | Production measurement/comparison blocks with in-bound, over-bound and missing-data controls | PASS |
+| tests/cmake/lessons_unique.cmake | TUNE-05 | Yes | 0 | No | Live ledger plus duplicate-ID and normalized-text negative controls | PASS |
+| tests/hygiene/tests.cmake | TUNE-05/06 | Yes | 0 | No | Exact budget boundaries, timeout evidence and route failure controls | PASS |
+| tests/core/test_state.c | TUNE-05 | Yes | 0 | No | Reads actual serialized byte count and asserts state format/length | PASS |
 
-Disabled tests on requirements: 0
-Circular patterns detected: 0
-Insufficient assertions: 0
+The linked tests contain no disabled/skipped test patterns. Fixture outputs are fixed synthetic inputs; no test generates its expected values by running the system under test. The current exact-head hosted run passed the linked cases.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |---|---:|---|---|---|
-| scripts/triage-report.sh:22,42 | Temporary-file templates contain XXXXXX, the six-character secure mktemp suffix, not an XXX debt marker. | Info | No phase debt marker. |
-| docs/testing.md:69 | The word placeholder describes CD-ROM-only test registrations, not an unimplemented Phase 7 artifact. | Info | No phase stub or missing implementation. |
+| scripts/triage-report.sh | 22, 42 | XXXXXX is the secure mktemp suffix, not an XXX debt marker. | Info | No unresolved debt marker. |
+| docs/testing.md | 76 | “placeholder registrations” describes CD-ROM-only test registration, not an unfinished Phase 7 feature. | Info | No Phase 7 stub. |
+| tests/hygiene/tests.cmake | 535 | “placeholder zips” refers to synthetic release archive fixtures. | Info | No production placeholder. |
 
-No unreferenced TBD, FIXME or XXX debt marker was found in changed implementation files. The no-skip scan and policy.no_skip controls passed.
+No unreferenced TBD, FIXME or XXX debt marker was found in the Phase 7 implementation files. No empty implementation or console-log-only implementation was found.
 
 ### Human Verification Required
 
-N/A — infrastructure/CI phase with no user-facing flow and no behavior-unverified invariants. No owner UAT is needed.
-
-### Hosted Ship Evidence
-
-These are automated results, not owner verification:
-
-1. [Phase PR #28](https://github.com/szTheory/schwaystation/pull/28): exact-head CI run 44468099352 and Nightly run 44468099361 passed. The Ubuntu 26 linked WASI module measured 595,820 bytes; Windows ARM64 completed `policy.quality_metrics` in 116.03s under the 180s cap.
-2. [Release PR #29](https://github.com/szTheory/schwaystation/pull/29): exact generated files were `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`; `CI required` passed in run 44476990492 in about 70s. The old baseline's merge SHA is unavailable, so no exact fingerprint or speedup claim is made.
-3. Release PR #29 merged as `af64484f388eddf67c615673b98edd6ccb5dae4c`. Main CI [run 44477155668](https://github.com/szTheory/schwaystation/actions/runs/44477155668) passed on the targeted retry; automatic Release [run 44477155670](https://github.com/szTheory/schwaystation/actions/runs/44477155670) published [v0.7.0](https://github.com/szTheory/schwaystation/releases/tag/v0.7.0) with 19 assets and passed `install-line-latest`.
-4. Default-branch triage [run 44486437761](https://github.com/szTheory/schwaystation/actions/runs/44486437761) uploaded a schema-valid artifact showing zero open issues and no truncation; its CI, release and Nightly entries all succeeded.
-5. On the current exact head `830bf4cfe74aca92930e34fdf9667c5c1b24c370`, [Main CI run 44645037841](https://github.com/szTheory/schwaystation/actions/runs/44645037841) and [Release run 44645037923](https://github.com/szTheory/schwaystation/actions/runs/44645037923) both completed successfully. The current quality checks accept the 608,540-byte linked WASI module and 3,755,328-byte serialized state.
-
-### Current CI Efficiency Review
-
-The current Main CI run took 1h22m22s end to end; its BE32 job ran 4,694 seconds. The Release workflow took 1h04m06s and concurrently ran its reusable `release-ci` matrix on the same exact source SHA; that BE32 job ran 3,402 seconds. Both workflows passed. The repeated matrix validates the same source revision and adds runner cost without improving source-revision coverage. A follow-up can assess reusing a successful exact-SHA CI result for release publication while retaining release-specific publication checks and `install-line-latest`. The CI and Release jobs expose Linux, Windows, macOS, BE32 and WASI runners to `act`-specific differences, so local `act` can supplement routing checks but cannot replace these hosted results.
+N/A — this is an infrastructure/CI phase with no user-facing flow to manually test. Its observable outcomes are covered by gating checks and exact hosted run evidence.
 
 ### Gaps Summary
 
-No source, wiring, local-test, or hosted ship-evidence gap remains. The release-App baseline cannot support an exact workload fingerprint because its merge SHA was not retained; that limitation is recorded and no speedup is claimed. The linked baseline now reflects the later measured WASI and state values. Current exact-head Main CI and Release are green; the duplicated same-SHA release matrix is recorded above for follow-up.
+The Phase 7 CI and release mechanisms remain connected and pass on current source. The final-head Main CI run passed its heavy jobs and correctly declined to compare a 3,921-second path against the Phase 7 baseline after the workload fingerprint changed. Post-merge Main CI and Release also succeeded. The previously reported documentation and coverage mismatch is resolved: maintainer guidance matches the 3,901-line gate, and the roadmap and prompt coverage now reflect completed measured evidence without claiming an exact release-App speedup. Cheap current budget checks and the documentation byte-budget check pass.
 
 ---
 
-**Verification approach:** Goal-backward from ROADMAP success criteria, cross-checked with all 10 plans and their artifact links.
-**Must-haves source:** Phase 7 ROADMAP success criteria plus Plans 07-01 through 07-10.
-**Automated checks:** 13 focused CTest checks passed after targeted reconfiguration; all 10 plan artifact queries passed (27/27 artifacts); current exact-head Main CI and Release passed.
-**Human checks required:** None; this is an infrastructure phase. Hosted ship evidence is complete.
-**Refresh checks:** No full suite was rerun. Exact-head hosted CI and Release runs were inspected; the baseline document was synchronized to measured current values and now identifies the superseded Phase 7 measurements. The covered-input fingerprint was regenerated.
-
----
-Verified: 2026-11-20T02:09:50Z
+_Verified: 2026-11-25T01:57:35Z_
+_Verifier: the agent (gsd-verifier)_

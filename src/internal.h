@@ -22,8 +22,8 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 20u
-#define SCHWAY__STATE_FORMAT 20u
+#define SCHWAY__BEHAVIOUR_REVISION 21u
+#define SCHWAY__STATE_FORMAT 21u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -282,8 +282,14 @@ _Static_assert(offsetof(schway_input, analog_button) == 24, "input.analog_button
 _Static_assert(offsetof(schway_input, reserved0) == 26, "input.reserved0");
 _Static_assert(offsetof(schway_input, multitap) == 28, "input.multitap");
 _Static_assert(offsetof(schway_input, controllers) == 36, "input.controllers");
+_Static_assert(offsetof(schway_input, guns) == 228, "input.guns");
 _Static_assert(sizeof(schway_controller_input) == 24, "controller_input size");
-_Static_assert(sizeof(schway_input) == 228, "input size");
+_Static_assert(offsetof(schway_gun_input, x) == 0, "gun_input.x");
+_Static_assert(offsetof(schway_gun_input, y) == 4, "gun_input.y");
+_Static_assert(offsetof(schway_gun_input, flags) == 8, "gun_input.flags");
+_Static_assert(offsetof(schway_gun_input, reserved0) == 12, "gun_input.reserved0");
+_Static_assert(sizeof(schway_gun_input) == 16, "gun_input size");
+_Static_assert(sizeof(schway_input) == 260, "input size");
 
 _Static_assert(offsetof(schway_budget, size) == 0, "budget.size");
 _Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");

@@ -55,6 +55,11 @@
 #define LR_DEVICE_FLIGHT RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
 #define LR_DEVICE_NEGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 #define LR_DEVICE_JOGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
+#define LR_DEVICE_JUSTIFIER RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2)
+#define LR_GUN_SOURCE_UNKNOWN 0u
+#define LR_GUN_SOURCE_LIGHTGUN 1u
+#define LR_GUN_SOURCE_POINTER 2u
+#define LR_GUN_SOURCE_UNSUPPORTED 3u
 #define LR_ANALOG_TOGGLE_FRAMES 60u
 #define LR_ANALOG_TOGGLE_BUTTONS                                                            \
     ((1u << RETRO_DEVICE_ID_JOYPAD_SELECT) | (1u << RETRO_DEVICE_ID_JOYPAD_START) |        \
@@ -97,6 +102,7 @@ static uint8_t lr_mode_pulse_pending[LR_PLAYER_LIMIT];
 static uint8_t lr_toggle_latched[LR_PLAYER_LIMIT];
 static uint8_t lr_toggle_frames[LR_PLAYER_LIMIT];
 static uint8_t lr_multitap_enabled[2];
+static uint8_t lr_lightgun_support_state;
 static unsigned lr_active_player_count = 2u;
 
 static uint32_t lr_disc_read_sector(void *user, uint32_t lba, uint8_t raw[2352],
@@ -144,6 +150,12 @@ schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *bu
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
                                  size_t capacity, size_t *written);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_input(unsigned port, schway_gun_input *out);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_sensor(unsigned port, unsigned *armed, unsigned *consumed);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_fill_gun_frame(void);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -615,7 +627,7 @@ static struct retro_variable lr_variables[] = {
     {NULL, NULL},
 };
 
-static struct retro_controller_description lr_controller_types[] = {
+static const struct retro_controller_description lr_base_controller_types[] = {
     {"DualShock", RETRO_DEVICE_ANALOG},
     {"PlayStation Controller", RETRO_DEVICE_JOYPAD},
     {"None", RETRO_DEVICE_NONE},
@@ -624,6 +636,18 @@ static struct retro_controller_description lr_controller_types[] = {
     {"Jogcon", LR_DEVICE_JOGCON},
     {"Mouse", RETRO_DEVICE_MOUSE},
 };
+static const struct retro_controller_description lr_gun_controller_types[] = {
+    {"GunCon", RETRO_DEVICE_LIGHTGUN},
+    {"Justifier", LR_DEVICE_JUSTIFIER},
+};
+enum {
+    LR_CONTROLLER_TYPE_CAP = sizeof lr_base_controller_types /
+                                 sizeof lr_base_controller_types[0] +
+                             sizeof lr_gun_controller_types /
+                                 sizeof lr_gun_controller_types[0],
+};
+static struct retro_controller_description
+    lr_controller_types[LR_PLAYER_LIMIT][LR_CONTROLLER_TYPE_CAP];
 static struct retro_controller_info lr_controller_info[LR_PLAYER_LIMIT + 1u];
 
 #define LR_PAD_DESCRIPTORS(port_)                                                             \
@@ -655,9 +679,21 @@ static struct retro_controller_info lr_controller_info[LR_PLAYER_LIMIT + 1u];
 static const struct retro_input_descriptor lr_pad_descriptor_template[] = {
     LR_PAD_DESCRIPTORS(0u),
 };
+static const struct retro_input_descriptor lr_gun_descriptor_template[] = {
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X, "Screen X"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y, "Screen Y"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER, "Trigger"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN, "Offscreen"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_RELOAD, "Reload"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_AUX_A, "GunCon A"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_AUX_B, "GunCon B"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_START, "Justifier Start"},
+    {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_SELECT, "Justifier Back"},
+};
 static struct retro_input_descriptor
     lr_input_descriptors[LR_PLAYER_LIMIT *
-                             (sizeof lr_pad_descriptor_template / sizeof lr_pad_descriptor_template[0]) +
+                             (sizeof lr_pad_descriptor_template / sizeof lr_pad_descriptor_template[0] +
+                              9u) +
                          1u];
 #undef LR_PAD_DESCRIPTORS
 
@@ -665,32 +701,58 @@ static void lr_publish_input_topology(void)
 {
     const unsigned per_player =
         (unsigned)(sizeof lr_pad_descriptor_template / sizeof lr_pad_descriptor_template[0]);
+    const unsigned gun_controls =
+        (unsigned)(sizeof lr_gun_descriptor_template / sizeof lr_gun_descriptor_template[0]);
+    const unsigned base_types =
+        (unsigned)(sizeof lr_base_controller_types / sizeof lr_base_controller_types[0]);
+    const unsigned gun_types =
+        (unsigned)(sizeof lr_gun_controller_types / sizeof lr_gun_controller_types[0]);
     unsigned p0_players = lr_multitap_enabled[0] != 0u ? 4u : 1u;
+    unsigned descriptor_count = 0u;
     lr_active_player_count = p0_players + (lr_multitap_enabled[1] != 0u ? 4u : 1u);
 
     for (unsigned player = 0u; player < LR_PLAYER_LIMIT; player++) {
         if (player < lr_active_player_count) {
-            lr_controller_info[player].types = lr_controller_types;
-            lr_controller_info[player].num_types =
-                (unsigned)(sizeof lr_controller_types / sizeof lr_controller_types[0]);
+            unsigned physical_port = player < p0_players ? 0u : 1u;
+            unsigned socket = player < p0_players ? player : player - p0_players;
+            int direct_gun = socket == 0u && lr_multitap_enabled[physical_port] == 0u;
+            if (!direct_gun &&
+                (lr_controller_devices[player] == RETRO_DEVICE_LIGHTGUN ||
+                 lr_controller_devices[player] == LR_DEVICE_JUSTIFIER)) {
+                lr_controller_devices[player] = RETRO_DEVICE_ANALOG;
+            }
+            memcpy(lr_controller_types[player], lr_base_controller_types,
+                   sizeof lr_base_controller_types);
+            lr_controller_info[player].types = lr_controller_types[player];
+            lr_controller_info[player].num_types = base_types;
+            if (direct_gun) {
+                memcpy(lr_controller_types[player] + base_types, lr_gun_controller_types,
+                       sizeof lr_gun_controller_types);
+                lr_controller_info[player].num_types += gun_types;
+            }
+
+            for (unsigned item = 0u; item < per_player; item++) {
+                lr_input_descriptors[descriptor_count] = lr_pad_descriptor_template[item];
+                lr_input_descriptors[descriptor_count++].port = player;
+            }
+            if (direct_gun) {
+                for (unsigned item = 0u; item < gun_controls; item++) {
+                    lr_input_descriptors[descriptor_count] = lr_gun_descriptor_template[item];
+                    lr_input_descriptors[descriptor_count++].port = player;
+                }
+            }
         } else {
+            if (lr_controller_devices[player] == RETRO_DEVICE_LIGHTGUN ||
+                lr_controller_devices[player] == LR_DEVICE_JUSTIFIER) {
+                lr_controller_devices[player] = RETRO_DEVICE_ANALOG;
+            }
             lr_controller_info[player].types = NULL;
             lr_controller_info[player].num_types = 0u;
         }
     }
     lr_controller_info[lr_active_player_count].types = NULL;
     lr_controller_info[lr_active_player_count].num_types = 0u;
-
-    for (unsigned player = 0u; player < lr_active_player_count; player++) {
-        for (unsigned item = 0u; item < per_player; item++) {
-            struct retro_input_descriptor *descriptor =
-                &lr_input_descriptors[player * per_player + item];
-            *descriptor = lr_pad_descriptor_template[item];
-            descriptor->port = player;
-        }
-    }
-    memset(&lr_input_descriptors[lr_active_player_count * per_player], 0,
-           sizeof lr_input_descriptors[0]);
+    memset(&lr_input_descriptors[descriptor_count], 0, sizeof lr_input_descriptors[0]);
 
     if (env_cb != NULL) {
         (void)env_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, lr_controller_info);
@@ -715,6 +777,86 @@ static int lr_player_endpoint(unsigned player, unsigned *physical_port, unsigned
     }
     *physical_port = 1u;
     *socket = player;
+    return 1;
+}
+
+static int lr_is_gun_device(unsigned device)
+{
+    return device == RETRO_DEVICE_LIGHTGUN || device == LR_DEVICE_JUSTIFIER;
+}
+
+static int lr_has_selected_gun(void)
+{
+    for (unsigned player = 0u; player < lr_active_player_count; player++) {
+        if (lr_is_gun_device(lr_controller_devices[player])) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void lr_log_gun_support(unsigned source)
+{
+    uint8_t state = (uint8_t)source;
+    if (lr_lightgun_support_state == state) {
+        return;
+    }
+    if (source == LR_GUN_SOURCE_UNSUPPORTED || source == LR_GUN_SOURCE_POINTER ||
+        (source == LR_GUN_SOURCE_LIGHTGUN &&
+         (lr_lightgun_support_state == LR_GUN_SOURCE_UNSUPPORTED ||
+          lr_lightgun_support_state == LR_GUN_SOURCE_POINTER))) {
+        struct retro_log_callback callback;
+        if (env_cb != NULL) {
+            memset(&callback, 0, sizeof callback);
+            if (env_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &callback) &&
+                callback.log != NULL) {
+                if (source == LR_GUN_SOURCE_LIGHTGUN) {
+                    callback.log(RETRO_LOG_INFO,
+                                 "schwaystation: LIGHTGUN input is available again\n");
+                } else if (source == LR_GUN_SOURCE_POINTER) {
+                    callback.log(RETRO_LOG_INFO,
+                                 "schwaystation: using POINTER input fallback for lightguns\n");
+                } else {
+                    callback.log(RETRO_LOG_WARN,
+                                 "schwaystation: LIGHTGUN input unsupported: frontend callback or LIGHTGUN/POINTER device capability unavailable\n");
+                }
+            }
+        }
+    }
+    lr_lightgun_support_state = state;
+}
+
+/* Called from retro_run once before the frame's input snapshot is queued. */
+static unsigned lr_gun_host_source(void)
+{
+    uint64_t capabilities = 0u;
+    unsigned source = LR_GUN_SOURCE_UNSUPPORTED;
+    if (!lr_has_selected_gun()) {
+        lr_lightgun_support_state = LR_GUN_SOURCE_UNKNOWN;
+        return LR_GUN_SOURCE_UNKNOWN;
+    }
+    if (input_state_cb != NULL && env_cb != NULL &&
+        env_cb(RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES, &capabilities)) {
+        if ((capabilities & (UINT64_C(1) << RETRO_DEVICE_LIGHTGUN)) != 0u) {
+            source = LR_GUN_SOURCE_LIGHTGUN;
+        } else if ((capabilities & (UINT64_C(1) << RETRO_DEVICE_POINTER)) != 0u) {
+            source = LR_GUN_SOURCE_POINTER;
+        }
+    }
+    lr_log_gun_support(source);
+    return source;
+}
+
+static int lr_lightgun_pixel(int16_t coordinate, unsigned extent, int32_t *pixel)
+{
+    int64_t normalized, mapped;
+    if (pixel == NULL || extent == 0u) {
+        return 0;
+    }
+    normalized = (int32_t)coordinate - (int32_t)INT16_MIN;
+    mapped = (normalized * (int64_t)(extent - 1u) + (int64_t)UINT16_MAX / 2) /
+             (int64_t)UINT16_MAX;
+    *pixel = (int32_t)mapped;
     return 1;
 }
 
@@ -1108,7 +1250,7 @@ static uint8_t lr_pressure_from_axis(int16_t axis, int inverted)
 }
 
 /* RetroPad positions map to the active-low serial word used by the PSX pad. */
-static void lr_queue_input(void)
+static void lr_queue_input(unsigned gun_source)
 {
     struct lr_button_mapping {
         unsigned id;
@@ -1165,11 +1307,82 @@ static void lr_queue_input(void)
             controller->device = SCHWAY_INPUT_DEVICE_NEGCON;
         } else if (device == LR_DEVICE_JOGCON) {
             controller->device = SCHWAY_INPUT_DEVICE_JOGCON;
+        } else if (device == RETRO_DEVICE_LIGHTGUN) {
+            controller->device = SCHWAY_INPUT_DEVICE_GUNCON;
+        } else if (device == LR_DEVICE_JUSTIFIER) {
+            controller->device = SCHWAY_INPUT_DEVICE_JUSTIFIER;
         } else {
             controller->device = SCHWAY_INPUT_DEVICE_NONE;
         }
 
-        if (controller->device == SCHWAY_INPUT_DEVICE_MOUSE) {
+        if (lr_is_gun_device(device)) {
+            if (gun_source != LR_GUN_SOURCE_UNKNOWN &&
+                gun_source != LR_GUN_SOURCE_UNSUPPORTED && input_state_cb != NULL) {
+                unsigned input_device = gun_source == LR_GUN_SOURCE_POINTER
+                                            ? RETRO_DEVICE_POINTER
+                                            : RETRO_DEVICE_LIGHTGUN;
+                unsigned x_id = gun_source == LR_GUN_SOURCE_POINTER
+                                    ? RETRO_DEVICE_ID_POINTER_X
+                                    : RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X;
+                unsigned y_id = gun_source == LR_GUN_SOURCE_POINTER
+                                    ? RETRO_DEVICE_ID_POINTER_Y
+                                    : RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y;
+                unsigned trigger_id = gun_source == LR_GUN_SOURCE_POINTER
+                                          ? RETRO_DEVICE_ID_POINTER_PRESSED
+                                          : RETRO_DEVICE_ID_LIGHTGUN_TRIGGER;
+                unsigned offscreen_id = gun_source == LR_GUN_SOURCE_POINTER
+                                            ? RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN
+                                            : RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN;
+                int16_t screen_x = input_state_cb(player, input_device, 0u, x_id);
+                int16_t screen_y = input_state_cb(player, input_device, 0u, y_id);
+                int trigger = input_state_cb(player, input_device, 0u, trigger_id) != 0;
+                int offscreen = input_state_cb(player, input_device, 0u, offscreen_id) != 0;
+                int reload = gun_source == LR_GUN_SOURCE_LIGHTGUN &&
+                             input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
+                                            RETRO_DEVICE_ID_LIGHTGUN_RELOAD) != 0;
+                int32_t pixel_x = 0, pixel_y = 0;
+                unsigned width = geometry_width != 0u ? geometry_width : info.width;
+                unsigned height = geometry_height != 0u ? geometry_height : info.height;
+                uint32_t flags = 0u;
+                if (lr_lightgun_pixel(screen_x, width, &pixel_x) &&
+                    lr_lightgun_pixel(screen_y, height, &pixel_y)) {
+                    snapshot.guns[port].x = pixel_x;
+                    snapshot.guns[port].y = pixel_y;
+                    if (!offscreen && !reload) {
+                        flags |= SCHWAY_GUN_INPUT_VALID;
+                    }
+                }
+                if (trigger) {
+                    flags |= SCHWAY_GUN_INPUT_TRIGGER;
+                }
+                if (offscreen) {
+                    flags |= SCHWAY_GUN_INPUT_OFFSCREEN;
+                }
+                if (reload) {
+                    flags |= SCHWAY_GUN_INPUT_RELOAD;
+                }
+                snapshot.guns[port].flags = flags;
+                if (gun_source == LR_GUN_SOURCE_LIGHTGUN && device == RETRO_DEVICE_LIGHTGUN) {
+                    if (input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
+                                       RETRO_DEVICE_ID_LIGHTGUN_AUX_A) != 0) {
+                        controller->buttons |= 0x0008u;
+                    }
+                    if (input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
+                                       RETRO_DEVICE_ID_LIGHTGUN_AUX_B) != 0) {
+                        controller->buttons |= 0x4000u;
+                    }
+                } else if (gun_source == LR_GUN_SOURCE_LIGHTGUN) {
+                    if (input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
+                                       RETRO_DEVICE_ID_LIGHTGUN_START) != 0) {
+                        controller->buttons |= 0x0008u;
+                    }
+                    if (input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
+                                       RETRO_DEVICE_ID_LIGHTGUN_SELECT) != 0) {
+                        controller->buttons |= 0x4000u;
+                    }
+                }
+            }
+        } else if (controller->device == SCHWAY_INPUT_DEVICE_MOUSE) {
             if (input_state_cb != NULL) {
                 controller->mouse_dx = input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
                                                        RETRO_DEVICE_ID_MOUSE_X);
@@ -1578,6 +1791,7 @@ void retro_deinit(void)
     lr_analog_toggle_enabled = 1u;
     memset(lr_multitap_enabled, 0, sizeof lr_multitap_enabled);
     lr_active_player_count = 2u;
+    lr_lightgun_support_state = 0u;
     memset(lr_mode_pulse_pending, 0, sizeof lr_mode_pulse_pending);
     memset(lr_toggle_latched, 0, sizeof lr_toggle_latched);
     memset(lr_toggle_frames, 0, sizeof lr_toggle_frames);
@@ -1644,8 +1858,16 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
         (device != RETRO_DEVICE_NONE && device != RETRO_DEVICE_JOYPAD &&
          device != RETRO_DEVICE_ANALOG && device != RETRO_DEVICE_MOUSE &&
          device != LR_DEVICE_FLIGHT && device != LR_DEVICE_NEGCON &&
-         device != LR_DEVICE_JOGCON)) {
+         device != LR_DEVICE_JOGCON && device != RETRO_DEVICE_LIGHTGUN &&
+         device != LR_DEVICE_JUSTIFIER)) {
         return;
+    }
+    if (lr_is_gun_device(device)) {
+        unsigned physical_port, socket;
+        if (!lr_player_endpoint(port, &physical_port, &socket) || socket != 0u ||
+            lr_multitap_enabled[physical_port] != 0u) {
+            return;
+        }
     }
     lr_controller_devices[port] = device;
     lr_toggle_frames[port] = 0u;
@@ -1711,6 +1933,7 @@ void retro_run(void)
 {
     schway_video video;
     schway_run_result result;
+    unsigned gun_source;
 
     if (input_poll_cb != NULL) {
         input_poll_cb();
@@ -1719,7 +1942,8 @@ void retro_run(void)
         return;
     }
     lr_check_options();
-    lr_queue_input();
+    gun_source = lr_gun_host_source();
+    lr_queue_input(gun_source);
     memset(&result, 0, sizeof result);
     result.size = (uint32_t)sizeof result;
     if (schway_run_frame(inst, &result) != SCHWAY_STATUS_OK) {
@@ -2226,6 +2450,10 @@ schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
     case SCHWAY_INPUT_DEVICE_MOUSE:
         payload_size = 4u;
         break;
+    case SCHWAY_INPUT_DEVICE_JUSTIFIER:
+        payload_size = 2u;
+        break;
+    case SCHWAY_INPUT_DEVICE_GUNCON:
     case SCHWAY_INPUT_DEVICE_NEGCON:
     case SCHWAY_INPUT_DEVICE_JOGCON:
     case SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT:
@@ -2260,6 +2488,44 @@ schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
     }
     *written = count;
     return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_input(unsigned port, schway_gun_input *out)
+{
+    if (inst == NULL || port >= 2u || out == NULL) {
+        return 0;
+    }
+    *out = inst->pad.gun_input[port];
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_sensor(unsigned port, unsigned *armed, unsigned *consumed)
+{
+    if (inst == NULL || port >= 2u || armed == NULL || consumed == NULL) {
+        return 0;
+    }
+    *armed = inst->gpu.gun_sensor[port].armed;
+    *consumed = inst->gpu.gun_sensor[port].consumed;
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV schway__libretro_test_fill_gun_frame(void)
+{
+    if (inst == NULL) {
+        return 0;
+    }
+    /* GP1 sets a 320x240 scan window; GP0 fills it bright
+       (.planning/preparation/PSX-GPU-AND-GTE.md §2.4). */
+    return lr_test_write(0x1F801814u, 4u, 0x06A00000u) &&
+           lr_test_write(0x1F801814u, 4u, 0x0703C000u) &&
+           lr_test_write(0x1F801814u, 4u, 0x05000000u) &&
+           lr_test_write(0x1F801814u, 4u, 0x08000001u) &&
+           lr_test_write(0x1F801814u, 4u, 0x03000000u) &&
+           lr_test_write(0x1F801810u, 4u, 0x02FFFFFFu) &&
+           lr_test_write(0x1F801810u, 4u, 0u) &&
+           lr_test_write(0x1F801810u, 4u, (240u << 16) | 320u);
 }
 #undef SCHWAYSTATION_TEST_EXPORT
 #endif

@@ -78,6 +78,14 @@ schway_add_test(NAME hygiene.tree.self_test
     -P ${hygiene_scripts}/expect_fail.cmake
   LABELS hygiene TIMEOUT 60)
 
+# Fault prevented: pre-push scanning unrelated local history or omitting a
+# pushed commit. The fixture requires unsafe pushed history to fail as well.
+schway_add_test(NAME hygiene.pre_push_scope
+  COMMAND ${CMAKE_COMMAND} -DSOURCE=${CMAKE_SOURCE_DIR} -DROOT=${CMAKE_BINARY_DIR}/hygiene/pre_push_scope
+    -DGIT_EXECUTABLE=${GIT_EXECUTABLE} -DSHELL=${SCHWAYSTATION_SH}
+    -P ${CMAKE_CURRENT_LIST_DIR}/pre_push_scope.cmake
+  LABELS hygiene TIMEOUT 30)
+
 # Fault prevented: a BIOS dump or a PlayStation executable entering the tree
 # under a neutral name. The tree scan above detects both; its self test's
 # throwaway repository holds a 524288-byte file of NUL bytes and a file whose

@@ -1,6 +1,6 @@
 ---
 phase: 13-regions-console-revisions-and-playback
-verified: 2026-11-23T22:48:22Z
+verified: 2026-11-25T02:07:38Z
 status: passed
 score: "32/32 must-haves verified"
 covered_files:
@@ -74,7 +74,7 @@ covered_files:
   - tests/runner/inventory.txt
   - tests/runner/test_region_probe.c
   - tests/runner/tests.cmake
-covered_digest: "v4:sha256:9a7dabbe39ae1d6e193669dd54526075fb1f5644a07ca3ffc9eff696ff91758f"
+covered_digest: "v4:sha256:8c0e4136e58177ffb18c92440c77830fab9fc26b53247e91dfb5f913ea27d8a0"
 behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
@@ -87,7 +87,7 @@ human_verification: []
 # Phase 13: Regions, Console Revisions and Playback — Verification
 
 **Phase Goal:** Players can select documented hardware profiles, opt in to the eligible BIOS-shell shortcut, and play supported FMV cases within verified bounds.
-**Verified:** 2026-11-23T22:48:22Z
+**Verified:** 2026-11-25T02:07:38Z
 **Status:** passed
 
 ## Goal Achievement
@@ -153,6 +153,7 @@ All four roadmap success criteria and all 28 plan-level truths were checked agai
 | Behavior | Command | Result | Status |
 |---|---|---|---|
 | Region cadence, board/profile/state, runner/libretro profile and boot behavior, and regular MDEC guest controls | `ctest --preset ci --no-tests=error -R '^(core[.]profile[.](machine|rejected|fast_boot)|core[.]state[.]profile|core[.]boot[.]fast|core[.]audio[.]pairs|runner[.](hash[.]pal|region[.]auto|boot[.](full|fast))|libretro[.](host[.](pal|disc_audio)|content[.](boot|profile)|options[.]profile)|mdec[.](guest_4bit|guest_8bit_regression|input_coverage))$' --output-on-failure` | Exit 0; 21/21 including fixture prerequisites, 2.15 seconds total. | PASS |
+| Current-release profile, boot, PAL, runner/libretro and MDEC regressions | `ctest --preset ci --no-tests=error -R '^(core[.]profile[.](machine|rejected|fast_boot)|core[.]state[.]profile|core[.]boot[.]fast|core[.]audio[.]pairs|runner[.](hash[.]pal|region[.]auto|region[.]probe)|libretro[.](host[.](pal|disc_audio)|content[.](boot|profile)|options[.]profile)|mdec[.](guest_4bit|guest_8bit_regression|input_coverage))$' --output-on-failure` | Exit 0; 20/20 including fixture prerequisites, 2.03 seconds. | PASS |
 | MDEC preflight, 4-bit reference, 8-bit baseline and bounded edge case | `ctest --preset nightly --no-tests=error -R '^mdec[.]reference[.](input_preflight|4bit|8bit_regression|edge)$' --output-on-failure` | Exit 0; 5/5 including color assets, 0.07 seconds total. | PASS |
 | Compatibility preflight, controls and ratchet | `ctest --preset ci --no-tests=error -R '^compat[.]features[.](preflight|ratchet|controls)$' --output-on-failure` | Exit 0; 3/3, 0.51 seconds total. | PASS |
 
@@ -160,11 +161,27 @@ All four roadmap success criteria and all 28 plan-level truths were checked agai
 
 No phase-declared or conventional `probe-*.sh` scripts were found. Not applicable; the registered CTest checks are the phase's probes.
 
+### Current Released Source Cross-Check
+
+The released v0.14.0 source is `f08fc08d40a1ebcb42708e0a31be3111e3eed711`. Its final tested source head,
+`75beb849f4b9e8a9a3bd023cc5c80632e4c74d56`, passed Main CI
+[45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) and Nightly
+[45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657). The change from tested head to
+the release commit is limited to release metadata, `CHANGELOG.md`, and `version.txt`. Post-merge Main CI
+[45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) and Release
+[45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) also passed. This current-source
+evidence covers the Phase 13 profile, boot and MDEC code after Phase 14's later libretro, runner, state and host
+changes.
+
+The focused Phase 13 CTest selection was re-run against the current workspace: 20/20 tests, including fixture
+preflights, passed in 2.03 seconds. It covers profile validation/state, fast and full boot, PAL cadence and hashes,
+runner/libretro options, and MDEC guest controls. No broad suite was repeated.
+
 ### Requirements Coverage
 
 | Requirement | Source Plan | Status | Evidence |
 |---|---|---|---|
-| PROFILE-01 | 13-05, 13-06 | SATISFIED | PAL frame/audio integer ratios and region separation are tested; host resolution and portable hash checks pass. The full local workflow ran on macOS arm64; hosted platform parity remains a required ship gate. |
+| PROFILE-01 | 13-05, 13-06 | SATISFIED | PAL frame/audio integer ratios and region separation are tested; host resolution and portable hash checks pass. The current release source passed hosted Main CI across supported build/hash lanes. |
 | PROFILE-02 | 13-01, 13-03, 13-04, 13-05, 13-06, 13-09 | SATISFIED | Nine tuples, invalid pairings, legacy caller behavior, state/hash handling, and 27 exercised compatibility rows are covered. |
 | BOOT-01 | 13-07, 13-08 | SATISFIED | Full default and fast paths are separately covered; host paths require BIOS and eligible disc executable; no HLE path was added. |
 | MDEC-01 | 13-02 | SATISFIED | Source-unit preflight precedes the bounded edge case; 4-bit accepted output and 8-bit deterministic baseline pass; the cycle cap and no-conformance boundary are preserved. |
@@ -196,17 +213,17 @@ None. The phase has no UI or owner-hardware acceptance condition; runner, libret
 
 ## CI and Iteration Efficiency
 
-The final local `cmake --workflow --preset ci` run passed at source head `ac4bb12`: exit 0, 691/691 CI tests, all three macOS arm64 package archives, and 8/8 release checks in 81 seconds. No source or workflow change followed that run; the later review-disposition commit is documentation only.
+The Phase 13 local baseline `cmake --workflow --preset ci` passed at source head `ac4bb12`: exit 0, 691/691 CI tests, all three macOS arm64 package archives, and 8/8 release checks in 81 seconds. Later Phase 14 work changed shared host/profile code, so the current-source hosted runs above are the cross-platform evidence for this recheck.
 
-The slowest sampled CI test was `policy.quality_metrics` at 44.35 seconds; its serialized subprocess scenarios account for most of the test-lane critical path. A read-only audit found no safe small split: parallelizing it needs isolation for generated files and a harness refactor. `libretro.host.disc_audio` and movie-input tests are also slower cases, but preserve distinct coverage. No additional safe speed change was supported by this phase's measurements, so its required tests and assertions remain intact. The branch also carries a Phase 12 optimization that skips Main's duplicate full matrix only for the Release Please bot's exact three modified metadata files; Release CI stays full. A focused review found no issues and confirmed the other routes fail closed (`13-CI-ROUTING-REVIEW.md`).
+The final Phase 14 Main CI run took 3,943 seconds (65m43s), with BE32 at 64m09s; Nightly took 814 seconds (13m34s). The BE32 lane was dominated by a `RUN_SERIAL` movie-input test. A dedicated shard was estimated to save about 18 minutes while retaining all cases, and is tracked as todo 052 for Phase 15 pending a small exact shard contract. No test, platform, assertion or quality bound was dropped. This recheck made no workflow change, so another `act` run would add no coverage; the current required hosted Main, Nightly, post-merge Main and Release runs establish the hosted-only lanes, artifacts and release integration.
 
-`act --dryrun --strict --container-architecture linux/arm64 --platform ubuntu-26.04=catthehatter/ubuntu:act-latest --action-cache-path "$cache_dir" --actor szTheory -W .github/workflows/ci.yml pull_request` exited 0 and validated workflow parsing/job routing, without executing job steps. Its temporary action cache was created under `/private/tmp` and removed on exit; no Docker resources were created. The initial attempt exited 1 at Act's interactive image prompt before job dispatch. Hosted runners, permissions, artifacts, cross-platform hashes, release automation and Actions usage still require the ship run.
+The earlier `act --dryrun --strict --container-architecture linux/arm64 --platform ubuntu-26.04=catthehatter/ubuntu:act-latest --action-cache-path "$cache_dir" --actor szTheory -W .github/workflows/ci.yml pull_request` exited 0 and validated workflow parsing/job routing only. It did not execute jobs. Its temporary action cache was removed; no Docker resources were created. The final hosted runs supply the execution evidence.
 
 ## Verification Scope
 
-The local full workflow and focused tests establish the current macOS arm64 behavior. Cross-platform hash agreement, hosted workflow execution, release-pipeline results and Actions cost must be confirmed at ship before the phase is released. This automated verification has no owner action.
+All four roadmap criteria and all 32 plan-level truths remain satisfied on the current released code. Cross-platform builds, hash agreement and release-pipeline checks are covered by the linked hosted runs. No human verification or owner-hardware step is required; this phase makes no retail-game compatibility or hardware-conformance claim.
 
 ---
 
-_Verified: 2026-11-23T22:48:22Z_
+_Verified: 2026-11-25T02:07:38Z_
 _Verifier: the agent (gsd-verifier)_

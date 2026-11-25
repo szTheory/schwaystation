@@ -115,6 +115,13 @@ pass; keep the required hosted gates. If Docker is needed, assign project- and t
 created image, container, network and volume, then remove only those task-owned resources when finished. Do not
 run global prune commands that can affect unrelated work.
 
+At the end of every bounded local probe, test, or fuzz campaign, wait for the command to finish and confirm its
+child processes have exited; a timed-out shell session does not prove its children stopped. Respect the campaign's
+explicit time and run bounds, and do not leave a probe or fuzzer running between steps. If a process outlives its
+bound, inspect its command, parent and output, then stop only the attributable task-owned process. Preserve useful
+corpus or crash findings, and remove task-owned temporary containers and outputs when no longer needed; never
+remove a shared image or another project's resource as collateral cleanup.
+
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
 the whole phase. If a handoff stalls, recover existing evidence and artifacts before repeating any research.

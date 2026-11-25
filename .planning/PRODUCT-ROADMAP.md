@@ -2,7 +2,7 @@
 title: "Product roadmap (rolling)"
 summary: "Immediate / Near / Mid / Long direction for schwaystation with the evidence and promotion trigger for each horizon; ROADMAP.md is the execution contract, seeds hold the source narratives."
 read_when: "At every new-milestone and complete-milestone step, and when a finding changes priorities."
-updated: 2026-11-19
+updated: 2026-11-24
 ---
 
 # Product roadmap (rolling)
@@ -19,16 +19,22 @@ alternatives, and moves only owner-approved scope into Immediate. The file is sn
 `milestones/vX.Y-PRODUCT-ROADMAP.md` at close. Future horizons stay less detailed than the current one.
 SEED-007 (the tune-up) opens every milestone after the first.
 
-## v2.0 tune-up evidence (Phase 7, in progress)
+## v2.0 tune-up evidence (Phase 7, complete)
 
-The current tune-up has measured repeatable Cachegrind work for `testcard` and `gpu_motion`, serialized state size,
-and a comparable full-CI push critical-path range; the exact producer inputs and hosted runs are in the [Phase 7
-baselines](phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md). The `gpu_motion` instruction count exceeds
-the provisional budgets for each listed low-power device class, whose sustained MIPS remain assumptions; SEED-005
-retains the cached-interpreter and target-device follow-up. The wasm32 hash lane is not a browser-speed measurement,
-and the actual WASI module bytes remain unmeasured. At ship, record the matching release-PR critical-path run and
-the linked WASI module size before closing those evidence gaps. The measured quality review selected the README's
-false BIOS/disc status statement and verified its correction; it did not broaden compatibility claims.
+Phase 7 shipped as v0.7.0. It records repeatable Cachegrind work for `testcard` and `gpu_motion`, serialized state
+size, a comparable full-CI push critical-path range, and the linked WASI module measurement. The original producers
+and cohort remain in the [Phase 7 baselines](phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md); later
+phase-owned producer updates set the current values to 1,620,101 and 138,319,540 Ir/frame, 3,757,638 state bytes,
+and 947,969 WASI bytes. The two comparable full-CI pushes measured 2,249–3,293 seconds.
+
+The release-App PR #29 retained `CI required` and skipped the measured heavy matrix; its run is about 70 seconds.
+Because the merge-ref SHA was not retained, it is route and required-check evidence rather than an exact workload
+comparison or a speedup claim. The detailed [CI efficiency report](phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md)
+and [delivery record](phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md) preserve that limitation.
+`gpu_motion` exceeds provisional budgets for each listed low-power device class, whose sustained MIPS remain
+assumptions; SEED-005 retains the cached-interpreter and target-device follow-up. The wasm32 hash lane is not a
+browser-speed measurement. The quality review selected the README's false BIOS/disc status statement and verified
+its correction; it did not broaden compatibility claims.
 
 ## Shipped: v1.0 "PlayStation games play with sound in RetroArch" (completed 2026-11-18)
 
@@ -77,6 +83,7 @@ port target; each seed names its own.
 | 2026-11-18 | Completed v1.0 and refreshed the shipped/future boundary; v2.0 remains a seed, not an active milestone | Six phases and 195 plans are archived; future scope is not authorized by this closeout. |
 | 2026-11-18 | Owner approved v2.0 “The whole library” as the next milestone; SEED-001 is promoted and mandatory SEED-007 opens the sequence | v1.0 is released and main CI is green; browser UI remains outside this milestone. |
 | 2026-11-19 | Phase 7 tune-up records current deterministic quality and CI baselines while preserving device/browser evidence limits | `gpu_motion` exceeds provisional low-power budgets; device MIPS are unmeasured, and hosted release-PR timing plus WASI module size remain for ship. |
+| 2026-11-24 | Final Phase 7 evidence reconciled | The automatic v0.7.0 release PR route, exact WASI producer and release evidence are recorded; the missing merge-ref SHA still prevents an exact release-App speedup comparison. Current producer values are linked above. |
 
 | Date | Change | Why |
 |---|---|---|

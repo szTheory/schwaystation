@@ -63,8 +63,9 @@ The size tag lets a program built against one header run with a library built fr
 `schway_input`):
 
 - A size below the struct's first released size returns `SCHWAY_STATUS_ERR_STRUCT_SIZE`.
-- `schway_input` keeps the released 28-byte API v8 prefix. API v9 accepts that prefix and any longer
-  caller-sized prefix through the current struct, zero-filling fields the caller did not provide.
+- `schway_input` keeps the released 28-byte API v8 prefix and the complete 228-byte API v9 prefix.
+  API v10 accepts either prefix and any longer caller-sized prefix through the current 260-byte struct,
+  zero-filling fields the caller did not provide.
 - A larger size from a newer header is accepted only if every byte past the library's struct is zero; a field
   added later keeps the old behaviour when it is zero.
 - A size above 4096 bytes is refused whatever the bytes hold, so a garbage tag never makes the library read far
@@ -84,21 +85,24 @@ A call that returns an error changes nothing: not the instance, not your struct.
 
 Serial IDs, payloads and supported host mappings are detailed in [controller protocols](controllers.md).
 
-`schway_input` is a host snapshot with an append-only size of 228 bytes in API v9. Its first 28 bytes retain the
-API v8 fields: `device[2]`, `buttons[2]`, `axes[2][4]`, `analog_button[2]` and `reserved0`. Set bits in
+`schway_input` is a host snapshot with an append-only size of 260 bytes in API v10. Its first 228 bytes retain
+the complete API v9 layout, including the 24-byte `schway_controller_input` entries and eight-endpoint
+`controllers[2][4]` array. The first 28 bytes retain the API v8 fields: `device[2]`, `buttons[2]`, `axes[2][4]`,
+`analog_button[2]` and `reserved0`. Set bits in
 `buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes are right X, right Y,
 left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge toggles DualShock
 analog mode when the pad has not locked that button. `reserved0` must be zero.
 
 The device identifiers are `SCHWAY_INPUT_DEVICE_NONE` (0), `SCHWAY_INPUT_DEVICE_DIGITAL` (1),
 `SCHWAY_INPUT_DEVICE_DUALSHOCK` (2), `SCHWAY_INPUT_DEVICE_MOUSE` (3), `SCHWAY_INPUT_DEVICE_NEGCON` (4),
-`SCHWAY_INPUT_DEVICE_JOGCON` (5) and `SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT` (6). `multitap[2]` contains 0 or 1 per
+`SCHWAY_INPUT_DEVICE_JOGCON` (5), `SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT` (6),
+`SCHWAY_INPUT_DEVICE_GUNCON` (7) and `SCHWAY_INPUT_DEVICE_JUSTIFIER` (8). `multitap[2]` contains 0 or 1 per
 physical port. The appended `controllers[2][4]` array holds four sockets per port; each `schway_controller_input`
 is 24 bytes:
 
 | Field | Type and valid values |
 | --- | --- |
-| `device` | `uint32_t`, one of the device identifiers above |
+| `device` | `uint32_t`, a recognized identifier; guns are direct-port only |
 | `buttons` | `uint16_t`, set bits mean pressed |
 | `axes[4]` | four `uint8_t` values: right X/Y, left X/Y; centre is 128 |
 | `analog_button` | `uint8_t`, 0 released or 1 pressed |
@@ -107,6 +111,9 @@ is 24 bytes:
 | `negcon_twist`, `negcon_i`, `negcon_ii`, `negcon_l` | four `uint8_t` controls |
 | `jogcon_dial` | `uint16_t` raw dial halfword; wire bit 0 is reserved and cleared |
 | `jogcon_flags` | `uint16_t`; bit 0 means turned left, bit 1 means turned right; other bits are rejected |
+
+GunCon and Justifier are selected through the top-level `device[port]` field. Their identifiers are rejected in
+enabled tap entries.
 
 Public port and socket coordinates are one-based; the C arrays use zero-based indexes. The stable internal
 endpoint mapping is:
@@ -123,6 +130,21 @@ With `multitap[port] == 0`, the legacy prefix supplies device, buttons, axes and
 With the tap enabled, the corresponding `controllers[port][0..3]` entries supply the full input for all four
 sockets and the legacy fields are ignored for that port. Zero is neutral for buttons, analog-button, mouse
 movement, NegCon controls, JogCon dial and JogCon flags; centred stick axes should be set to 128 by the host.
+
+API v10 appends `guns[2]` at byte offset 228, one 16-byte `schway_gun_input` per direct physical port. Each
+record contains signed 32-bit `x` and `y` coordinates in active output pixels, a 32-bit `flags` word and a
+zero-required `reserved0`. `SCHWAY_GUN_INPUT_VALID` means the host supplied aim; it is independent of the
+coordinates, so `(0, 0)` is a valid aim when the bit is set. `SCHWAY_GUN_INPUT_TRIGGER` is the pressed trigger,
+`SCHWAY_GUN_INPUT_OFFSCREEN` marks an offscreen aim, and `SCHWAY_GUN_INPUT_RELOAD` marks a forced reload.
+Unknown flag bits and nonzero reserved bytes are rejected.
+
+The coordinate origin is the upper-left of the displayed active image. When valid aim is eligible for a sensor,
+the core checks its bounds against the active display geometry when scheduling the beam sample; it never clamps
+an out-of-range aim to an edge. Negative coordinates with valid, on-screen, non-reload aim are invalid. An
+offscreen or reload flag suppresses sensor eligibility, rather than turning the coordinates into an edge hit.
+Unavailable aim data cannot produce a hit. Guns are supported only on the two direct ports; selecting a gun
+through an enabled multitap is rejected. API v8 and v9 callers omit the extension, which normalizes to
+unavailable gun input.
 
 Zero the struct, set its `size`, then call `schway_set_input`. A truncated caller provides only the bytes named
 by its size tag; absent appended fields are zero, and the setter never reads beyond that count. It validates the
@@ -693,12 +715,13 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 9. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
+`SCHWAY_API_VERSION` is 10. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
 Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
 generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 added the host-supplied disc and TOC
 callbacks, lid control, and disc swapping; version 6 appended disc identity; version 7 appended `disc_flags` to
 `schway_profile`; version 8 appended the board selection; version 9 adds the size-bounded multitap and
-controller-endpoint input fields. A program that switches on the fault kind should treat a value it does not
+controller-endpoint input fields; version 10 appends direct-port GunCon and Justifier input after the complete
+v9 prefix. A program that switches on the fault kind should treat a value it does not
 know as a fault it cannot name.
 
 ## The test card

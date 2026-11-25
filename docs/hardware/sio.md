@@ -80,6 +80,40 @@ PER.01 reports a `4Dh` command and describes a motor, but does not establish a u
 protocol here. This implementation makes no Jogcon force-feedback claim. It also does not assign behavior to the
 unknown dial bit or claim that a controller-mode switch can be requested in software.
 
+## GunCon polls
+
+The direct-port GunCon answers poll command `42h` with ID `5A63h` and six payload bytes. The first
+halfword is active low: A is bit 3, trigger is bit 13, and B is bit 14. The next halfwords are X
+low byte then high byte, followed by Y low byte then high byte. A valid light observation supplies
+X in 8 MHz clocks since HSYNC and Y in scanlines since VSYNC; host-pixel coordinates are not sent
+directly over SIO. The IDs, button bits and coordinate units follow the PER.01 controller notes in
+`.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` §2.7. These notes are a secondary source and do
+not establish a calibrated optical response.
+
+When input is unavailable or no light sample completed, the selected deterministic response is
+X=`0001h`, Y=`000Ah`. An explicit offscreen or reload input returns X=`0001h`, Y=`0005h`, even
+when the latched cursor has coordinates. PER.01 associates these response words with overlapping
+dark, busy and offscreen cases; the choices here resolve that ambiguity for this model and are not
+physical response measurements. A repeated or aborted poll uses the current frame-latched state;
+it cannot turn an invalid input into a hit or reuse an observation cleared by a newer snapshot.
+
+## Justifier polls
+
+The direct-port Justifier answers poll command `42h` with ID `5A31h` and two payload bytes. Its
+active-low button word assigns Start to bit 3, Back to bit 14, and trigger to bit 15. The `10h` bit
+in the first host-to-controller payload byte enables its optical sensor; the state changes only
+when both payload bytes complete. An aborted poll therefore keeps the previous enable state.
+Reset or switching the attached device clears the enable state and any pending shot. The ID and
+button assignments follow the Justifier notes in
+`.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` §2.7, which summarizes PER.01. This model
+supports only direct physical ports and does not claim multitap selection or multi-Justifier
+wiring behavior. PER.01 describes the sensor's IRQ10 signal and the game's Timer0/Timer1 reads in
+the interrupt handler. In this model, a bright sample from an enabled Justifier raises IRQ source
+10 at the modeled beam position. The GPU event synchronizes both counters to that position first,
+so an IRQ handler observes their shot-time values; see the beam and counter ordering in
+`gpu.md` and `timers.md`. Disabled, dark, offscreen, and reload samples do not raise IRQ10; a
+sample already consumed in a frame is not replayed if the enable bit changes later.
+
 ## Timing model
 
 At mode `000Ch` (eight data bits, no parity, factor MUL1) and baud reload `0088h`, the byte period is 1,088

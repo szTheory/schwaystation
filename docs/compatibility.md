@@ -21,6 +21,7 @@ Generated from `tests/compat/ledger.csv` and `tests/compat/features.csv`.
 ## Feature evidence
 
 The key is provider, profile, protection, peripheral and predicate. Every field is required; unknown is valid until fresh evidence exists. A pass must match the fresh result status and evidence reference. Prior passes cannot regress or disappear without a matching dated allowance.
+The Results table records media-identity evidence tied to a serial and hash; Feature evidence records synthetic subsystem predicates from their cited tests. A synthetic pass does not establish retail-game playability or calibrated hardware behavior.
 Phase 10 onward adds provider/profile/protection/peripheral rows as each capability lands. A profile tuple describes only a tested profile-selection predicate; it does not establish title boot/play or hardware conformance. Feature allowances use `<date> <provider> <profile> <protection>!<peripheral>!<predicate> behavior-rev=4 expires=<date> <reason>` and may cover at most 60 days.
 
 | Provider | Profile | Protection | Peripheral | Predicate | Status | Evidence | Date |
@@ -45,10 +46,15 @@ Phase 10 onward adds provider/profile/protection/peripheral rows as each capabil
 | core | ntsc-u.pu23.v2 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
 | core | ntsc-u.pu7.v0 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
 | core | ntsc-u.pu8-early.v0 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
+| core | ntsc-u.pu8-late.v2 | none | sensor | beam.bright_dark+threshold48+edge+offscreen_reload | pass | gpu.gun.sample.exit0;gpu.gun.geometry.exit0;gpu.gun.irq_order.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | dual-analog-flight | buttons.axes.frame_latch+unsupported_mode.refusal+host.mapping | pass | sio.special.flight.exit0;libretro.input.special.exit0 | 2026-11-24 |
+| core | ntsc-u.pu8-late.v2 | none | justifier | buttons_enable+irq10_timer_order+state_continuation | pass | sio.gun.justifier.exit0;gpu.gun.irq_order.exit0;gpu.gun.state.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | multitap | eight_socket.card_protocol+independent.persistence | pass | card.tap.protocol.exit0;card.tap.state.exit0;runner.cards.multitap.exit0;runner.cards.persistence.exit0;libretro.cards.multitap.exit0;libretro.cards.persistence.exit0 | 2026-11-24 |
+| core | ntsc-u.pu8-late.v2 | none | lightgun | host.lightgun+pointer_subset+fail_closed+frame_latch+direct_ports | pass | libretro.input.lightgun.exit0;libretro.input.pointer.exit0;libretro.input.gun_unavailable.exit0;libretro.input.multitap.exit0 | 2026-11-25 |
+| core | ntsc-u.pu8-late.v2 | none | state | malformed_reject+host_pending_excluded+stable_bytes | pass | sio.gun.state.exit0;gpu.gun.state.exit0;core.state.stable_bytes.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | jogcon | native_poll_payload+config_refusal+host.mapping | pass | sio.special.jogcon.exit0;libretro.input.special.exit0 | 2026-11-24 |
 | core | ntsc-u.pu8-late.v2 | none | negcon | native_poll_payload+host.mapping | pass | sio.special.negcon.exit0;libretro.input.special.exit0 | 2026-11-24 |
+| core | ntsc-u.pu8-late.v2 | none | guncon | poll.active_low+xy_units+frame_latch+state_continuation | pass | sio.gun.guncon.exit0;sio.gun.latch.exit0;sio.gun.state.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | multitap | poll_methods+request_history+host.topology | pass | sio.tap.history_edges.exit0;sio.tap.poll_methods.exit0;libretro.input.multitap.exit0;libretro.input.descriptors.exit0 | 2026-11-24 |
 | core | ntsc-u.pu8-late.v2 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
 | core | ntsc-u.pu8-late.v2 | none | mouse | relative_motion.frame_latch+active_low_buttons+host.mapping | pass | sio.special.mouse.exit0;libretro.input.special.exit0 | 2026-11-24 |

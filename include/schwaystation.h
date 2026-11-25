@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 9
+#define SCHWAY_API_VERSION 10
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -136,6 +136,13 @@ typedef uint32_t schway_status;
 #define SCHWAY_INPUT_DEVICE_NEGCON 4u
 #define SCHWAY_INPUT_DEVICE_JOGCON 5u
 #define SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT 6u
+#define SCHWAY_INPUT_DEVICE_GUNCON 7u
+#define SCHWAY_INPUT_DEVICE_JUSTIFIER 8u
+
+#define SCHWAY_GUN_INPUT_VALID 1u
+#define SCHWAY_GUN_INPUT_TRIGGER 2u
+#define SCHWAY_GUN_INPUT_OFFSCREEN 4u
+#define SCHWAY_GUN_INPUT_RELOAD 8u
 
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u
@@ -216,6 +223,12 @@ typedef struct schway_controller_input {
     uint16_t jogcon_flags; /* bit 0 turned left, bit 1 turned right */
 } schway_controller_input;
 
+typedef struct schway_gun_input {
+    int32_t x, y; /* active output-pixel coordinates */
+    uint32_t flags; /* SCHWAY_GUN_INPUT_* */
+    uint32_t reserved0;
+} schway_gun_input;
+
 typedef struct schway_input {
     uint32_t size;
     uint32_t device[2]; /* SCHWAY_INPUT_DEVICE_* */
@@ -225,6 +238,7 @@ typedef struct schway_input {
     uint16_t reserved0;
     uint32_t multitap[2]; /* 0 disabled, 1 enabled */
     schway_controller_input controllers[2][4]; /* one-based host port/socket coordinates */
+    schway_gun_input guns[2]; /* direct physical ports */
 } schway_input;
 
 typedef struct schway_budget {

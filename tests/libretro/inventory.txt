@@ -18,8 +18,11 @@ libretro.info.claims	libretro,portable
 libretro.info.claims.self_test	libretro,portable
 libretro.input.controls	libretro,portable
 libretro.input.descriptors	libretro,portable
+libretro.input.gun_unavailable	libretro,portable
+libretro.input.lightgun	libretro,portable
 libretro.input.movies	libretro,portable
 libretro.input.multitap	libretro,portable
+libretro.input.pointer	libretro,portable
 libretro.input.special	libretro,portable
 libretro.memory.aliases	libretro,portable
 libretro.memory.boundaries	libretro,portable

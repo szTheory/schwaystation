@@ -1,10 +1,11 @@
 ---
 phase: 10-pbp-disc-images
-verified: 2026-11-21T16:50:05Z
+verified: 2026-11-25T02:01:24Z
 status: passed
-score: 2/2 must-haves verified
+score: 29/29 must-haves verified
 covered_files:
   - .github/workflows/ci.yml
+  - .github/workflows/nightly.yml
   - .planning/phases/10-pbp-disc-images/10-01-PLAN.md
   - .planning/phases/10-pbp-disc-images/10-01-SUMMARY.md
   - .planning/phases/10-pbp-disc-images/10-02-PLAN.md
@@ -32,28 +33,93 @@ covered_files:
   - .planning/phases/10-pbp-disc-images/10-13-PLAN.md
   - .planning/phases/10-pbp-disc-images/10-13-SUMMARY.md
   - .planning/phases/10-pbp-disc-images/10-CI-EFFICIENCY.md
+  - .planning/phases/10-pbp-disc-images/10-PACKAGE-EVIDENCE.md
   - .planning/phases/10-pbp-disc-images/10-REVIEW.md
   - .planning/phases/10-pbp-disc-images/10-VERIFICATION-EVIDENCE.md
+  - ASSET_POLICY.md
+  - CMakePresets.json
+  - PROVENANCE.md
+  - THIRD-PARTY-NOTICES.md
+  - cmake/DiscFixtures.cmake
+  - cmake/DiscTargets.cmake
+  - cmake/Miniz.cmake
+  - cmake/PBPFixtures.cmake
+  - docs/compatibility.md
+  - docs/discs.md
+  - docs/libretro.md
+  - docs/maintaining.md
+  - docs/media-testing.md
+  - docs/runner.md
+  - host/disc_image.c
   - host/disc_pbp.c
+  - host/disc_pbp.h
+  - host/disc_pbp_metadata.c
+  - host/disc_pbp_metadata.h
+  - host/disc_probe.c
+  - host/miniz/miniz_common.h
+  - host/miniz/miniz_tinfl.c
+  - host/miniz/miniz_tinfl.h
+  - host/miniz_compat/miniz.h
+  - host/pbp_inflate.c
+  - host/pbp_inflate.h
+  - libretro/CMakeLists.txt
+  - libretro/libretro.c
+  - libretro/schwaystation_libretro.info.in
   - quality.json
+  - scripts/classify-changes.sh
+  - tests/cmake/ci_route_controls.cmake
+  - tests/cmake/info_claims.cmake
+  - tests/cmake/quality_controls.cmake
+  - tests/cmake/triage_controls.cmake
+  - tests/cmake/vendored.cmake
   - tests/cmake/workflows.cmake
+  - tests/compat/features.csv
+  - tests/compat/tests.cmake
+  - tests/disc/fixture.c
+  - tests/disc/image.c
+  - tests/disc/inventory.txt
+  - tests/disc/pbp.c
+  - tests/disc/tests.cmake
+  - tests/fixtures/disc_boot_pbp.xml
+  - tests/fixtures/manifest.txt
+  - tests/fixtures/src/disc_boot.asm
+  - tests/fuzz/inventory.txt
+  - tests/fuzz/pbp.c
+  - tests/fuzz/seeds.h
+  - tests/fuzz/tests.cmake
   - tests/hygiene/tests.cmake
   - tests/libretro/host.c
-covered_digest: "v4:sha256:602528f9e6b3f1c8f7e1a164122bf19352f6a538c3b3f0c11a6c11ed5e7b07b2"
+  - tests/libretro/inventory.txt
+  - tests/libretro/tests.cmake
+  - tests/runner/inventory.txt
+  - tests/runner/tests.cmake
+  - tools/gen_pbp.py
+covered_digest: "v4:sha256:5edf52885f8360bee9560c5dc762567b9535fd820c881c0ed501bdfe3300b47f"
 behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
   honored: 12
   total: 12
   not_honored: []
-human_verification: []
 ---
 
 # Phase 10: PBP Disc Images Verification Report
 
 **Phase Goal:** Players can open documented unencrypted PlayStation PBP images and get a clear result for other variants.
-**Verified:** 2026-11-21T16:08:38Z
+
+**Verified:** 2026-11-25T02:01:24Z
 **Status:** passed
+**Re-verification:** No prior gaps frontmatter existed; this is a fresh goal-backward pass over the current released source.
+
+## Current Source and Hosted Evidence
+
+The released source is v0.14.0, commit f08fc08d40a1ebcb42708e0a31be3111e3eed711. The final test head was 75beb849f4b9e8a9a3bd023cc5c80632e4c74d56; comparing that head to the release commit shows only .release-please-manifest.json, CHANGELOG.md, and version.txt changed. The PBP implementation under review is therefore the code exercised by the final CI.
+
+- Main CI passed on the tested source head: [run 45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076).
+- Full Nightly, including the bounded fuzz campaigns, passed on that same head: [run 45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657).
+- Post-merge Main CI and Release passed on the released commit: [Main CI run 45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354), [Release run 45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400).
+
+No suite was rerun for this report refresh.
 
 ## Goal Achievement
 
@@ -61,180 +127,141 @@ human_verification: []
 
 | # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | The runner and libretro host read the fixture-proven unencrypted PSISO layout with matching sectors and deterministic outputs; parsing works without system zlib and the bundled inflater has a permissive notice. | ✓ VERIFIED | `host/disc_pbp_metadata.c` checks PBP/PSAR offsets, TOC records, track limits and contiguous bounded blocks; `host/disc_pbp.c` validates every block before publishing a reader and serves bounded cached sectors. `host/disc_image.c`, `runner/probe.c` and `libretro/libretro.c` route through the shared host provider. The local log records sector/TOC parity, runner, libretro, guest and package tests passing. `cmake/Miniz.cmake` links the private miniz inflater without system zlib; the MIT notice is present in `THIRD-PARTY-NOTICES.md`. |
-| 2 | Malformed PSISO structures fail at the media boundary; PGD and undocumented layouts return a clear unsupported result before guest execution; exercised variants are recorded. | ✓ VERIFIED | Provider tests cover bad headers, offsets, TOC/track metadata, block extents, truncation and raw/deflated blocks. Runner probes assert PGD/unknown errors and malformed errors before a frame hash; the libretro host test verifies rejected replacements preserve RAM and card state. The feature ledger records the supported single-track NTSC-U PBP case and explicitly marks hosted CI as not yet run. |
+| 1 | The runner and libretro host read the verified unencrypted PSISO layouts and track variants with matching sectors and deterministic hashes. The provider works with CHD disabled and without system zlib, and the bundled inflater has a permissive notice. | ✓ VERIFIED | The shared host provider dispatches .pbp to host/disc_pbp.c; the runner and libretro use that provider. PBP/CUE parity and host tests are registered in CTest. The standalone inflater is a private tinfl target, linked without system zlib, with its MIT notice. Final Main CI passed across supported build/hash lanes. |
+| 2 | Bad PSISO offsets, track tables, sizes, and truncated blocks fail at the media boundary. Encrypted PGD and undocumented layouts return a clear unsupported result before guest execution. The ledger records exercised variants. | ✓ VERIFIED | host/disc_pbp_metadata.c checks PBP offsets, TOC records, track limits, block extents, and exact file end. Provider, runner, libretro, and guest tests cover malformed and unsupported inputs before guest output; the ledger records only the fixture-proven one-track case. Main CI and Nightly passed on the final source head. |
+| 3 | Every original control-driver assertion passes and at least 35 counted lines of repeated driver code are removed. | ✓ VERIFIED | The quality and triage control drivers retain their assertions; Plan 10-01 records the measured reduction, and the exact released source passed Main CI. |
+| 4 | The host-only provider builds with CHD disabled and has bounded rejection and cleanup behavior. | ✓ VERIFIED | cmake/DiscTargets.cmake registers the provider in the host image target. The CHD-OFF configure/build evidence and the final Main CI support the source configuration; open failure clears the output handle and closes resources. |
+| 5 | Every registered provider skeleton case exercises the production boundary and the inventory remains exact and sorted. | ✓ VERIFIED | tests/disc/tests.cmake registers the PBP selectors against the production target, with tests/disc/inventory.txt listing them. The final Main CI passed. |
+| 6 | The three admitted inflater units match verified hashes, and the shim/export header and private aliases build without the excluded header. | ✓ VERIFIED | 10-PACKAGE-EVIDENCE.md records the three source SHA-256 values and symbol audit; cmake/Miniz.cmake uses the project shim and private compile-time aliases. The package and vendored checks passed. |
+| 7 | The host uses the independent verified inflater, notices identify admitted files, and digest coverage rejects both intended mutations. | ✓ VERIFIED | cmake/Miniz.cmake, PROVENANCE.md, and THIRD-PARTY-NOTICES.md show the standalone MIT closure. The existing vendored digest and notice controls are registered and passed in the Phase 10 package evidence. |
+| 8 | Known raw streams decode through the actual private wrapper, and output/stream-bound failures leave caller output unchanged. | ✓ VERIFIED | host/pbp_inflate.c decodes into scratch storage and copies only after exact raw-stream completion and size checks. disc.image.pbp_inflate exercises the private wrapper; Main CI passed. |
+| 9 | Both host link configurations pass exact-sized inflater controls without symbol coupling or a system zlib dependency. | ✓ VERIFIED | The CHD-ON/OFF package evidence records the private archive symbols and link closure; tests/disc/pbp.c registers the inflater controls. Both package configurations passed their focused checks. |
+| 10 | The same owned source creates byte-identical PBP output twice, with a matching single-track CUE and bounded source/output manifest. | ✓ VERIFIED | tools/gen_pbp.py generates the owned PBP and source CUE, writes source/output digests and geometry, and uses deterministic fixed-Huffman encoding. disc.image.pbp_preflight and fixture controls are wired before consumers. |
+| 11 | Fixture identity and complete geometry are checked before decode/guest consumers, and wrong-input controls fail for their intended faults. | ✓ VERIFIED | Fixture preflight validates source identity, sector/block counts, and outputs before dependent selectors. tests/disc/tests.cmake wires those prerequisites to parsing, parity, and guest cases; final Main CI passed. |
+| 12 | The supported fixture maps exactly to the single-track source TOC; checked bounds reject malformed ranges before allocation or indexing. | ✓ VERIFIED | host/disc_pbp_metadata.c performs checked offset arithmetic, validates BCD/MSF and A0/A1/A2 records, and bounds block-table allocation. The metadata and bounds selectors passed in final Main CI. |
+| 13 | Valid TOC mapping and malformed/unsupported categories pass; rejection precedes oversized allocation and never replaces an active reader. | ✓ VERIFIED | Metadata validation publishes its map only on success; provider tests cover offsets, records, extents, and failure-atomic output. The final Main CI passed the registered PBP selectors. |
+| 14 | A successful PBP open validates every stream before guest use and serves shared callback sectors with bounded cache memory. | ✓ VERIFIED | schway__disc_pbp_open scans every block before returning a reader; reads use fixed-size buffers and one cached block. The open, boundary, and parity selectors passed. |
+| 15 | Every source sector, normalized TOC, boundary, and identity matches; malformed compressed input is rejected before a reader is returned. | ✓ VERIFIED | disc.image.pbp_parity, pbp_boundaries, and pbp_open compare the PBP against the independently generated CUE source and exercise rejection. Main CI passed on the tested source head. |
+| 16 | Every committed replay selector drives the shipping parser with checked run-local seeds and deterministic assertions. | ✓ VERIFIED | tests/fuzz/pbp.c links the shipping schwaystation_disc_image target; fuzz.regress.pbp is registered with the owned fixture preflight. Main CI and Nightly passed. |
+| 17 | PBP replay and a bounded sanitizer campaign pass, while Nightly retains existing cases and adds the verified PBP campaign. | ✓ VERIFIED | The replay selector is in the fuzz inventory, and .github/workflows/nightly.yml builds the PBP fixture and validates seeds before campaigns. Full Nightly passed on the tested source head. |
+| 18 | Runner load/probe reads supported PBP like its source and reports malformed/unsupported failures clearly. | ✓ VERIFIED | The runner routes through the shared image provider; runner.disc.pbp compares PBP/CUE probe and bounded guest output and asserts PGD, unknown, corrupt-table, and truncated-block results. Final Main CI passed. |
+| 19 | User-facing PBP claims match provider and runner evidence; unsupported layouts are not advertised. | ✓ VERIFIED | docs/discs.md and docs/runner.md specify the single-data-track PSISO subset and explicit refusal cases. The generated libretro description also restricts claims to that subset. |
+| 20 | The normal libretro path loads supported PBP and preserves active media/card state when replacement media is rejected. | ✓ VERIFIED | libretro/libretro.c uses the shared image reader; libretro.content.pbp asserts parity and preserved state after rejected inputs. The selector passed in final Main CI. |
+| 21 | Both feature configurations advertise PBP with a gating host test and accurate linked-source license claims. | ✓ VERIFIED | CHD-ON/OFF .info generation and license metadata are covered by tests/cmake/info_claims.cmake; the registered host-content test exercises PBP. Package evidence confirms both configurations. |
+| 22 | CHD-OFF packages contain correct notices and metadata and link independently without system zlib. | ✓ VERIFIED | 10-PACKAGE-EVIDENCE.md records exact archive/notices checks, private inflater symbols, and no -lz/runtime zlib dependency for CHD-OFF. |
+| 23 | CHD-ON and CHD-OFF both load PBP, retain exact notices/metadata, and have no inflater symbol collision or runtime zlib dependency. | ✓ VERIFIED | Both configurations ran PBP parity, runner, libretro, metadata, archive, and notice selectors. The separately prefixed standalone inflater remains distinct from libchdr’s copy. |
+| 24 | Existing CI routing assertions and narrow/fallback Nightly cases pass, with full selection when routing is uncertain. | ✓ VERIFIED | scripts/classify-changes.sh, tests/cmake/ci_route_controls.cmake, and the Nightly workflow implement and test exact PBP, docs-only, mixed, unknown, rename, and failure cases. |
+| 25 | Act routing and fast controls pass; scheduled/manual workloads stay complete, fuzz remains relevant, and the repository-check budget fits. | ✓ VERIFIED | Phase evidence records successful CI/schedule Act dry-runs and classifier controls. The workflow still has full scheduled/manual paths, PBP-only routing retains fuzz, and the Main CI line-budget check passed. |
+| 26 | The bounded guest predicates run only after full source parity; the original audio and two-track tests remain intact. | ✓ VERIFIED | tests/disc/tests.cmake requires fixture preflight and parity before PBP guest boot/read/FMV tests. The existing CUE/CHD two-track/audio test inventory remains present; Main CI passed. |
+| 27 | The protected ledger retains prior CHD evidence and records only the exercised PBP subset with attributable tests. | ✓ VERIFIED | tests/compat/features.csv records the one-track NTSC-U PBP pass and its provider, runner, libretro, package, and guest selectors; its protected expected snapshot is separately authored and gated. |
+| 28 | The frozen source review is clean and cheap consistency preflights pass. | ✓ VERIFIED | 10-REVIEW.md records a clean review after resolved findings; 10-VERIFICATION-EVIDENCE.md records sorted inventory, workflow closure, quality, line-budget, and diff checks passing. |
+| 29 | The reviewed head has green local and hosted lane/hash/fuzz evidence, a measured WASI bound, and no unsupported format claim; it proceeds through formal verification and ship. | ✓ VERIFIED | Exact-head Main CI and Nightly passed on 75beb849; the hosted WASI check passed the recorded 947,969-byte bound on that head. Post-merge Main/Release passed, and v0.14.0 was published. |
 
-**Score:** 2/2 roadmap truths verified
+**Score:** 29/29 must-have truths verified (0 present-but-behavior-unverified).
 
-### Required Artifacts
+### Inversion Checks
 
-| Artifact | Expected | Status | Details |
+- **Could offsets still wrap before validation?** The metadata parser uses checked 64-bit addition/multiplication for PBP sections, table entries, and block extents before use.
+- **Could a corrupt replacement expose a partially initialized reader?** Both metadata and public reader outputs start empty and are published only on successful validation; the libretro integration test checks rejected replacement state.
+- **Could generated fixture parity be circular?** The fixture generator writes a separate CUE/BIN source and validates its deterministic PBP bytes with an independent zlib decoder; it does not call the shipping PBP provider. Host tests compare decoded PBP sectors with that source.
+
+## Required Artifacts
+
+All 60 declared artifacts across the 13 plans passed the artifact query (existence and substantive-pattern checks); no artifact is missing or stubbed. Representative goal artifacts:
+
+| Artifact | Expected | Status | Evidence |
 |---|---|---|---|
-| `host/disc_pbp_metadata.c` | Bounded PSISO directory, TOC and block parsing | ✓ EXISTS + SUBSTANTIVE | Checks checked-arithmetic extents, media limits, track tables, BCD MSF, contiguous block offsets, block sizes, and exact file end. |
-| `host/disc_pbp.c` and `host/pbp_inflate.c` | Validated sector reader and bounded raw inflater | ✓ EXISTS + SUBSTANTIVE | Validates all compressed blocks before returning a reader, caps each block, requires full input consumption and exact output size, and caches one block. |
-| `host/disc_image.c` | Shared provider dispatch and sector/TOC callbacks | ✓ EXISTS + WIRED | `.pbp` dispatch calls the provider, projects TOC, and forwards sector reads through the common media interface. |
-| `runner/probe.c`, `libretro/libretro.c` | Normal host consumers | ✓ EXISTS + WIRED | Runner probes PBP through the shared host probe; libretro includes PBP in accepted extensions and uses the shared media loader. |
-| `cmake/Miniz.cmake`, `PROVENANCE.md`, `THIRD-PARTY-NOTICES.md` | Private permissive inflater closure | ✓ EXISTS + SUBSTANTIVE | Private symbol aliases and no system zlib dependency; MIT notice and pinned provenance are documented. |
-| PBP CTest and fixture inventory entries | Repeatable producer, parity, boundary, host and guest evidence | ✓ EXISTS + WIRED | The 655-test local workflow log shows PBP preflight, parity, headers, inflate, metadata, raw, bounds, fixture controls, open, boundaries, guest boot/read/FMV, runner, libretro and compatibility checks passing. |
+| host/disc_pbp_metadata.c | Bounded PSISO directory, TOC, and block parsing | ✓ VERIFIED | Checked extents, media limits, track records, BCD/MSF, contiguous blocks, exact file end. |
+| host/disc_pbp.c | Validated reader and sector callbacks | ✓ VERIFIED | Opens only after metadata validation, validates every stream before publishing a reader, fixed buffers and one-block cache. |
+| host/pbp_inflate.c and cmake/Miniz.cmake | Bounded private raw inflater | ✓ VERIFIED | Exact input/output completion into scratch storage; private aliases, no system zlib link. |
+| host/disc_image.c | Shared provider dispatch | ✓ VERIFIED | .pbp opens through the PBP provider and forwards TOC/sectors through the common image interface. |
+| runner/probe.c and host/disc_probe.c | Runner load/probe path | ✓ VERIFIED | The runner consumes shared TOC and sector callbacks and reports invalid/unsupported formats before guest execution. |
+| libretro/libretro.c | Libretro content loader | ✓ VERIFIED | Uses the shared media provider and retains active media/card state on rejected replacements. |
+| tools/gen_pbp.py and cmake/PBPFixtures.cmake | Owned deterministic fixture producer | ✓ VERIFIED | Emits PBP, source CUE/BIN, and bounded manifest; fixture preflight guards downstream use. |
+| tests/disc/pbp.c and tests/disc/tests.cmake | Provider/parity/boundary tests | ✓ VERIFIED | Registered PBP metadata, bounds, raw, inflate, open, boundary, and parity selectors. |
+| tests/runner/tests.cmake and tests/libretro/host.c | Shipping host consumers | ✓ VERIFIED | Runner and libretro integration tests exercise the shipping provider and failure behavior. |
+| PROVENANCE.md and THIRD-PARTY-NOTICES.md | Permissive inflater notice/provenance | ✓ VERIFIED | Pinned MIT source, exact source digests, and packaged notice evidence. |
 
-**Artifacts:** all phase-goal artifacts verified. The plan's stale `libretro/schwaystation_libretro.c` path was corrected to the actual `libretro/libretro.c` in `10-09-PLAN.md`; the subsequent plan artifact query passed 5/5 and the key-link query passed 1/1.
+## Key Link Verification
 
-### Key Link Verification
+All 13 plans’ key-link queries passed.
 
-| From | To | Via | Status | Details |
-|---|---|---|---|---|
-| `libretro/libretro.c` | `host/disc_image.c` | Normal content loader uses the shared PBP provider | ✓ WIRED | The libretro content path calls the shared `schway_disc_image_open` provider and consumes the common sector/TOC callbacks. |
-| `runner/probe.c` | `host/disc_image.c` | PBP probe opens the shared media image | ✓ WIRED | `schway__pbp_source` opens through the shared provider and derives probe metadata from its TOC and sector interface. |
-| `host/disc_image.c` | `host/disc_pbp.c` | `.pbp` dispatch | ✓ WIRED | Extension dispatch opens the PBP reader and forwards TOC/read-sector operations. |
-| `host/disc_pbp.c` | `host/pbp_inflate.c` | Compressed block decode | ✓ WIRED | The reader invokes the private bounded raw-DEFLATE wrapper for compressed PSISO blocks. |
-
-**Wiring:** 4/4 key connections verified. GSD artifact and key-link queries passed for all 13 plans after correcting the Plan 10-09 path.
-
-### Data-Flow Trace
-
-| Artifact | Data | Source | Produces real data | Status |
-|---|---|---|---|---|
-| `host/disc_pbp_metadata.c` → `host/disc_pbp.c` | PBP offsets, TOC and block map | Selected image bytes | Yes; checked metadata becomes a bounded map, then decoded sectors | ✓ FLOWING |
-| Shared provider → runner/libretro | Sector bytes, TOC and subcode | Decoded PBP blocks and host callbacks | Yes; both consumers use the actual provider | ✓ FLOWING |
-| Fixture parity tests | Expected sector bytes and TOC | Separately generated source CUE | Yes; tests compare every sector in both orders, TOC, subcode and content identity | ✓ FLOWING |
-
-No rendered UI or static runtime fallback exists in this phase.
-
-### Behavioral Spot-Checks
-
-The verifier did not start or repeat tests. It inspected the final workflow output already produced by Plan 10-13:
-
-| Behavior | Command | Result | Status |
+| From | To | Via | Status |
 |---|---|---|---|
-| Complete native build/test/package workflow | `cmake --workflow --preset ci` | exit 0; 655/655 standard tests, 7/7 release checks; 78 seconds total | ✓ PASS |
-| PBP provider and every-sector parity | PBP CTest inventory in the saved workflow output | `disc.image.pbp_preflight`, `disc.image.pbp_parity`, `disc.image.pbp_headers`, `disc.image.pbp_inflate`, `disc.image.pbp_metadata`, `disc.image.pbp_raw`, `disc.image.pbp_bounds`, `disc.image.pbp_fixture_controls`, `disc.image.pbp_open`, `disc.image.pbp_boundaries` passed | ✓ PASS |
-| Bounded guest and host consumers | PBP CTest inventory in the saved workflow output | PBP boot/read/FMV, `runner.disc.pbp`, and `libretro.content.pbp` passed | ✓ PASS |
-| Feature ledger and malformed-input privacy | PBP CTest inventory in the saved workflow output | Compatibility preflight/ratchet and malformed-PBP redaction test passed | ✓ PASS |
+| cmake/DiscTargets.cmake | host/disc_pbp.c | Host-only source registration | ✓ WIRED |
+| cmake/Miniz.cmake | host/miniz/miniz_tinfl.c | Private inflater target | ✓ WIRED |
+| host/pbp_inflate.c | cmake/Miniz.cmake | Wrapper consumes prefixed inflater | ✓ WIRED |
+| cmake/DiscFixtures.cmake | cmake/PBPFixtures.cmake | Owned PBP fixture producer | ✓ WIRED |
+| host/disc_pbp.c | host/disc_pbp_metadata.c | Reader consumes validated map | ✓ WIRED |
+| host/disc_image.c | host/disc_pbp.c | .pbp shared-provider dispatch | ✓ WIRED |
+| tests/fuzz/pbp.c | host/disc_image.c | Replay enters production parser | ✓ WIRED |
+| runner/main.c | host/disc_image.c | Runner uses shared disc provider | ✓ WIRED |
+| libretro/libretro.c | host/disc_image.c | Libretro uses shared provider | ✓ WIRED |
+| cmake/packaging.cmake | THIRD-PARTY-NOTICES.md | Archive notice check | ✓ WIRED |
+| .github/workflows/nightly.yml | scripts/classify-changes.sh | Conservative Nightly routing | ✓ WIRED |
+| tests/disc/fixture.c | host/disc_image.c | Bounded PBP guest consumes callbacks | ✓ WIRED |
+| .github/workflows/ci.yml | tests/inventory/ci.txt | Hosted CI includes required inventories | ✓ WIRED |
 
-The saved uncommitted-output path is `/private/tmp/schwaystation-phase10-ci-final.log`; it contains 100% pass summaries for both test phases. No log file is committed.
+## Data-Flow Trace
 
-### Test Quality Audit
+| Artifact | Data | Source | Real data reaches consumer | Status |
+|---|---|---|---|---|
+| host/disc_pbp_metadata.c → host/disc_pbp.c | Offsets, TOC, and block map | Selected PBP bytes | Validated map controls bounded block reads and sector output | ✓ FLOWING |
+| Shared provider → runner/libretro | Sector bytes and TOC | Decoded raw or DEFLATE PBP blocks | Both hosts consume the real provider callbacks | ✓ FLOWING |
+| PBP parity tests | Sector bytes and TOC | Independently generated source CUE/BIN | All selected PBP sectors are compared against source media | ✓ FLOWING |
 
-| Test File | Linked Req | Active | Skipped | Circular | Assertion Level | Verdict |
-|---|---|---:|---:|---|---|---|
-| `tests/disc/pbp.c` and `tests/disc/image.c` | PBP-01 | Yes | 0 found | No | Exact bytes/TOC/status/bounds; all sectors compared with source CUE | VALID |
-| `tests/runner/tests.cmake` | PBP-01 | Yes | 0 found | No | Exit status, clear diagnostic, no frame output before guest | VALID |
-| `tests/libretro/host.c` | PBP-01 | Yes | 0 found | No | Load, full sector parity, frame/audio/state comparisons and rejection state preservation | VALID |
-| `tests/compat/tests.cmake`, `tests/compat/features.csv` | PBP-01 | Yes | 0 found | No | Malformed path redaction and explicit exercised/unknown feature evidence | VALID |
-| `tests/fuzz/pbp.c` | PBP-01 | Yes | 0 found | No | Production parser replay over mutation cases; sanitizer campaign is a required Nightly gate | VALID |
+## Behavioral Spot-Checks
 
-No disabled-test patterns or unreferenced `TODO`/`HACK`/`FIXME`/`XXX` markers were found in the requirement-linked PBP tests and production paths. The parity expectations come from the separate source CUE; the fixture generator does not call the provider under test. This is not a circular test.
+No tests were rerun for this refresh. The listed exact-head and release runs exercise the current implementation; the release commit changes only generated release metadata from the tested source head.
 
-### Requirements Coverage
+| Behavior | Check | Result | Status |
+|---|---|---|---|
+| PBP parse, sector parity, deterministic host behavior and cross-platform hashes | cmake --workflow --preset ci in Main CI on 75beb849 | Passed; [run 45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) | ✓ PASS |
+| Malformed/unsupported rejection before runner guest output | Registered runner.disc.pbp and PBP provider selectors in the same Main CI | Passed on tested source head | ✓ PASS |
+| Libretro PBP loading and rejected-replacement state preservation | Registered libretro.content.pbp in the same Main CI | Passed on tested source head | ✓ PASS |
+| PBP mutation replay and bounded sanitizer fuzz route | Full Nightly on the same source head | Passed; [run 45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657) | ✓ PASS |
+| Shipped package/release integrity | Post-merge Main CI and Release on f08fc08 | Both passed; [Main CI](https://github.com/szTheory/schwaystation/actions/runs/45455115354), [Release](https://github.com/szTheory/schwaystation/actions/runs/45455115400) | ✓ PASS |
+
+The phase declares no shell probe. The user-visible runner --probe behavior is covered by runner.disc.pbp.
+
+## Test Quality Audit
+
+| Test File | Linked Requirement | Active | Circular | Strongest Assertion | Verdict |
+|---|---|---|---|---|---|
+| tests/disc/pbp.c, tests/disc/image.c | PBP-01 | Yes | No | Exact bytes, TOC, status, bounds, full sector parity | VALID |
+| tests/runner/tests.cmake | PBP-01 | Yes | No | Exit/status, clear diagnostic, no guest frame on refusal | VALID |
+| tests/libretro/host.c | PBP-01 | Yes | No | Content parity, state preservation, frame/audio/RAM comparisons | VALID |
+| tests/compat/tests.cmake, tests/compat/features.csv | PBP-01 | Yes | No | Protected evidence snapshot and feature-key expectations | VALID |
+| tests/fuzz/pbp.c | PBP-01 | Yes | No | Production parser mutation replay; full Nightly fuzz passes | VALID |
+
+No disabled or skipped requirement test was found. The PBP generator does not invoke the parser under test; source-media parity uses a separate CUE/BIN fixture.
+
+## Requirements Coverage
 
 | Requirement | Source | Description | Status | Evidence |
 |---|---|---|---|---|
-| PBP-01 | Phase 10 plans 01–13 | Fixture-proven unencrypted PSISO PBP, bounded metadata/block parsing, deterministic sectors, clear unsupported cases, permissive inflater without system zlib | ✓ SATISFIED in local implementation | Provider/runner/libretro/guest/parity/package tests passed locally. The required exact-head hosted CI/Nightly and linked WASI size remain mandatory ship gates before release or advancing to Phase 11. |
+| PBP-01 | Phase 10 plans 01–13 | Bounded fixture-proven unencrypted PSISO support, deterministic sector output, clear PGD/unknown rejection, permissive in-tree inflater without system zlib | ✓ SATISFIED | Provider, runner, libretro, guest, package, notice, parity, and fuzz checks passed on the tested source head; released as v0.14.0. |
 
-No orphaned Phase 10 requirements were found. Context decision coverage is 12/12 honored.
+No orphaned requirements are mapped to Phase 10. The decision-coverage query reports 12/12 context decisions honored.
 
-### Probe Execution
-
-No shell probe was declared for Phase 10. The runner's PBP `--probe` path is covered by the registered `runner.disc.pbp` test.
-
-### Anti-Patterns Found
+## Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |---|---:|---|---|---|
-| - | - | None in reviewed PBP implementation and linked test files | - | No stub, unreferenced debt marker, or disabled requirement test was found. |
+| tests/compat/features.csv | 39 | hosted_ci.not_run | ⚠️ WARNING | The PBP row correctly records the exercised one-track subset and its tests, but this hosted-evidence token is stale: final Main CI and Nightly passed afterward. It does not invalidate the tested feature behavior or block the phase goal. |
+| .planning/todos/pending/051-nightly-pr-job-routing.md | 34 | Pending hosted-run wording | ⚠️ WARNING | It still says to keep the todo pending until an exact-head hosted run, although the Phase 10 Main CI/Nightly runs and timing were subsequently recorded. Planning bookkeeping is stale, not a missing implementation behavior. |
 
-### Human Verification Required
+No TBD, FIXME, or XXX debt marker was found in the phase implementation files.
 
-None. The phase has no visual or hardware-only acceptance criterion; its file parsing, determinism and host seams are exercised by automated tests. No BIOS, disc, or physical-console test is required.
+## Human Verification Required
 
-### Initial Ship-Gate Snapshot — 2026-11-21T16:08:38Z
-
-The hosted evidence is a **required ship gate**, not a failed implementation truth. `.planning/AUTONOMOUS.md` and AGENTS rules 9–10 require exact-head PR CI, Nightly and release-pipeline inspection before release or Phase 11. The first attempt ran on pre-repair commit `50efc31217b851de8cbe3b53677b525b9b65447d` and was cancelled after actionable failures; it does not satisfy the gate. Before release or Phase 11, the ship step must:
-
-1. Run and inspect one exact-head PR CI and full Nightly attempt, including required platform/package jobs, sanitizer, no-float, BE32, WASI, eight-way hashes, RetroArch, release rehearsal and the full fuzz route.
-2. Re-measure the linked WASI module on the repaired head. The first hosted producer measured 875,971 bytes on [run 44924014258](https://github.com/szTheory/schwaystation/actions/runs/44924014258), [job 136906260832](https://github.com/szTheory/schwaystation/actions/runs/44924014258/job/136906260832); `quality.json` now records that exact measurement. If the repaired producer differs, update the bound from its linked artifact. Do not substitute the native macOS module size.
-3. Record exact run URLs, lane critical path and runner-time signals. Historical data identifies BE32/QEMU as the critical-path candidate; current Phase 10 Actions dollars are not yet available. No coverage reduction is justified from historical runs alone.
-
-The mixed code/workflow head must use the full Nightly route. Docker is available locally, but this Apple Silicon host would need x86_64 emulation for the workflow's pinned x86_64 Wasmtime runtime; Act dry-runs checked route wiring only. The hosted WASI job provides the required artifact handoffs and matching architecture, so another local Act run would not establish those hosted properties.
-
-## Follow-Up Verification — 2026-11-21T16:50:05Z
-
-This follow-up preserves the initial report above and checks the Phase 10 ship-fix batch against the two roadmap success criteria. No PBP parsing or acceptance scope changed. The implementation truths remain **2/2 verified locally**; hosted exact-head checks are still a separate required ship gate. No broad suite was rerun by this verifier.
-
-| Repair | Code and wiring evidence | Verification result |
-|---|---|---|
-| MSVC PBP opener | `host/disc_pbp.c` routes PBP opens through `schway__disc_pbp_open_file`; the `_MSC_VER` branch uses `fopen_s`, while other compilers use `fopen`. | The local PBP module build passed on this host. The MSVC branch has not yet been compiled on the repaired head; the old Windows jobs failed before this fix, so Windows CI remains required. |
-| Pointer-safe libretro assertion | `tests/libretro/host.c` compares the current RAM pointer directly with the saved `pbp_ram` pointer after rejected replacements. | The local full workflow recorded 655/655 tests and 7/7 release checks passing. This removes the pointer-to-integer conversion that failed the old BE32 build; repaired BE32 CI remains pending. |
-| Classifier workflow assertion | `tests/hygiene/tests.cmake` filters classifier output to the two values that `ci.classify` owns. `tests/cmake/ci_route_controls.cmake` independently checks `nightly_full` and `pbp_only` outputs across route cases. | Recorded focused checks passed: `ci.classify` 1/1 and `ci.classify_policy` plus PBP tests 11/11. |
-| Protected-base sparse checkout | `.github/workflows/ci.yml` includes `tests/cmake/date_days.cmake` in `compat-base`; `tests/cmake/workflows.cmake` asserts that required dependency remains in the sparse checkout. `tests/cmake/compat-ratchet.cmake` includes that helper. | The route/closure check passed, as did protected-base ratchet tests against a full base checkout (7/7). GitHub has not yet exercised the repaired sparse checkout. |
-| WASI module bound | `quality.json` now records 875,971 bytes, matching the linked module measured by the first PBP-enabled WASI attempt. The local quality comparison passed. | This is a measurement from the failed/cancelled pre-repair run, not a green repaired-head WASI gate. Re-measure the linked module on the repaired head. |
-
-The first exact-head PR run [44924014258](https://github.com/szTheory/schwaystation/actions/runs/44924014258) ended **cancelled** on pre-repair SHA `50efc31217b851de8cbe3b53677b525b9b65447d`; hygiene, WASI, BE32 and several native build jobs had failed. The concurrent [Nightly run 44924014369](https://github.com/szTheory/schwaystation/actions/runs/44924014369) on the same SHA also ended **cancelled**, with its fuzz and report jobs cancelled. Neither is a passing ship gate. At 16:50Z, PR [#34](https://github.com/szTheory/schwaystation/pull/34) still pointed to the pre-repair SHA; the repaired working-tree changes therefore have no exact-head hosted result yet.
-
-Local evidence recorded in `10-VERIFICATION-EVIDENCE.md` includes the successful native workflow, targeted classifier and PBP checks, module build, workflow closure test, and `act --dryrun` routing check. Act establishes routing only; hosted Windows/MSVC, BE32, WASI, platform/package lanes, artifact handoffs, RetroArch and release integrations remain unverified here. Repaired exact-head PR CI, the full Nightly route, linked WASI measurement and release pipeline must be green and inspected before shipping or advancing to Phase 11.
-
-## Decision Coverage
-
-All 12 trackable `10-CONTEXT.md` decisions are honored by the phase plans and implementation; the non-blocking decision-coverage query reported 12/12.
+None. The CLI/refusal behavior and host integrations are automated; no visual or owner-hardware acceptance is part of PBP-01.
 
 ## Gaps Summary
 
-No Phase 10 implementation gap was found. The phase goal is verified on the local host; release and milestone advancement remain gated on the exact-head hosted work listed above. The generic SPDX scanner remains deferred by the owner's explicit choice, and the 3,901-line ceiling remains unchanged.
-
-## Ship repair follow-up (2026-11-21)
-
-The pre-repair exact-head CI attempt failed in five areas: the hygiene classifier-output assertion, the prior WASI
-size bound, a pointer-to-integer assertion in the BE32 host test, MSVC's warning-as-error for direct `fopen`, and
-the protected-base sparse checkout's missing `date_days.cmake` dependency. Its Nightly attempt's classifier,
-vectors, WASI benchmark and three benchmark legs passed; the fuzz job was cancelled. Both attempts were cancelled
-after diagnosis. They are recorded in [10-CI-EFFICIENCY.md](10-CI-EFFICIENCY.md) and are not treated as green
-ship evidence.
-
-The fixes were independently reviewed clean. The full local workflow passed 655 standard tests and 7 release
-checks; focused hygiene, PBP, classifier-policy, protected-ratchet and workflow-closure checks passed. The
-protected-base sparse checkout now includes `tests/cmake/date_days.cmake`, guarded by a workflow assertion. The
-repository-check budget is exactly 3,901/3,901 lines. These results preserve the two roadmap truths and do not
-claim cross-platform hosted success. The repaired exact-head CI, Nightly and release-pipeline runs remain
-required before Phase 11.
-
-## Second ship-fix follow-up — 2026-11-21T17:23Z
-
-The second repaired-head attempt [44927726830](https://github.com/szTheory/schwaystation/actions/runs/44927726830)
-passed its WASI job at the recorded 875,971-byte bound but failed while linking the SDL2 example. The optional
-example's source list did not include the PBP provider or inflater. The concurrent Nightly
-[44927726826](https://github.com/szTheory/schwaystation/actions/runs/44927726826) reached the full fuzz route;
-`fuzz.regress.pbp` found that its owned fixture had not been built. The full route's explicit preset builds
-campaign executables but not the PBP fixture target, and seed validation was interleaved with long campaigns.
-
-The example source closure now builds the PBP provider and private inflater target; the exact local SDL2 example
-configure/build command passed. Nightly now builds the PBP fixture and validates all replay seed counts before
-any timed campaign; the focused local PBP replay wrote 14 seeds. The workflow-closure assertion, actionlint and
-diff checks passed. No acceptance behavior or roadmap truth changed. The two hosted attempts are not green ship
-evidence; finish the post-review local checks and run CI/Nightly together on the next head before release.
-
-## Post-review seed-order guard — 2026-11-21T17:39Z
-
-The independent review found the workflow assertion could accept a campaign moved inside the replay seed loop.
-The regex also used the route's literal `||` without escaping it. The test now checks that the loader campaign
-appears after the seed loop closes and treats `||` literally. The actual `disc_registration` check passed; a
-temporary malformed workflow with the loader campaign moved into the loop failed the same check as expected.
-The repository-check budget remains 3,901/3,901. This closes the local review/verification delta, but the
-repaired source and workflow still need one exact-head hosted CI/Nightly run and the release-pipeline checks.
-
-## Generated-media graph guard — 2026-11-21T18:03Z
-
-Nightly [44931682921](https://github.com/szTheory/schwaystation/actions/runs/44931682921) failed in its fuzz
-fixture build because CMake generated `xa.xa` and `movie.str` but exposed only the manifest as an output to
-Ninja. The paired CI run [44931682851](https://github.com/szTheory/schwaystation/actions/runs/44931682851) was
-cancelled after local reproduction while BE32, ASan, RetroArch, and rehearsal work was still running. The CMake
-media rule now declares all three generated files as byproducts.
-
-The no-external-media configure command and three Ninja producer queries passed. The workflow regression check
-passed after review; it scopes byproduct matching to the command that emits `media.sha256`. A negative fixture
-with the files declared on another command is rejected. The code-review report records the clean re-review.
-The local media graph now has a producer for every dependency, with no encoding or sanitizer campaign run. The
-exact-head CI/Nightly and release-pipeline checks remain required.
+No substantive implementation or roadmap-criterion gap was found. The two warnings are stale evidence bookkeeping: the feature ledger still says hosted CI was not run, and TODO 051 still requests the now-recorded exact-head hosted run. The Phase 10 Main CI and Nightly evidence is green on the PBP source; the release and post-merge gates are green on v0.14.0. No plan or source changes are required to establish the Phase 10 goal.
 
 ---
-*Verified: 2026-11-21T16:50:05Z*
-*Verifier: the agent (gsd-verifier)*
+
+_Verified: 2026-11-25T02:01:24Z_
+_Verifier: the agent (gsd-verifier)_
