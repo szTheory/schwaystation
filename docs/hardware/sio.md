@@ -80,6 +80,16 @@ PER.01 reports a `4Dh` command and describes a motor, but does not establish a u
 protocol here. This implementation makes no Jogcon force-feedback claim. It also does not assign behavior to the
 unknown dial bit or claim that a controller-mode switch can be requested in software.
 
+## GunCon polls
+
+The direct-port GunCon answers poll command `42h` with ID `5A63h` and six payload bytes. The first
+halfword is active low: A is bit 3, trigger is bit 13, and B is bit 14. The next halfwords are X
+low byte then high byte, followed by Y low byte then high byte. A valid light observation supplies
+X in 8 MHz clocks since HSYNC and Y in scanlines since VSYNC; host-pixel coordinates are not sent
+directly over SIO. The IDs, button bits and coordinate units follow the PER.01 controller notes in
+`.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` §2.7. These notes are a secondary source and do
+not establish a calibrated optical response.
+
 ## Timing model
 
 At mode `000Ch` (eight data bits, no parity, factor MUL1) and baud reload `0088h`, the byte period is 1,088

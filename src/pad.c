@@ -501,6 +501,9 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
 
 static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
 {
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON) {
+        return 0x63u;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 0x53u;
     }
@@ -527,6 +530,7 @@ static uint8_t poll_size(const struct schway__pad *pad, uint32_t port)
          pad->analog_mode[port] != 0u) ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_JOGCON ||
+        pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 6u;
     }
@@ -542,6 +546,29 @@ static void refresh_watchdog(schway *inst, uint32_t port, uint64_t now)
 
 static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t index)
 {
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON) {
+        /* GunCon 42h fields follow the button and coordinate table in docs/hardware/sio.md. */
+        enum { GUNCON_A = 1u << 3, GUNCON_TRIGGER = 1u << 13, GUNCON_B = 1u << 14 };
+        uint16_t buttons = (uint16_t)(pad->buttons[port] |
+                                      (uint16_t)~(GUNCON_A | GUNCON_TRIGGER | GUNCON_B));
+        if ((pad->gun_input[port].flags & SCHWAY_GUN_INPUT_TRIGGER) != 0u) {
+            buttons = (uint16_t)(buttons & (uint16_t)~GUNCON_TRIGGER);
+        } else {
+            buttons = (uint16_t)(buttons | GUNCON_TRIGGER);
+        }
+        if (index == 0u) {
+            return (uint8_t)buttons;
+        }
+        if (index == 1u) {
+            return (uint8_t)(buttons >> 8);
+        }
+        uint16_t coordinate = index < 4u ? pad->gun_result_x[port]
+                                          : pad->gun_result_y[port];
+        if (index == 2u || index == 4u) {
+            return (uint8_t)coordinate;
+        }
+        return (uint8_t)(coordinate >> 8);
+    }
     if (index == 0u) {
         return (uint8_t)(pad->buttons[port] & 0xFFu);
     }
