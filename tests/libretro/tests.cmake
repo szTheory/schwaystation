@@ -384,6 +384,22 @@ schway_add_test(NAME libretro.input.special
     $<TARGET_FILE:schwaystation-libretro-card-test> input-special
   LABELS libretro portable TIMEOUT 30)
 
+# Fault prevented: LIGHTGUN screen aim, trigger, offscreen, or reload mapping changes.
+schway_add_test(NAME libretro.input.lightgun
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> input-lightgun
+  LABELS libretro portable TIMEOUT 30)
+# Fault prevented: POINTER fallback controls are missing or exceed its documented subset.
+schway_add_test(NAME libretro.input.pointer
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> input-pointer
+  LABELS libretro portable TIMEOUT 30)
+# Fault prevented: absent gun callback or device capability produces a valid sensor hit.
+schway_add_test(NAME libretro.input.gun_unavailable
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> input-gun-unavailable
+  LABELS libretro portable TIMEOUT 30)
+
 # Fault prevented: published input descriptors have wrong ports, IDs,
 # descriptions, or do not remain valid through load, run, unload and deinit.
 schway_add_test(NAME libretro.input.descriptors
