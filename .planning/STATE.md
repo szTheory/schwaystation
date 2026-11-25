@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 15-05-PLAN.md
-last_updated: "2026-11-25T08:31:06.792Z"
-last_activity: 2026-11-24
-last_activity_desc: Phase 15 Plan 15-03 completed; Plan 15-04 is ready to execute
-state_head: a9e736b0b5f3b3bd9517fc17f9bded3af668b080
+stopped_at: Completed Phase 15 Plan 15-06; Plan 15-07 is next
+last_updated: "2026-11-25T12:42:39.784Z"
+last_activity: 2026-11-25
+last_activity_desc: Phase 15 Plan 15-06 completed; Codex GSD executor gpt-6-luna xhigh; about 3h52m wall time, active time not isolated; focused GPU/SIO checks passed; Plan 15-07 is next
+state_head: 8b70d9127b20e67a76de71df3d76b1e218e9a56e
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 100
+  completed_plans: 101
   percent: 80
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 15 Plan 15-03 completed; Plan 15-04 is next. Phase 14 remains the latest released phase.
+Last activity: 2026-11-25 — Phase 15 Plan 15-06 completed; Codex GSD executor gpt-6-luna xhigh; about 3h52m wall time, active time not isolated; focused GPU/SIO checks passed; Plan 15-07 is next
 Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
@@ -1844,6 +1844,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 15 P03 | 13m 25s | 2 tasks | 5 files |
 | Phase 15 P04 | 13m | 2 tasks | 3 files |
 | Phase 15 P05 | 2h28m | 2 tasks | 4 files |
+| Phase 15 P6 | about 3h 52m wall time; active time not isolated | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -2334,6 +2335,8 @@ Recent decisions affecting current work:
 - [Phase 15]: GunCon reports only the documented active-low A, trigger, and B wire bits; unsupported bits remain released.
 - [Phase 15]: Use one bounded GPU scheduler deadline per latched direct-port aim and sample live VRAM at that beam point.
 - [Phase 15]: Use RGB5 channel sum >= 48 as an uncalibrated threshold, decode RGB24 with scanout byte addressing, and truncate the regional 8 MHz X conversion.
+- [Phase 15]: Raise IRQ10 from the GPU beam callback only for an enabled bright Justifier sample. — The existing scheduler synchronizes Timer0 and Timer1 before the callback. Preserve its timer-to-GPU-to-DMA order instead of changing timers.c or globally reordering devices.
+- [Phase 15]: Reuse the existing serialized byte-staging lane for Justifier sensing enable. — This preserves the established continuation format and avoids adding a state-format field or revision.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2585,8 +2588,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T08:31:06.497Z
-Stopped at: Completed 15-05-PLAN.md
+Last session: 2026-11-25T12:36:17.181Z
+Stopped at: Completed Phase 15 Plan 15-06; Plan 15-07 is next
 Resume file: None
 
 ### v1.0 session history
