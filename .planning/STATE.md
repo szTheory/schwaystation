@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 10
+current_plan: 12
 status: verifying
-stopped_at: Phase 15 code review fixes complete; final verification is next
-last_updated: "2026-11-25T16:39:57.809Z"
+stopped_at: Phase 15 plans and local workflow complete; goal-backward verification and ship are next
+last_updated: "2026-11-25T18:14:04Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 15 code review completed; CR-01 and CR-02 fixed by f30c7fd and d7ab38e; OpenBIOS 240-frame hash restored; focused review regressions passed 7/7; final phase verification is next
-state_head: d7ab38e0799b594ae825e97a48890b7a15980c12
+last_activity_desc: Phase 15 plans 15-11 and 15-12 closed; reviewed state pins and libretro control fix passed the 717-test local workflow and 8 release checks; verifier and ship remain
+state_head: 97606163409f6be78c08b8a2249b85bb68930619
 progress:
   total_phases: 10
   completed_phases: 8
-  total_plans: 105
-  completed_plans: 105
+  total_plans: 107
+  completed_plans: 107
   percent: 80
 ---
 
@@ -26,16 +26,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 15 — execute the reviewed GunCon and Justifier plans. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
+**Current focus:** Phase 15 — finish goal-backward verification and ship the reviewed GunCon and Justifier changes. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
 
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 10
-Total Plans in Phase: 10
-Status: Phase complete — ready for verification
-Last activity: 2026-11-25 — Phase 15 code review completed; CR-01 and CR-02 fixed by f30c7fd and d7ab38e; OpenBIOS 240-frame hash restored; focused review regressions passed 7/7; final phase verification is next
-Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
+Current Plan: 12
+Total Plans in Phase: 12
+Status: Phase plans complete — ready for goal-backward verification
+Last activity: 2026-11-25 — Phase 15 gap plans 15-11 and 15-12 completed; final local workflow passed 717/717 CTest cases and 8/8 release checks; no test process remains active
+Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2915,3 +2915,31 @@ and `docs/maintaining.md`; no extra workflow change or repeated full local suite
 planning on its branch, refresh the stale Phase 7 and Phase 8 verification reports using the exact main/release
 evidence already available, then continue Phase 10 discussion and planning. The roadmap now marks Phase 9
 complete; the Phase 9 report and tracking edits still need to be committed and shipped through PR #32.
+
+### Phase 15 gap-plan execution and final local workflow (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary and typed agent model IDs were not exposed. Plan 15-11 updated only the Format 21 `gpu_motion` state hashes at frames
+150 and 180 to the exact runner values. `git diff --check`, `cmake --preset ci`, selector-count preflight, and
+the two focused state selectors passed; the selectors took 0.67 seconds.
+
+The first full `cmake --workflow --preset ci` attempt on `c79b694` exited 8 after 49 seconds (CTest 48.32s).
+It exposed one remaining stale test assumption: `libretro.input.controls` still called the now-supported
+`RETRO_DEVICE_LIGHTGUN` an invalid device selection. The correct fix was in the host test, not the emulator.
+Plan 15-12 changes only that negative control to `RETRO_DEVICE_KEYBOARD`, retaining LIGHTGUN tests and the
+serialized-state assertions. A focused CTest run before rebuilding the changed host test used the stale binary
+and failed in 1.34 seconds. The plan was corrected to rebuild `schwaystation-test-libretro-host` first; the
+build passed and the focused selector then passed 1/1 in 1.33 seconds.
+
+Code review ran before final verification and found no active issues in either gap fix. On reviewed head
+`97606163409f6be78c08b8a2249b85bb68930619`, `time cmake --workflow --preset ci` exited 0 in 74.50 seconds.
+CTest's JUnit report records 717/717 passing cases and 71 seconds suite time; the release selector passed 8/8
+in 1.54 seconds. The slowest cases were `policy.quality_metrics` (39.50s), `libretro.host` (35.56s),
+`libretro.input.movies` (25.84s, serial tail), `runner.disc.legacy` (20.48s) and `runner.hashes_file`
+(16.48s). The required cases and bounds remain intact. No workflow files changed, so Act would add no coverage
+beyond the complete local workflow. Hosted Main and Release checks remain required during ship. This was a
+local workflow, so there is no run URL.
+
+All bounded CTest and workflow commands returned; CTest waited for its child processes, and no task-owned
+fuzzer or Docker resource was created in this closeout. The earlier stopped fuzz jobs remain covered by the
+durable cleanup rule in `AGENTS.md` and `.planning/AUTONOMOUS.md`. Goal-backward Phase 15 verification and ship
+are next; previous Phase 7–14 verifier fingerprints currently need refresh after shared-file changes.
