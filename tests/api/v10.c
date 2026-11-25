@@ -243,17 +243,27 @@ int main(void)
         free(partial);
     }
 
-    /* A partial flags word is still size-tagged caller data. Its supplied
-       low-byte validity bit makes the origin aim explicit; omitted bytes are
-       zero-filled. */
-    uint8_t partial_valid[237];
-    memset(partial_valid, 0, sizeof partial_valid);
-    uint32_t partial_size = (uint32_t)sizeof partial_valid;
+    /* A size-tagged input can end partway through a flags word. Keep the
+       supplied prefix byte zero so the partial object representation is
+       valid on both little- and big-endian hosts; omitted bytes are zero-filled. */
+    uint8_t partial_flags[237];
+    memset(partial_flags, 0, sizeof partial_flags);
+    uint32_t partial_size = (uint32_t)sizeof partial_flags;
     uint32_t guncon = SCHWAY_INPUT_DEVICE_GUNCON;
-    memcpy(partial_valid, &partial_size, sizeof partial_size);
-    memcpy(partial_valid + offsetof(schway_input, device), &guncon, sizeof guncon);
-    partial_valid[236] = (uint8_t)(SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER);
-    CHECK_EQ_U64(schway_set_input(inst, partial_valid), SCHWAY_STATUS_OK);
+    memcpy(partial_flags, &partial_size, sizeof partial_size);
+    memcpy(partial_flags + offsetof(schway_input, device), &guncon, sizeof guncon);
+    CHECK_EQ_U64(schway_set_input(inst, partial_flags), SCHWAY_STATUS_OK);
+
+    /* Supply a complete flags word to check valid GunCon input independent of
+       the host byte order. */
+    uint8_t complete_flags[240];
+    memset(complete_flags, 0, sizeof complete_flags);
+    partial_size = (uint32_t)sizeof complete_flags;
+    uint32_t valid_flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    memcpy(complete_flags, &partial_size, sizeof partial_size);
+    memcpy(complete_flags + offsetof(schway_input, device), &guncon, sizeof guncon);
+    memcpy(complete_flags + 236u, &valid_flags, sizeof valid_flags);
+    CHECK_EQ_U64(schway_set_input(inst, complete_flags), SCHWAY_STATUS_OK);
 
     uint8_t partial_bad[241];
     memset(partial_bad, 0, sizeof partial_bad);
