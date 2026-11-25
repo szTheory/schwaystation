@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 15
-current_phase_name: GunCon and Justifier
-current_plan: 12
-status: verifying
-stopped_at: Phase 15 plans and local workflow complete; goal-backward verification and ship are next
-last_updated: "2026-11-25T18:14:04Z"
+current_phase: 16
+current_phase_name: Patches, cheats and compatibility evidence
+current_plan: Not started
+status: planning
+stopped_at: Phase 15 complete, ready to plan Phase 16
+last_updated: "2026-11-25T18:32:59.281Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 15 plans 15-11 and 15-12 closed; reviewed state pins and libretro control fix passed the 717-test local workflow and 8 release checks; verifier and ship remain
-state_head: 97606163409f6be78c08b8a2249b85bb68930619
+last_activity_desc: Phase 15 complete, transitioned to Phase 16
+state_head: f0442f6fcc5eaa44ba96154787f5925cc1fbbd8a
 progress:
   total_phases: 10
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 107
   completed_plans: 107
-  percent: 80
+  percent: 90
 ---
 
 # Project State
@@ -30,12 +30,12 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 15 — GunCon and Justifier
-Current Plan: 12
+Phase: 16 — Patches, cheats and compatibility evidence
+Current Plan: Not started
 Total Plans in Phase: 12
-Status: Phase plans complete — ready for goal-backward verification
-Last activity: 2026-11-25 — Phase 15 gap plans 15-11 and 15-12 completed; final local workflow passed 717/717 CTest cases and 8/8 release checks; no test process remains active
-Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
+Status: Ready to plan
+Last activity: 2026-11-25 — Phase 15 complete, transitioned to Phase 16
+Progress: [█████████░] 90% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -1570,7 +1570,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 290
+- Total plans completed: 302
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1592,6 +1592,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 12 | 7 | - | - |
 | 13 | 9 | - | - |
 | 14 | 16 | - | - |
+| 15 | 12 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -2617,7 +2618,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-25T16:39:57.389Z
-Stopped at: Phase 15 code review fixes complete; final verification is next
+Stopped at: Phase 15 complete, ready to plan Phase 16
 Resume file: None
 
 ### v1.0 session history

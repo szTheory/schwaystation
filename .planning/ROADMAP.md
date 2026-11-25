@@ -18,7 +18,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact. (completed 2026-11-23)
 - [x] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior. (completed 2026-11-23)
 - [x] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode. (completed 2026-11-24)
-- [ ] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs.
+- [x] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs. (completed 2026-11-25)
 - [ ] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support.
 
 ## Phase Details
@@ -339,7 +339,7 @@ Plans:
   2. Supported libretro lightgun or pointer input maps to the expected game inputs. A host missing the required input reports it as unsupported without registering false hits. These checks use synthetic input and displays.
   3. The public mapping covers every delivered controller class with official device and subclass identifiers, frame-latched input and a reproducible integration check. The ledger includes gun evidence.
 
-**Plans**: 12/12 plans executed
+**Plans**: 12/12 plans complete
 
 Plans:
 - [x] 15-11-PLAN.md
@@ -407,5 +407,5 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
-| 15. GunCon and Justifier | 12/12 | In Progress | - |
+| 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |
