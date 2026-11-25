@@ -2,7 +2,7 @@
 title: "PSX-GPU-AND-GTE: GPU revisions, VRAM, GP0/GP1 commands, rasterisation rules, timing, display, GTE, oracles, output format"
 summary: "What gpu.c and gte.c must do: the v0/v2 GPU differences, VRAM addressing, every GPUSTAT bit, the GP0 primitive set with word counts, the exact dither matrix, blend and modulation formulas, mask bits, texture windows and CLUTs, the fill rules and size limits, video clocks and display geometry as rationals, FIFO and DMA behaviour, measured primitive costs, every GTE register, opcode, cycle count and flag, the UNR division, the oracles and their licences, the accuracy model, the v1 frame format, and the hooks later enhancements need."
 read_when: "Before writing or changing gpu.c, gte.c, the frame output path, GPU DMA, timers that use dotclock or hblank, or when a game's geometry, colours, blending, interlacing or GTE-driven culling diverges."
-updated: 2026-11-13
+updated: 2026-11-25
 ---
 
 # PSX-GPU-AND-GTE
@@ -190,6 +190,8 @@ ares converted these to clocks per pixel but disabled the model with the note th
 **Choice 4.A (GPU busy model).** Recommendation: v1 keeps a GPU clock budget per primitive: setup constant plus pixels × a per-class cost table seeded from the ares-derived column, charged after rendering the primitive at once; GPUSTAT bits 26 and 28 read 0 while the budget is unspent, DMA2 stalls on them, and the budget drains in GPU clocks on the master tick. Strongest alternative: instantaneous drawing with bits 26/28 always 1 (what ares ships). Would change if: a corpus title tears or skips frames because it polls bit 26 or chains DMA at a rate that only a cost model reproduces; or if a measured line and clipped-pixel table arrives, which replaces the seed values.
 
 **4.5 Mapping the display area to an image.** Source: GP1(05h) start X,Y in VRAM, width from GP1(06h) with the resolution's divider, native field height Y2-Y1 (not doubled for interlace). ares subtracts a per-width nominal X1 (228h for 256, 260h otherwise) and nominal Y1 (10h NTSC 240, 20h PAL 256) to place the picture in a 640x512 canvas and draws black elsewhere [GPU.05]. Titles that move the window with 06h/07h (Chrono Cross) are reproduced only if the host honours the offset [GPU.01]. The wobble of vertices and the affine "swimming" of textures are real hardware: the GTE emits integer screen coordinates and the GPU interpolates UV linearly in screen space with no Z, so a native-resolution core must keep them [GPU.01][GPU.18].
+
+**GunCon/Justifier event model (delivered 2026-11-25).** A valid direct-port aim schedules one bounded GPU event at its active display pixel. The scheduler catches timers up to that beam position and samples current VRAM; it does not retain per-pixel timestamps or brightness history. RGB555/RGB24 use the deterministic threshold documented in [the public GPU reference](../../docs/hardware/gpu.md#light-gun-beam-sample). This replaces the earlier timestamp-every-pixel proposal and remains an uncalibrated emulator model.
 
 ## 5. GTE (COP2)
 
