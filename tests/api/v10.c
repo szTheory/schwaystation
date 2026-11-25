@@ -157,10 +157,11 @@ static uint32_t endpoint_index(uint32_t port, uint32_t socket)
 
 static void expect_rejected_v10_input(schway *inst,
                                       const schway_current_input *baseline,
-                                      const schway_current_input *invalid)
+                                      const void *invalid,
+                                      schway_status expected)
 {
-    CHECK_EQ_U64(schway_set_input(inst, (const void *)baseline), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(schway_set_input(inst, (const void *)invalid), SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_set_input(inst, baseline), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_set_input(inst, invalid), expected);
     CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
     observed_input observed;
     check_observed_input(inst, &observed);
@@ -207,25 +208,71 @@ int main(void)
     schway_current_input invalid = baseline;
     invalid.buttons[0] ^= UINT16_C(0xFFFF);
     invalid.guns[0].flags = 0x10u;
-    expect_rejected_v10_input(inst, &baseline, &invalid);
+    expect_rejected_v10_input(inst, &baseline, &invalid, SCHWAY_STATUS_ERR_ARGUMENT);
     invalid = baseline;
     invalid.buttons[0] ^= UINT16_C(0xFFFF);
     invalid.guns[0].reserved0 = 1u;
-    expect_rejected_v10_input(inst, &baseline, &invalid);
+    expect_rejected_v10_input(inst, &baseline, &invalid, SCHWAY_STATUS_ERR_ARGUMENT);
     invalid = baseline;
     invalid.buttons[0] ^= UINT16_C(0xFFFF);
     invalid.guns[0].x = -1;
-    expect_rejected_v10_input(inst, &baseline, &invalid);
+    expect_rejected_v10_input(inst, &baseline, &invalid, SCHWAY_STATUS_ERR_ARGUMENT);
     invalid = baseline;
     invalid.buttons[0] ^= UINT16_C(0xFFFF);
     invalid.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
     invalid.multitap[0] = 1u;
-    expect_rejected_v10_input(inst, &baseline, &invalid);
+    expect_rejected_v10_input(inst, &baseline, &invalid, SCHWAY_STATUS_ERR_ARGUMENT);
     invalid = baseline;
     invalid.buttons[0] ^= UINT16_C(0xFFFF);
     invalid.multitap[0] = 1u;
     invalid.controllers[0][2].device = SCHWAY_INPUT_DEVICE_JUSTIFIER;
-    expect_rejected_v10_input(inst, &baseline, &invalid);
+    expect_rejected_v10_input(inst, &baseline, &invalid, SCHWAY_STATUS_ERR_ARGUMENT);
+
+    /* Every partial size from the released prefix through the current object
+       is an exact caller allocation and is normalized without an overread. */
+    for (uint32_t size = (uint32_t)sizeof(schway_input);
+         size <= (uint32_t)sizeof(schway_current_input); size++) {
+        uint8_t *partial = (uint8_t *)calloc((size_t)size, 1u);
+        CHECK(partial != NULL);
+        if (partial == NULL) {
+            schway_destroy(inst);
+            CHECK_DONE();
+        }
+        memcpy(partial, &size, sizeof size);
+        CHECK_EQ_U64(schway_set_input(inst, partial), SCHWAY_STATUS_OK);
+        free(partial);
+    }
+
+    /* A partial flags word is still size-tagged caller data. Its supplied
+       low-byte validity bit makes the origin aim explicit; omitted bytes are
+       zero-filled. */
+    uint8_t partial_valid[237];
+    memset(partial_valid, 0, sizeof partial_valid);
+    uint32_t partial_size = (uint32_t)sizeof partial_valid;
+    uint32_t guncon = SCHWAY_INPUT_DEVICE_GUNCON;
+    memcpy(partial_valid, &partial_size, sizeof partial_size);
+    memcpy(partial_valid + offsetof(schway_input, device), &guncon, sizeof guncon);
+    partial_valid[236] = (uint8_t)(SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER);
+    CHECK_EQ_U64(schway_set_input(inst, partial_valid), SCHWAY_STATUS_OK);
+
+    uint8_t partial_bad[241];
+    memset(partial_bad, 0, sizeof partial_bad);
+    memcpy(partial_bad, &baseline, sizeof(schway_input));
+    partial_size = (uint32_t)sizeof partial_bad;
+    memcpy(partial_bad, &partial_size, sizeof partial_size);
+    uint32_t valid_flag = SCHWAY_GUN_INPUT_VALID;
+    memcpy(partial_bad + 236u, &valid_flag, sizeof valid_flag);
+    partial_bad[240] = 1u;
+    expect_rejected_v10_input(inst, &baseline, partial_bad, SCHWAY_STATUS_ERR_ARGUMENT);
+
+    uint8_t oversized[sizeof(schway_current_input) + 8u];
+    memset(oversized, 0, sizeof oversized);
+    memcpy(oversized, &baseline, sizeof baseline);
+    uint32_t oversized_size = (uint32_t)sizeof oversized;
+    memcpy(oversized, &oversized_size, sizeof oversized_size);
+    CHECK_EQ_U64(schway_set_input(inst, oversized), SCHWAY_STATUS_OK);
+    oversized[sizeof oversized - 1u] = 1u;
+    expect_rejected_v10_input(inst, &baseline, oversized, SCHWAY_STATUS_ERR_STRUCT_SIZE);
 
     /* Allocate exactly the released v9 object extent: no gun extension exists. */
     schway_input *input = (schway_input *)calloc(1u, sizeof *input);
