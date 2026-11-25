@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 10
+open_count: 12
 waived_count: 5
 fixed_count: 10
-total_count: 25
-last_updated: 2026-11-23T17:39:13.635Z
+total_count: 27
+last_updated: 2026-11-25T15:07:38.675Z
 ---
 
 # Broken Windows Ledger
@@ -40,6 +40,8 @@ last_updated: 2026-11-23T17:39:13.635Z
 | 23 | 11 | stub | host/disc_ccd.c | 198 | CloneCD sector reads remain unsupported until Plan 11-04 validates its sector mapping. | fixed |  | 2026-11-22T02:07:28.648Z | 2026-11-22T13:35:43.206Z |
 | 24 | 11 | stub | host/disc_ecm.c | 222 | ECM type-1/2/3 record decoding remains unsupported pending independent output vectors in Plan 11-05. | open |  | 2026-11-22T03:12:50.763Z |  |
 | 25 | 13 | deviation | tests/core/test_state.c |  | Task 2 validation assertions were green immediately because shared board-state validation landed in Task 1; no separate Task 2 RED run was fabricated. | waived | Task 2 adds planned regression coverage for validation implemented in Task 1; all negative cases passed the exact focused selector, and the sequencing exception is recorded in 13-04-SUMMARY and STATE. No test or behavior gap remains. | 2026-11-23T17:38:49.703Z | 2026-11-23T17:39:13.635Z |
+| 26 | 15 | deviation | src/pad.c |  | Raw fixed-width signed gun coordinates are required so the state visitor reproduces saved bytes. | open |  | 2026-11-25T15:06:00.729Z |  |
+| 27 | 15 | deviation | tests/core/test_state.c |  | Expanded the test-only state field-record capacity to cover the new serialized gun fields. | open |  | 2026-11-25T15:07:38.675Z |  |
 
 ````json
 [
@@ -366,6 +368,32 @@ last_updated: 2026-11-23T17:39:13.635Z
     "reason": "Task 2 adds planned regression coverage for validation implemented in Task 1; all negative cases passed the exact focused selector, and the sequencing exception is recorded in 13-04-SUMMARY and STATE. No test or behavior gap remains.",
     "recorded_at": "2026-11-23T17:38:49.703Z",
     "resolved_at": "2026-11-23T17:39:13.635Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 26,
+    "kind": "deviation",
+    "phase": "15",
+    "file": "src/pad.c",
+    "line": null,
+    "description": "Raw fixed-width signed gun coordinates are required so the state visitor reproduces saved bytes.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-25T15:06:00.729Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 27,
+    "kind": "deviation",
+    "phase": "15",
+    "file": "tests/core/test_state.c",
+    "line": null,
+    "description": "Expanded the test-only state field-record capacity to cover the new serialized gun fields.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-25T15:07:38.675Z",
+    "resolved_at": null,
     "milestone": "v2.0"
   }
 ]

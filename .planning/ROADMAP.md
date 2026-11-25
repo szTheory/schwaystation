@@ -339,7 +339,7 @@ Plans:
   2. Supported libretro lightgun or pointer input maps to the expected game inputs. A host missing the required input reports it as unsupported without registering false hits. These checks use synthetic input and displays.
   3. The public mapping covers every delivered controller class with official device and subclass identifiers, frame-latched input and a reproducible integration check. The ledger includes gun evidence.
 
-**Plans**: 8/10 plans executed
+**Plans**: 9/10 plans executed
 
 Plans:
 **Wave 1**
@@ -361,7 +361,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [x] 15-08-PLAN.md — POINTER subset and topology transitions
-- [ ] 15-09-PLAN.md — In-flight gun save-state continuation
+- [x] 15-09-PLAN.md — In-flight gun save-state continuation
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 15-10-PLAN.md — Synthetic evidence and reviewed-verification handoff
@@ -398,5 +398,5 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
-| 15. GunCon and Justifier | 8/10 | In Progress | - |
+| 15. GunCon and Justifier | 9/10 | In Progress | - |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |

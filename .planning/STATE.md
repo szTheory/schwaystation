@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 9
+current_plan: 10
 status: executing
-stopped_at: Completed 15-08-PLAN.md
-last_updated: "2026-11-25T14:22:16.498Z"
+stopped_at: Completed 15-09-PLAN.md
+last_updated: "2026-11-25T15:05:24.744Z"
 last_activity: 2026-11-25
 last_activity_desc: Phase 15 Plan 15-08 completed; Codex/OpenGSD 1.23.0, gsd-executor gpt-6-luna xhigh; 29m26s wall window; POINTER fallback and focused gun/topology checks passed; Plan 15-09 is next
-state_head: a6f6b093edc33ace004fea976f676eea4a9ff6a2
+state_head: 00f030bf10191c60b41c0407280f9586cfd5efbb
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 103
+  completed_plans: 104
   percent: 80
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 9
+Current Plan: 10
 Total Plans in Phase: 10
 Status: Ready to execute
 Last activity: 2026-11-25 — Phase 15 Plan 15-08 completed; Codex/OpenGSD 1.23.0, gsd-executor gpt-6-luna xhigh; 29m26s wall window; POINTER fallback and focused gun/topology checks passed; Plan 15-09 is next
@@ -82,6 +82,10 @@ Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary se
 Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. The recorded wall window ran from the Plan 15-07 closeout at 2026-11-25T13:49:09Z through the final task commit at 14:18:35Z (29m26s). Task 1 used an accepted failing POINTER integration assertion before implementing capability-gated fallback. Task 2 found frame latching and tap restrictions already implemented by prior plans; regression tests plus documentation passed without a production fix.
 
 `cmake --preset ci`, required-selector enumeration, ABI v9, documentation budget and fixture budget checks passed. The Task 1 three-selector set passed 3/3, the Task 2 five-selector set passed 5/5, targeted builds and `git diff --check` passed. The first Task 2 run exposed an incomplete test-host LIGHTGUN trigger setup after pointer input state was separated; the mock was corrected before the final green run. A full-tree hygiene scan was stopped after about 25 seconds (exit 130) as redundant; the configured staged hygiene hook passed on both task commits. No broad workflow, hosted CI, Act or Docker or fuzz campaign was run. Task commits: `3390f94`, `f8e2a4e`, `059cc0f`, `a6f6b09`; summary: `.planning/phases/15-guncon-and-justifier/15-08-SUMMARY.md`.
+
+### Phase 15 Plan 15-09 execution (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. The plan ran from 2026-11-25T14:26:43Z through task closeout at about 15:05Z (38 minutes wall time). Both sequential tasks had accepted RED evidence before implementation. Focused SIO/GPU continuation selectors passed 4/4, then the aggregate state/version/no-allocation selectors passed 8/8, with the final GPU reset/disabled-display cases passing 1/1. The exact local stable-state producer reported 3,757,754 bytes and the updated exact quality bound comparison passed. An intermediate visitor mismatch led to matching signed fixed-width serialization to visitor bytes; the test-only field inventory was expanded to cover the new fields. `cmake --preset ci`, ABI v9, selector preflight and `git diff --check` passed. No broad workflow, hosted CI, Act, Docker or fuzz campaign was run. Task commits: `f879ecc`, `e9fe132`, `00f3677`, `00f030b`; summary: `.planning/phases/15-guncon-and-justifier/15-09-SUMMARY.md`.
 
 ### Phase 14 final hosted verification and release (2026-11-24)
 
@@ -1853,6 +1857,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 15 P6 | about 3h 52m wall time; active time not isolated | 2 tasks | 5 files |
 | Phase 15 P07 | 24m commit window; active start not separately recorded | 2 tasks | 4 files |
 | Phase 15 P08 | 29m 26s | 2 tasks | 4 files |
+| Phase 15 P09 | 38m | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -2349,6 +2354,8 @@ Recent decisions affecting current work:
 - [Phase 15]: Treat capability as device-type support only; zero input_state values remain neutral and cannot identify absent controls.
 - [Phase 15]: Prefer LIGHTGUN when both device types are advertised; POINTER is a limited fallback without forced reload.
 - [Phase 15]: Keep GunCon and Justifier on direct physical ports; multitap sockets reject guns.
+- [Phase 15]: Pending host input remains outside serialized machine state; the host submits it through the normal input API after load.
+- [Phase 15]: State format and behavior revision 21 carry gun protocol fields; state.bytes tracks the exact 3757754-byte producer result.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2600,8 +2607,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T14:22:16.187Z
-Stopped at: Completed 15-08-PLAN.md
+Last session: 2026-11-25T15:05:24.356Z
+Stopped at: Completed 15-09-PLAN.md
 Resume file: None
 
 ### v1.0 session history
