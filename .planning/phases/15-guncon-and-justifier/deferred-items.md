@@ -1,8 +1,9 @@
-# Phase 15 Deferred Items
+# Phase 15 Review Findings
 
-## OpenBIOS shell hash changes on the Phase 15 source head
+## OpenBIOS shell hash regression — resolved
 
-- **Status:** Open; phase owner review/fix required before final verification.
-- **File:** `tests/built/tests.cmake` (expected frame-240 hash); Phase 15 source changes affect the measured output.
-- **Evidence:** `built.openbios.shell` fails on the Phase 15 head with `1b819a89fbb391d76011340ee7a762e7583b878e18a79d8f12d4300dbdd79552`. An isolated build from merge base `f08fc08d40a1ebcb42708e0a31be3111e3eed711` passes the same BIOS/region/frame command with the checked hash `df2704d7cf3f01ff70ab4534a443729bba77bf73e3488c836513f9f8b86a9372`. It was discovered as a CTest fixture setup dependency of `compat.ratchet.rows`; the selected Plan 15-10 tests themselves passed.
-- **Why deferred:** The regression is in earlier Phase 15 implementation source, outside Plan 15-10's owned files. The orchestrator should trace and fix it during the required phase review before final phase verification.
+- **Status:** Resolved during the required Phase 15 code review.
+- **Files:** `src/frame.c`, `src/gpu.c`, `tests/gpu/beam.c`.
+- **Cause:** Unconditional GPU synchronization at frame start changed the BIOS timing path even with no gun selected.
+- **Fix:** Commit `d7ab38e` limits frame-start synchronization to direct-gun configurations while retaining valid sensor sampling at display mode zero.
+- **Evidence:** `built.openbios.shell` now passes the exact 240-frame hash `df2704d7cf3f01ff70ab4534a443729bba77bf73e3488c836513f9f8b86a9372`; the focused OpenBIOS/GPU/state/SIO regression set passed 7/7.

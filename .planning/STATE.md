@@ -6,11 +6,11 @@ current_phase: 15
 current_phase_name: GunCon and Justifier
 current_plan: 10
 status: verifying
-stopped_at: Completed 15-10-PLAN.md; phase review is next
-last_updated: "2026-11-25T16:04:35.293Z"
+stopped_at: Phase 15 code review fixes complete; final verification is next
+last_updated: "2026-11-25T16:39:57.809Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 15 Plan 15-08 completed; Codex/OpenGSD 1.23.0, gsd-executor gpt-6-luna xhigh; 29m26s wall window; POINTER fallback and focused gun/topology checks passed; Plan 15-09 is next
-state_head: 25943c2dd94aa662e481abeb8961f9630bacb81a
+last_activity_desc: Phase 15 code review completed; CR-01 and CR-02 fixed by f30c7fd and d7ab38e; OpenBIOS 240-frame hash restored; focused review regressions passed 7/7; final phase verification is next
+state_head: d7ab38e0799b594ae825e97a48890b7a15980c12
 progress:
   total_phases: 10
   completed_phases: 8
@@ -34,7 +34,7 @@ Phase: 15 — GunCon and Justifier
 Current Plan: 10
 Total Plans in Phase: 10
 Status: Phase complete — ready for verification
-Last activity: 2026-11-25 — Phase 15 Plan 15-10 completed; Codex/OpenGSD 1.23.0, gsd-executor gpt-6-luna xhigh; about 60 minutes; synthetic gun evidence and measured quality bounds recorded; phase review is next
+Last activity: 2026-11-25 — Phase 15 code review completed; CR-01 and CR-02 fixed by f30c7fd and d7ab38e; OpenBIOS 240-frame hash restored; focused review regressions passed 7/7; final phase verification is next
 Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
@@ -2363,7 +2363,8 @@ Recent decisions affecting current work:
 - [Phase 15]: State format and behavior revision 21 carry gun protocol fields; state.bytes tracks the exact 3757754-byte producer result.
 - [Phase 15]: Keep gun compatibility evidence synthetic; no retail-game or physical calibration claim is supported.
 - [Phase 15]: Set exact WASI and Cachegrind bounds from measured current-head producers; preserve the 100-basis-point relative limit.
-- [Phase 15]: Defer the OpenBIOS shell hash regression to phase review because it predates Plan 15-10 source changes.
+- [Phase 15]: Limit frame-start GPU synchronization to direct-gun configurations so the no-gun OpenBIOS timing path stays unchanged while armed sensors retain mode-zero sampling.
+- [Phase 15]: Reject GunCon and Justifier in every saved multitap endpoint and guard direct-gun polling against endpoint indexes outside its two-port arrays.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2615,8 +2616,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T16:04:34.869Z
-Stopped at: Completed 15-10-PLAN.md; phase review is next
+Last session: 2026-11-25T16:39:57.389Z
+Stopped at: Phase 15 code review fixes complete; final verification is next
 Resume file: None
 
 ### v1.0 session history

@@ -128,7 +128,7 @@ Targeted behavior and policy checks:
 - On an x86_64 Ubuntu 26.04 container, with tests registered, CHD enabled, and Clang/LLD 21.1.8, the linked WASI runner measured 956,794 bytes. `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DARTIFACT=build/phase15-10-src/build/wasm32/schwaystation-run -P tests/cmake/quality.cmake` passed after updating the exact bound. The first comparison against the prior 947,969-byte pin failed as stale; no value was guessed or padded.
 - With GCC 15.2.0 and Valgrind 3.26.0, `env -i "$valgrind" --tool=cachegrind --cache-sim=no ...` used the CI frame windows (testcard 60/360, GPU motion 10/60). Current-head results were 1,649,769 and 138,440,983 Ir/frame. The same producer on merge base `f08fc08d40a1ebcb42708e0a31be3111e3eed711` measured 1,649,208 and 138,364,065; the respective changes are about 3.4bp and 5.6bp, below 100bp. Exact-bound comparisons passed after updating `quality.json`.
 
-One required focused CTest command returned exit 8: its seven selected compatibility/documentation tests passed, but CTest also ran the `built.openbios.shell` fixture setup, which failed the 240-frame BIOS hash. The test prints `1b819a89fbb391d76011340ee7a762e7583b878e18a79d8f12d4300dbdd79552` on the Phase 15 head, while an isolated build and identical BIOS/region/frame run from merge base `f08fc08d40a1ebcb42708e0a31be3111e3eed711` exited 0 with the checked hash `df2704d7cf3f01ff70ab4534a443729bba77bf73e3488c836513f9f8b86a9372`. The cause predates Plan 15-10's owned changes and is listed in `deferred-items.md`; phase review should resolve it before final verification.
+One required focused CTest command initially returned exit 8: its seven selected compatibility/documentation tests passed, but the fixture setup `built.openbios.shell` failed the 240-frame BIOS hash. It produced `1b819a89fbb391d76011340ee7a762e7583b878e18a79d8f12d4300dbdd79552` on the Phase 15 head; an isolated build from merge base `f08fc08d40a1ebcb42708e0a31be3111e3eed711` produced the checked hash `df2704d7cf3f01ff70ab4534a443729bba77bf73e3488c836513f9f8b86a9372`. The cause was resolved during phase review: commit `d7ab38e` limits frame-start GPU synchronization to direct-gun configurations while retaining mode-zero gun sensing. The exact OpenBIOS hash and focused OpenBIOS/GPU/state/SIO regression set then passed; see `15-REVIEW-FIX.md`.
 
 All bounded local commands completed. The task-named containers and images, the two temporary source trees and the temporary source archive were removed; the pre-existing arm64 `ubuntu:26.04` image tag was restored. No task container, volume, network, fuzzer or child process remains.
 
@@ -136,7 +136,7 @@ All bounded local commands completed. The task-named containers and images, the 
 
 - Compatibility feature rows describe only synthetic predicates and passing tests; no retail serials, ROM identities or measured physical-gun calibration were added.
 - Absolute quality bounds follow the measured current-head producer outputs. The 100-basis-point relative Cachegrind gate and the existing workload fingerprint were not changed.
-- The failing OpenBIOS shell fixture is documented for phase review rather than patched here because the failure is in earlier Phase 15 source, outside this plan's files.
+- The OpenBIOS shell fixture was outside this plan's files, so its initial failure was handed to phase review and fixed there as recorded above.
 
 ## Deviations from Plan
 
@@ -144,9 +144,9 @@ All bounded local commands completed. The task-named containers and images, the 
 - CMake 4.2.3 in the minimal Ubuntu container did not support the project's preset schema version 11. The exact Clang/LLD versions and cache settings were used with a direct configure command; preset execution remains a hosted confirmation.
 - The focused compatibility CTest selection exposed the OpenBIOS fixture failure described above. It is an open phase issue, not a passing result.
 
-## Deferred Issues
+## Review Follow-up
 
-- `built.openbios.shell` fails on the Phase 15 source head while the same command passes on the phase merge base; see [`deferred-items.md`](deferred-items.md). Phase review/fix and final phase verification remain with the orchestrator.
+- The deferred OpenBIOS hash regression is resolved; the malformed multitap save-state finding is also resolved. See [`15-REVIEW-FIX.md`](15-REVIEW-FIX.md) and [`deferred-items.md`](deferred-items.md). Final phase verification remains with the orchestrator.
 
 ## Self-Check: PASSED
 
