@@ -389,7 +389,27 @@ Plans:
   3. The generated compatibility report accounts for all 13,407 entries at the pinned, licensed DAT revision and links supported pass and fail results to evidence. Untested entries and combinations remain explicitly unknown.
   4. `is_experimental` is false only when the committed required-capability matrix passes every row, with zero unknown or failing required rows. It stays true when that evidence is missing or fails. The matrix covers the specified boot-to-play disc families, region and board tuples, peripheral classes, card persistence, patches and cheats. DAT-wide playability is outside that claim.
 
-**Plans**: TBD
+**Plans**: 18 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — Freeze the released caller and register the complete test graph
+- [ ] 16-02-PLAN.md — Expose checked RAM writes and the shared host cheat boundary
+- [ ] 16-03-PLAN.md — Complete the bounded GameShark parser and canonical cheat bytes
+- [ ] 16-04-PLAN.md — Apply GameShark entries through libretro callbacks
+- [ ] 16-05-PLAN.md — Serialize libretro cheat configuration atomically
+- [ ] 16-06-PLAN.md — Expose runner cheats and configuration-aware state hashes
+- [ ] 16-07-PLAN.md — Apply identity-bound PPF1 patches to an exact raw-track mapping
+- [ ] 16-08-PLAN.md — Complete PPF2 and PPF3 native checks and records
+- [ ] 16-09-PLAN.md — Stage and validate complete BPS transformations
+- [ ] 16-10-PLAN.md — Expose the transactional patch path in the runner
+- [ ] 16-11-PLAN.md — Replay and fuzz patch and cheat hostile input
+- [ ] 16-12-PLAN.md — Account for DAT occurrences through a bounded runner inventory path
+- [ ] 16-13-PLAN.md — Reconcile the pinned Redump source and retain aggregate provenance
+- [ ] 16-14-PLAN.md — Define required capabilities and evaluate fresh results fail-closed
+- [ ] 16-15-PLAN.md — Protect current feature evidence against the actual base
+- [ ] 16-16-PLAN.md — Publish truthful inventory and required-capability reports
+- [ ] 16-17-PLAN.md — Evaluate the full BE32 shard candidate with exact coverage
+- [ ] 16-18-PLAN.md — Close local integration evidence before source review
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`, `PROVENANCE.md`, `ASSET_POLICY.md`
 
@@ -408,4 +428,4 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
-| 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |
+| 16. Patches, cheats and compatibility evidence | 0/18 | Planning | - |

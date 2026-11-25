@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: Not started
+current_plan: 01 (planned; checker pending)
 status: planning
-stopped_at: Phase 16 context gathered
-last_updated: "2026-11-25T22:30:48.455Z"
+stopped_at: Phase 16 plans drafted; plan checker pending
+last_updated: "2026-11-25T23:13:03.582Z"
 last_activity: 2026-11-25
-last_activity_desc: "Phase 15 shipped as PR #44"
-state_head: f6260661015f23468b1bd3c1944c7cc8fb3dcd2f
+last_activity_desc: Phase 16 execution plans drafted; plan checker pending
+state_head: 7b14286e3040017986a8a2ae436ad59d13f5426b
 progress:
   total_phases: 10
   completed_phases: 9
-  total_plans: 107
+  total_plans: 125
   completed_plans: 107
-  percent: 90
+  percent: 86
 ---
 
 # Project State
@@ -26,16 +26,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 15 — finish goal-backward verification and ship the reviewed GunCon and Justifier changes. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
+**Current focus:** Phase 16 — plan the patch, cheat and compatibility-evidence implementation. Phase 15 shipped as v0.15.0 with green post-merge Main CI and Release CI.
 
 ## Current Position
 
 Phase: 16 — Patches, cheats and compatibility evidence
-Current Plan: Not started
-Total Plans in Phase: 12
-Status: Ready to plan
-Last activity: 2026-11-25 -- Phase 15 shipped as PR #44
-Progress: [█████████░] 90% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
+Current Plan: 01 (planned; checker pending)
+Total Plans in Phase: 18
+Status: Plans drafted; plan checker pending
+Last activity: 2026-11-25 -- Phase 16 plans drafted from committed context and research
+Progress: [█████████░] 86% (9/10 v2.0 phases released; Phase 16 has 18 implementation plans awaiting plan checks and execution. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+
+### Phase 16 planning (2026-11-25)
+
+Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. Eighteen plans cover the four Phase 16 requirements and eight locked decisions across eleven file-disjoint waves. Plan 01 registers the CMake skeleton and exact test inventories; later owners implement checked RAM writes, bounded GameShark text/state, PPF/BPS source-bound overlays, per-occurrence DAT accounting and the protected fresh-result capability matrix. Plan schemas/structures are validated; code review and final phase verification remain later steps. No application/build/behavior tests ran during planning. The source audit records coverage, concrete bounds and the experimental metadata evidence boundary.
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2617,9 +2621,10 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T22:30:47.980Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-CONTEXT.md
+Last session: 2026-11-25T23:13:03.188Z
+Stopped at: Phase 16 plans drafted; plan checker pending
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01-PLAN.md
+
 Runtime/model: Codex with OpenGSD 1.23.0; primary model ID unavailable. Three assumption analyses used gpt-6.1-sol high.
 
 Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
