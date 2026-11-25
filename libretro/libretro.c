@@ -144,6 +144,8 @@ schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *bu
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
                                  size_t capacity, size_t *written);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_input(unsigned port, schway_gun_input *out);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -2226,6 +2228,10 @@ schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
     case SCHWAY_INPUT_DEVICE_MOUSE:
         payload_size = 4u;
         break;
+    case SCHWAY_INPUT_DEVICE_JUSTIFIER:
+        payload_size = 2u;
+        break;
+    case SCHWAY_INPUT_DEVICE_GUNCON:
     case SCHWAY_INPUT_DEVICE_NEGCON:
     case SCHWAY_INPUT_DEVICE_JOGCON:
     case SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT:
@@ -2259,6 +2265,16 @@ schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
         reply[count++] = received;
     }
     *written = count;
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_input(unsigned port, schway_gun_input *out)
+{
+    if (inst == NULL || port >= 2u || out == NULL) {
+        return 0;
+    }
+    *out = inst->pad.gun_input[port];
     return 1;
 }
 #undef SCHWAYSTATION_TEST_EXPORT
