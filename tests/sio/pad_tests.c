@@ -1458,6 +1458,74 @@ static int gun_latch(void)
     return gun_tap_failures != 0u || check_failures != 0 ? 1 : 0;
 }
 
+static uint32_t gun_protocol_count;
+static uint32_t gun_protocol_failures;
+
+static void gun_protocol_check(int passed, const char *name)
+{
+    gun_protocol_count++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_protocol_count, name);
+    if (passed == 0) {
+        fprintf(stderr, "GunCon protocol assertion failed: %s\n", name);
+        gun_protocol_failures++;
+    }
+}
+
+static int gun_guncon(void)
+{
+    gun_protocol_count = 0u;
+    gun_protocol_failures = 0u;
+    puts("TAP version 13");
+
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.buttons[0] = (uint16_t)((1u << 3) | (1u << 14));
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    input.guns[1].flags = SCHWAY_GUN_INPUT_VALID;
+    latch_input(inst, &input);
+    inst->pad.gun_result_valid[0] = 1u;
+    inst->pad.gun_result_x[0] = UINT16_C(0x0123);
+    inst->pad.gun_result_y[0] = UINT16_C(0x0045);
+    inst->pad.gun_result_valid[1] = 1u;
+    inst->pad.gun_result_x[1] = UINT16_C(0xABCD);
+    inst->pad.gun_result_y[1] = UINT16_C(0x1357);
+
+    static const uint8_t expected[2][6] = {
+        {0xF7u, 0x9Fu, 0x23u, 0x01u, 0x45u, 0x00u},
+        {0xFFu, 0xFFu, 0xCDu, 0xABu, 0x57u, 0x13u},
+    };
+    static const char *const names[2][6] = {
+        {"port 1 A button", "port 1 trigger and B buttons", "port 1 X low byte",
+         "port 1 X high byte", "port 1 Y low byte", "port 1 Y high byte"},
+        {"port 2 released buttons", "port 2 released trigger", "port 2 X low byte",
+         "port 2 X high byte", "port 2 Y low byte", "port 2 Y high byte"},
+    };
+
+    for (uint32_t port = 0u; port < 2u; port++) {
+        configure_sio_port(inst, port);
+        gun_protocol_check(exchange(inst, 0x01u, 1) == 0xFFu,
+                           port == 0u ? "port 1 address ACK reply" : "port 2 address ACK reply");
+        gun_protocol_check(exchange(inst, 0x42u, 1) == 0x63u,
+                           port == 0u ? "port 1 GunCon ID" : "port 2 GunCon ID");
+        gun_protocol_check(exchange(inst, 0x00u, 1) == 0x5Au,
+                           port == 0u ? "port 1 poll delimiter" : "port 2 poll delimiter");
+        for (uint32_t i = 0u; i < 6u; i++) {
+            uint8_t actual = exchange(inst, 0u, i < 5u);
+            gun_protocol_check(actual == expected[port][i], names[port][i]);
+        }
+        gun_protocol_check((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u,
+                           port == 0u ? "port 1 final reply has no ACK" :
+                                        "port 2 final reply has no ACK");
+    }
+
+    schway_destroy(inst);
+    printf("1..%u\n", gun_protocol_count);
+    return gun_protocol_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -1486,6 +1554,8 @@ int main(int argc, char **argv)
         special_jogcon();
     } else if (strcmp(argv[1], "gun_latch") == 0) {
         return gun_latch();
+    } else if (strcmp(argv[1], "gun_guncon") == 0) {
+        return gun_guncon();
     } else {
         return 2;
     }
