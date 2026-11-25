@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/szTheory/schwaystation/compare/v0.14.0...v0.15.0) (2026-11-25)
+
+
+### Features
+
+* **input:** add GunCon and Justifier support ([#44](https://github.com/szTheory/schwaystation/issues/44)) ([59991f5](https://github.com/szTheory/schwaystation/commit/59991f538f44f9738184f3055a68f176170a6299))
+
 ## [0.14.0](https://github.com/szTheory/schwaystation/compare/v0.13.0...v0.14.0) (2026-11-24)
 
 
