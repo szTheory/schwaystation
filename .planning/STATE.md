@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: Phase 15 planning
-status: planning
-stopped_at: Phase 15 discussion committed; plan-phase is next
-last_updated: "2026-11-25T02:55:32Z"
+current_plan: Phase 15 execution
+status: planned
+stopped_at: Phase 15 plans reviewed; planning commit is next
+last_updated: "2026-11-25T03:22:19Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 15 discussion completed after role fan-out and adversarial synthesis
-state_head: 073013a2fb30649c0a43a9384613f7fa743a0651
+last_activity_desc: Phase 15 planning and independent plan review completed
+state_head: 60f8a8cdd025359cbea3b27ff2c73804af97eb8d
 progress:
   total_phases: 10
   completed_phases: 8
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 15 — plan GunCon and Justifier. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
+**Current focus:** Phase 15 — execute the reviewed GunCon and Justifier plans. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
 
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: Phase 15 planning
-Total Plans in Phase: Not planned
-Status: Planning
-Last activity: 2026-11-24 — Phase 15 discussion committed; Phase 14 remains the latest released phase
+Current Plan: Phase 15 execution
+Total Plans in Phase: 10
+Status: Planned
+Last activity: 2026-11-24 — Phase 15 planning and independent plan review completed; Phase 14 remains the latest released phase
 Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
@@ -68,6 +68,10 @@ passed `git diff --check`, and GSD reports both `has_context` and `has_research`
 The research identified two plan risks to resolve against code: whether the aimed-pixel sample must read live
 RGB555 VRAM or reconstructed RGB24 output, and how to synchronize Timer 0/1 at the exact Justifier beam time
 before IRQ10. Keep the threshold numeric decision to the implementation after those representations are fixed.
+
+### Phase 15 planning and plan review (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-planner` gpt-6.1-sol high; `gsd-plan-checker` gpt-6-luna xhigh; primary session model ID unavailable. Planning produced ten plans across seven dependency waves for GUN-01, GUN-02 and SIO-05. The independent checker found one portability blocker: machine-specific GSD home paths in the plan execution contexts would fail repository hygiene. All ten references were changed to the existing home-relative `@~/.codex/...` convention; plan structure, shell/failure-direction probes, `git diff --check` and `sh scripts/hygiene.sh --tree` then passed, and the checker passed with no remaining findings. Planning artifacts are ready for the required `docs(15): create phase plan` commit; source work and implementation tests have not started. Wall time from the preceding STATE checkpoint was about 27 minutes; active time was not isolated. No hosted CI, Act or Docker resources were used.
 
 ### Phase 14 final hosted verification and release (2026-11-24)
 

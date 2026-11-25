@@ -339,7 +339,33 @@ Plans:
   2. Supported libretro lightgun or pointer input maps to the expected game inputs. A host missing the required input reports it as unsupported without registering false hits. These checks use synthetic input and displays.
   3. The public mapping covers every delivered controller class with official device and subclass identifiers, frame-latched input and a reproducible integration check. The ledger includes gun evidence.
 
-**Plans**: TBD
+**Plans**: 10 plans
+
+Plans:
+**Wave 1**
+- [ ] 15-01-PLAN.md — Released-caller tracer and CMake/test inventories
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 15-02-PLAN.md — Append-only API v10 gun input
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 15-03-PLAN.md — Frame-latched direct-port gun state
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 15-04-PLAN.md — GunCon serial replies
+- [ ] 15-05-PLAN.md — Beam-time emitted-pixel sampling and geometry
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 15-06-PLAN.md — Justifier enable and timer-visible IRQ10
+- [ ] 15-07-PLAN.md — Official LIGHTGUN mapping and host availability
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 15-08-PLAN.md — POINTER subset and topology transitions
+- [ ] 15-09-PLAN.md — In-flight gun save-state continuation
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 15-10-PLAN.md — Synthetic evidence and reviewed-verification handoff
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`
 
