@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 15-03-PLAN.md
-last_updated: "2026-11-25T04:43:21.784Z"
+stopped_at: Completed 15-04-PLAN.md
+last_updated: "2026-11-25T05:02:01.370Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 15 Plan 15-03 completed; Plan 15-04 is ready to execute
-state_head: c0af4f13a99f889834384e7e32f9f3f03d6fa865
+state_head: f49d7949f77042c054fc67a1741cf6b8a417295a
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 98
+  completed_plans: 99
   percent: 80
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 10
 Status: Ready to execute
 Last activity: 2026-11-24 — Phase 15 Plan 15-03 completed; Plan 15-04 is next. Phase 14 remains the latest released phase.
@@ -1842,6 +1842,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 15 P01 | 14 min | 3 tasks | 9 files |
 | Phase 15 P02 | 20m 10s | 2 tasks | 7 files |
 | Phase 15 P03 | 13m 25s | 2 tasks | 5 files |
+| Phase 15 P04 | 13m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2328,6 +2329,8 @@ Recent decisions affecting current work:
 - [Phase 15]: Normalize only size-tagged caller bytes and validate the complete snapshot before replacing pending input; reject guns on enabled multitaps.
 - [Phase 15]: Keep pending host input outside saved state; serialize only hardware-visible latched continuation in Plan 09.
 - [Phase 15]: Pad owns gun protocol/result state and invalidates GPU-owned per-port beam events through the instance.
+- [Phase 15]: GunCon unavailable or unsampled input returns X=0001h/Y=000Ah; explicit offscreen or reload returns X=0001h/Y=0005h as a deterministic model choice.
+- [Phase 15]: GunCon reports only the documented active-low A, trigger, and B wire bits; unsupported bits remain released.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2578,8 +2581,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T04:43:21.520Z
-Stopped at: Completed 15-03-PLAN.md
+Last session: 2026-11-25T05:02:00.901Z
+Stopped at: Completed 15-04-PLAN.md
 Resume file: None
 
 ### v1.0 session history
