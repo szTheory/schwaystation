@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 01 (revised; checker recheck pending)
-status: planning
+current_plan: 1
+status: executing
 stopped_at: Phase 16 plans passed independent verification; execution ready
-last_updated: "2026-11-25T23:48:12.537Z"
+last_updated: "2026-11-25T23:58:21.407Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 16 checker findings addressed; independent recheck pending
-state_head: 26f3870e41203c30d8567a176cf69c641674d8b1
+last_activity_desc: Phase 16 execution started
+state_head: 3759f75bde60bf562c839ffb0115ebbc195c25f3
 progress:
   total_phases: 10
   completed_phases: 9
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 16 — plan the patch, cheat and compatibility-evidence implementation. Phase 15 shipped as v0.15.0 with green post-merge Main CI and Release CI.
+**Current focus:** Phase 16 — Patches, cheats and compatibility evidence
 
 ## Current Position
 
-Phase: 16 — Patches, cheats and compatibility evidence
-Current Plan: 01 (revised; checker recheck pending)
+Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
+Current Plan: 1
 Total Plans in Phase: 18
-Status: Plans revised; plan checker recheck pending
-Last activity: 2026-11-25 -- Phase 16 plan scope and research-resolution findings addressed
+Status: Executing Phase 16
+Last activity: 2026-11-25 — Phase 16 execution started
 Progress: [█████████░] 86% (9/10 v2.0 phases released; Phase 16 has 18 implementation plans awaiting plan checks and execution. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
@@ -2630,6 +2630,8 @@ Stopped at: Phase 16 plans passed independent verification; execution ready
 Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01-PLAN.md
 
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
+
+Phase 16 execution started on `phase/16-patches-cheats-compatibility`. Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); GSD executor `codex exec` pinned to gpt-6-luna xhigh. Parallelization and GSD worktrees are enabled to follow the project’s disjoint-wave execution rule.
 
 Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
 
