@@ -281,6 +281,8 @@ static int parser_bounds(void)
     return 0;
 }
 
+static int canonical_state(void);
+
 static int parser_order(void)
 {
     static const char low_index[] = "30000010 0011\n30000010 0033";
@@ -312,7 +314,159 @@ static int parser_order(void)
         return 1;
     }
     schway_destroy(inst);
+    return canonical_state();
+}
+
+static int bytes_zero(const uint8_t *bytes, size_t begin, size_t end)
+{
+    for (size_t i = begin; i < end; i++) {
+        if (bytes[i] != 0u) return 0;
+    }
+    return 1;
+}
+
+static int decode_rejected_preserves_table(schway__host_cheats *destination,
+                                           const uint8_t *bytes, size_t size)
+{
+    schway__host_cheats before;
+    memcpy(&before, destination, sizeof before);
+    if (schway__host_cheats_decode(destination, bytes, size)) {
+        fputs("expected malformed canonical cheat state to be rejected\n", stderr);
+        return 1;
+    }
+    if (memcmp(&before, destination, sizeof before) != 0) {
+        fputs("rejected canonical state changed the destination table\n", stderr);
+        return 1;
+    }
     return 0;
+}
+
+static int canonical_state(void)
+{
+    static const char first_text[] = "30000010 00a5\r\n80000012 1234";
+    static const char equivalent_text[] = "30000010+00A5+80000012+1234";
+    static const char reversed_text[] = "80000012 1234\n30000010 00A5";
+    static const char destination_text[] = "30000030 0055";
+    schway__host_cheats first;
+    schway__host_cheats equivalent;
+    schway__host_cheats reversed;
+    schway__host_cheats disabled;
+    schway__host_cheats destination;
+    schway__host_cheats decoded;
+    schway__host_cheats_reset(&first);
+    schway__host_cheats_reset(&equivalent);
+    schway__host_cheats_reset(&reversed);
+    schway__host_cheats_reset(&disabled);
+    schway__host_cheats_reset(&destination);
+    schway__host_cheats_reset(&decoded);
+    if (!schway__host_cheats_replace(&first, 0u, true, first_text, sizeof first_text - 1u) ||
+        !schway__host_cheats_replace(&equivalent, 0u, true, equivalent_text,
+                                     sizeof equivalent_text - 1u) ||
+        !schway__host_cheats_replace(&reversed, 0u, true, reversed_text,
+                                     sizeof reversed_text - 1u) ||
+        !schway__host_cheats_replace(&disabled, 0u, false, first_text,
+                                     sizeof first_text - 1u) ||
+        !schway__host_cheats_replace(&destination, 5u, true, destination_text,
+                                     sizeof destination_text - 1u)) {
+        fputs("could not prepare canonical host cheat states\n", stderr);
+        return 1;
+    }
+
+    const size_t size = SCHWAY_HOST_CHEAT_SERIALIZED_SIZE;
+    uint8_t *bytes = calloc(size + 1u, 1u);
+    uint8_t *same_bytes = malloc(size);
+    uint8_t *changed_bytes = malloc(size);
+    uint8_t *roundtrip = malloc(size);
+    uint8_t *corrupt = malloc(size);
+    if (bytes == NULL || same_bytes == NULL || changed_bytes == NULL || roundtrip == NULL ||
+        corrupt == NULL) {
+        fputs("could not allocate canonical host cheat test buffers\n", stderr);
+        free(bytes);
+        free(same_bytes);
+        free(changed_bytes);
+        free(roundtrip);
+        free(corrupt);
+        return 1;
+    }
+
+    int failed = 0;
+    if (!schway__host_cheats_encode(&first, bytes, size) ||
+        !schway__host_cheats_encode(&equivalent, same_bytes, size) ||
+        memcmp(bytes, same_bytes, size) != 0) {
+        fputs("equivalent cheat text did not encode to identical canonical bytes\n", stderr);
+        failed = 1;
+        goto done;
+    }
+    if (size != 16656u || memcmp(bytes, "SCHT", 4u) != 0 || bytes[4] != 1u || bytes[5] != 0u ||
+        bytes[6] != SCHWAY_HOST_CHEAT_ENTRY_COUNT || bytes[7] != 0u || bytes[8] != 2u ||
+        bytes[9] != 0u || bytes[10] != 0u || bytes[11] != 0u ||
+        !bytes_zero(bytes, 12u, 16u) || bytes[16] != 1u || !bytes_zero(bytes, 17u, 20u) ||
+        bytes[20] != 2u || !bytes_zero(bytes, 21u, 24u) || bytes[24] != 1u || bytes[25] != 0u ||
+        bytes[26] != 0x10u || bytes[27] != 0u || bytes[28] != 0u || bytes[29] != 0u ||
+        bytes[30] != 0xA5u || bytes[31] != 0u || bytes[32] != 2u || bytes[33] != 0u ||
+        bytes[34] != 0x12u || bytes[35] != 0u || bytes[36] != 0u || bytes[37] != 0u ||
+        bytes[38] != 0x34u || bytes[39] != 0x12u || !bytes_zero(bytes, 40u, size)) {
+        fputs("canonical little-endian layout, counts, or reserved zero bytes were incorrect\n",
+              stderr);
+        failed = 1;
+        goto done;
+    }
+    if (!schway__host_cheats_decode(&decoded, bytes, size) ||
+        !schway__host_cheats_encode(&decoded, roundtrip, size) ||
+        memcmp(bytes, roundtrip, size) != 0) {
+        fputs("canonical decode/encode did not preserve the complete fixed layout\n", stderr);
+        failed = 1;
+        goto done;
+    }
+    if (!schway__host_cheats_encode(&reversed, changed_bytes, size) ||
+        memcmp(bytes, changed_bytes, size) == 0 ||
+        !schway__host_cheats_encode(&disabled, changed_bytes, size) ||
+        memcmp(bytes, changed_bytes, size) == 0) {
+        fputs("canonical bytes must preserve write order and enabled state\n", stderr);
+        failed = 1;
+        goto done;
+    }
+
+    struct invalid_byte {
+        size_t offset;
+        uint8_t value;
+    };
+    static const struct invalid_byte invalid[] = {
+        {4u, 2u},
+        {5u, 1u},
+        {6u, 31u},
+        {8u, 3u},
+        {12u, 1u},
+        {16u, 2u},
+        {17u, 1u},
+        {20u, 65u},
+        {24u, 4u},
+        {25u, 1u},
+        {28u, 0x20u},
+        {31u, 1u},
+        {40u, 1u},
+    };
+    for (size_t i = 0u; i < sizeof invalid / sizeof invalid[0]; i++) {
+        memcpy(corrupt, bytes, size);
+        corrupt[invalid[i].offset] = invalid[i].value;
+        if (decode_rejected_preserves_table(&destination, corrupt, size) != 0) {
+            failed = 1;
+            goto done;
+        }
+    }
+    if (decode_rejected_preserves_table(&destination, bytes, size - 1u) != 0 ||
+        decode_rejected_preserves_table(&destination, bytes, size + 1u) != 0) {
+        failed = 1;
+        goto done;
+    }
+
+done:
+    free(bytes);
+    free(same_bytes);
+    free(changed_bytes);
+    free(roundtrip);
+    free(corrupt);
+    return failed;
 }
 
 int main(int argc, char **argv)
