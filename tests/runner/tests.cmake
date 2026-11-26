@@ -2215,10 +2215,6 @@ target_link_libraries(schwaystation-test-cheats PRIVATE
 set_target_properties(schwaystation-test-cheats PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-cheats)
-if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
-  # Clang's Release frames for main and its rollback check total about 147 KiB.
-  target_link_options(schwaystation-test-cheats PRIVATE "LINKER:-z,stack-size=262144")
-endif()
 
 # The region precedence resolver is deliberately host-only and has no runner,
 # disc-image or core dependency, so the table test links only this module.

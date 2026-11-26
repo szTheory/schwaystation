@@ -48,3 +48,13 @@ Reviewed the follow-up corrections prompted by CI [45889677135](https://github.c
 - `tests/fuzz/tests.cmake` — the 256 KiB linker stack applies only to the WASI PPF regression replay executable. Its nested source/target buffers and baseline patch exceed WASI's 128 KiB default; the previously trapping replay now passes under pinned Wasmtime.
 
 No correctness, security, or maintainability findings remain. The targeted native host build and WASI PPF regression passed locally. The corrected hosted Windows matrix and full CI/Nightly results remain pending.
+
+## WASI stack and Windows hash correction review
+
+Reviewed the changes prompted by CI run [45892261219](https://github.com/szTheory/schwaystation/actions/runs/45892261219):
+
+- `cmake/toolchains/wasm32-wasi.cmake` raises the stack baseline to 256 KiB after the required CCD runner path trapped with the prior 128 KiB stack. The per-target 256 KiB overrides are removed because the toolchain now provides the same tested baseline to every WASI executable.
+- `scripts/library.sh` selects `sha256sum` or `shasum -a 256`, matching the existing cross-platform pin-fetching pattern. The three native library compatibility tests passed.
+- `quality.json` lowers the WASM floor to the measured local result of 1,014,617 bytes and retains 1,014,665 as the latest exact hosted ceiling until the revised hosted module is measured.
+
+The pinned Wasmtime 48.0.7 local run passed `runner.disc.legacy`, all 14 selected patch/PPF/cheat tests, and the local WASM size check against the revised floor. The exact changed-head hosted WASM producer and Windows matrix remain required ship checks.

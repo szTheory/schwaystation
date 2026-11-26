@@ -4,7 +4,7 @@
     "gpu_motion": {"floor": 138406446, "ceiling": 138406446}
   },
   "size": {
-    "wasm": {"floor": 1014665, "ceiling": 1014665}
+    "wasm": {"floor": 1014617, "ceiling": 1014665}
   },
   "state": {
     "bytes": {"floor": 3757754, "ceiling": 3757754}
@@ -40,6 +40,7 @@
     "2026-11-25: The hosted Phase 15 perf producer on PR run 45680980325, job 139441573300, measured testcard 1620373 and gpu_motion 138406436 Ir/frame. Its same-run merge-base measurements were 1620101 and 138319540, +1bp and +6bp; both remain inside the unchanged 100bp regression limit. The exact bounds track the hosted producer: https://github.com/szTheory/schwaystation/actions/runs/45680980325/job/139441573300.",
     "2026-11-25: After the Phase 15 review fixes, the tests-enabled CHD-on Release WASI producer measured 957144 linked bytes with Clang/LLD 21.1.8 in an x86_64 Ubuntu 26.04 task container. The exact bound tracks this measured value; the hosted runner remains required for final confirmation.",
     "2026-11-26: Phase 16's tests-enabled CHD-on Release WASI producer measured 1014609 linked bytes with Clang/LLD 21.1.8 in an x86_64 Ubuntu 26.04 task container after adding patch and cheat support and fixing WASI staging. The hosted PR producer on run 45885388357 measured 1014665 bytes after the no-cheat runner fast path; the exact bound tracks that hosted measurement: https://github.com/szTheory/schwaystation/actions/runs/45885388357/job/140134999786.",
+    "2026-11-26: raising the WASI stack baseline to 256 KiB for the CCD runner path measured 1014617 linked bytes in the tests-enabled CHD-on Release producer with Clang/LLD 21.1.8 and CMake 4.2.3 in an x86_64 Ubuntu 26.04 task container. The lower bound tracks this exact local result; the upper bound retains the latest hosted measurement pending the changed-head WASI producer.",
     "2026-11-26: The hosted Cachegrind producer after the no-cheat runner fast path measured testcard at 1620381 and gpu_motion at 138406446 Ir/frame on PR run 45885388357, job 140134774552. Same-run base measurements were 1620373 and 138406436; both relative deltas round to 0bp and stay below the unchanged 100bp limit. The exact bounds track the hosted measurements: https://github.com/szTheory/schwaystation/actions/runs/45885388357/job/140134774552."
   ]
 }

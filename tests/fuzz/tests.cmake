@@ -348,10 +348,6 @@ foreach(subsystem IN ITEMS ppf cheat)
   set_target_properties(${replay_target} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(${replay_target})
-  if(CMAKE_SYSTEM_NAME STREQUAL "WASI" AND subsystem STREQUAL "ppf")
-    # Four live 39,984-byte buffers and a 2 KiB baseline use about 158 KiB; 128 KiB traps.
-    target_link_options(${replay_target} PRIVATE "LINKER:-z,stack-size=262144")
-  endif()
 
   schway_add_test(NAME fuzz.regress.${subsystem}
     COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:${replay_target}>"

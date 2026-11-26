@@ -23,7 +23,8 @@ schway__library_absolute_file() {
 }
 
 schway__library_inventory() {
-    actual=$(shasum -a 256 "$1" | awk '{print $1}') || fail 'cannot verify PlayStation DAT digest'
+    actual=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi) || fail 'cannot verify PlayStation DAT digest'
+    actual=${actual%% *}
     expected=${2:-$actual}; [ "$actual" = "$expected" ] || fail 'PlayStation DAT digest is invalid'
     LIBRARY_PROBE_LOG= "$4" --library-inventory "$1" > "$temporary/inventory" 2>/dev/null || fail 'PlayStation DAT inventory failed'
     awk -F= -v digest="$expected" -v pinsha=52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8 \
