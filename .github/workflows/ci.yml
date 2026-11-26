@@ -75,7 +75,7 @@ jobs:
           set -eu
           cmake -DMODE=pins -DDIR=.github/workflows -P tests/cmake/workflows.cmake
           cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake
-          cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake
+          cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4693 -P tests/cmake/line_budget.cmake
           for inventory in tests/inventory/*.txt tests/disc/inventory.txt tests/fuzz/inventory.txt tests/release/inventory.txt; do
             LC_ALL=C sort -cu "$inventory"
           done

@@ -30,3 +30,17 @@ whose tests executed. The declared matrix leaves unsupported claims unknown.
 
 The local check precedes source review and reviewed-head phase verification. Hosted platforms, hash equality,
 RetroArch, and release integration remain ship gates.
+
+## Ship preflight correction
+
+The first pull-request CI run failed its `changes` preflight because it still enforced the Phase 15 ceiling of 3,901 lines; the producer measured 4,692 against the approved Phase 16 ceiling of 4,694. Nightly's `fuzz` preflight had the same stale limit. CI run [45879737052](https://github.com/szTheory/schwaystation/actions/runs/45879737052) failed in 54 seconds before its platform matrix started; the title and hygiene jobs passed. Nightly run [45879737752](https://github.com/szTheory/schwaystation/actions/runs/45879737752) also failed its `fuzz` preflight. Its vector and three platform benchmark jobs completed; the remaining long jobs were canceled after the same cause was confirmed.
+
+Both hosted preflight commands and the hygiene budget now use the final measured 4,693-line cap. The workflow registration test checks the CI `changes` job and Nightly `fuzz` job. Local correction checks exited 0:
+
+- `cmake -DMODE=pins -DDIR=.github/workflows -P tests/cmake/workflows.cmake && cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake && cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` — action pins, timeout comments and hosted registration passed.
+- `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4693 -P tests/cmake/line_budget.cmake` — measured 4,693 lines at the ratcheted limit.
+- `git diff --check` — passed.
+
+The supplemental review found no issues in this correction: [ship correction review](16-SHIP-REVIEW.md). The hosted jobs must be rerun on the corrected head; their final run URLs are recorded after completion.
+
+The configured regression command `cmake --workflow --preset ci` exited 0 on the corrected tree. It passed all 742 CI tests and all 8 release checks; CTest reported 148.37 seconds for the main suite and 2.68 seconds for release checks. The longest cases were `policy.quality_metrics` (88.89 seconds), `libretro.host` (73.25 seconds), and `runner.disc.legacy` (47.41 seconds). The command completed normally after all tests and package steps returned.
