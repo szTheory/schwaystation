@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Phase 16 wave 3 complete; wave 4 plans 16-04, 16-06 and 16-09 are ready
-last_updated: "2026-11-26T02:11:43Z"
+stopped_at: Phase 16 wave 4 complete; wave 5 plans 16-05, 16-10 and 16-11 are ready
+last_updated: "2026-11-26T03:25:04Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 plans 16-03 and 16-08 complete; wave 4 ready
-state_head: 11d982442fd3e03ff999e19e3e1225fe020a9d11
+last_activity_desc: Phase 16 plans 16-04, 16-06 and 16-09 complete; wave 5 ready
+state_head: 612891ff90490eb87847e8fb06f2e5676dac1cec
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 112
-  percent: 90
+  completed_plans: 115
+  percent: 92
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 18
 Status: Ready to execute
-Last activity: 2026-11-26 — Phase 16 wave 3 complete; wave 4 ready
-Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 5/18 plans complete and wave 4 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Last activity: 2026-11-26 — Phase 16 wave 4 complete; wave 5 ready
+Progress: [█████████░] 92% (9/10 v2.0 phases released; Phase 16 has 8/18 plans complete and wave 5 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -58,6 +58,12 @@ Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna
 Both isolated worktrees started at `542580e`, ended clean, and had resolved commit-scope checks. `verify-summary` produced heuristic false positives: it treated Plan 16-03's documented test failure as a failed self-check and Plan 16-08's inventory-check command as a created file. Both summaries explicitly report `Self-Check: PASSED`; direct inspection confirmed the declared files exist, their task commits and checks match the records, and no changes were needed to the artifacts.
 
 After merge, `git diff --check 542580e..HEAD`, the ABI/runner/disc inventory sorts, `cmake --preset ci`, and the 11-selector preflight passed. The cheat, API, PPF and documentation-budget targets plus runner and libretro consumers built successfully; all 11 focused selectors passed. The broad workflow remains for final phase verification after code review. No hosted CI, Act, or Docker work was needed at this wave boundary. Current plan is 4; wave 4 plans 16-04, 16-06 and 16-09 are ready.
+
+### Phase 16 wave 4 execution (2026-11-26)
+
+Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-04 took 31 minutes, Plan 16-06 took 40 minutes, and Plan 16-09 took 63m51s. Plan 16-04 connected libretro cheat callbacks to frame execution and preserved state across `retro_reset`; its two focused selectors and docs budget passed. Plan 16-06 added repeatable runner `--cheat` options and normalized-configuration hash contribution while preserving no-cheat hash pins; the exact six-selector run passed with a pinned OpenBIOS fixture built through the repository's named container producer. Its hash implementation landed with Task 1; the later Task 2 tests passed against it, and the actual TDD ordering was documented without rewriting the passing commit. All generated BIOS/toolchain/source files and task-owned container resources were removed. Plan 16-09 added bounded BPS transformation and complete-target staging (memory through 1 MiB, private temporary file above that); its regression set includes malformed cursors/varints/CRCs, late failures, large targets and injected source-I/O failure. It took 63m51s, including large-target coverage and compaction needed to keep `tests/disc/patch.c` below its existing 1,200-line cap; the final file has 1,199 lines. Its Task 2 tests were already satisfied by Task 1, so the executor retained the regressions and documented the overlap without redundant production changes. These measured durations exceed the plan's 30-minute target; use them when estimating future work and split materially larger plans before execution.
+
+All three worktrees started at `445d699`, ended clean, and had resolved commit-scope checks. `git diff --check 445d699..HEAD`, runner/disc/libretro/ABI inventory sorts, `cmake --preset ci`, unique-selector preflight, and the combined builds passed. The 17 targeted post-merge API, cheat, libretro, PPF/BPS, disc-image and docs-budget selectors passed 17/17. The hygiene preset's `policy.gate_budget` passed 1/1; the measured repository checks remain 3,901/3,901. The exact `runner.hashes_file` case passed earlier in Plan 16-06 with its pinned OpenBIOS fixture; it is not in the post-merge 17-selector set because that generated fixture was cleaned after the plan. The full workflow remains for final phase verification after source review. No hosted CI or Act was run; the plan-owned OpenBIOS container and outputs were cleaned. Current plan is 5; wave 5 plans 16-05, 16-10 and 16-11 are ready.
 
 ### Phase 15 discussion (2026-11-24)
 
