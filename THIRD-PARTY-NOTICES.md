@@ -737,6 +737,13 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## libretro-database Redump DAT inventory
+
+- **Applies to:** `tests/compat/dat-summary.txt`, an aggregate report of the source DAT; neither the DAT nor a bulk title table is included.
+- **Upstream:** https://github.com/libretro/libretro-database, `metadat/redump/Sony - PlayStation.dat` at commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a`.
+- **Attribution:** libretro-database contributors, Sony PlayStation Redump DAT. Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0); the exact upstream `LICENSE` text appears in the preceding libretro-database notice.
+- **Changes:** The DAT is parsed locally. Only its source digest, aggregate pass/fail/unknown counts, and missing/duplicate serial totals are retained.
+
 ## libchdr CHD header
 
 - **Applies to:** `cmake/Libchdr.cmake`, `host/disc_chd.c`, `src/disc.c`, and `libretro/CMakeLists.txt`.

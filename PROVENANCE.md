@@ -63,7 +63,7 @@ requires. `[PV.NN]` IDs resolve in section 10.
 | Kingcom/armips `62adab4ef30d` [PV.13] | `LICENSE.txt`: MIT 2009 to 2020 | tarball SHA-256 `f7a65102febb4811a336a06e6d93c7e84cc86548182d54e1b1b4e2bffe562f56`; at the pin only `ext/filesystem` (`3f1c185ab414`) is a submodule and the build does not fetch it (std::filesystem is on); `ext/tinyformat` (tree `6175527d738c`) is vendored in the tarball | as a tool: its output is ours; `.psx` instruction set, `hi()`/`lo()`, `.sym` |
 | Lameguy64/mkpsxiso v2.30: tag object `b6f9a25c8a96`, commit `54fb1644ed87` [PV.14] | `LICENSE.md`: GPL-2.0; bundles tinyxml2, miniaudio, FLAC | tag tarball SHA-256 `b44778180d239a586c13762322a1f4b9692c787db8772790ddd2fa255a75d9e0`; release zips pinned in PSXDEV-EXTRACTS 4 | as a tool only, run in CI, never vendored; the GPL covers the tool, the image is ours; the `<license file>` feature is never used |
 | Lameguy64/PSn00bSDK `5d9aa2d3dfc7`, release v0.24 [PV.15] | `LICENSE.md`: core MPL-2.0; mkpsxiso GPL-2+; the bundled `mipsel-none-elf` GCC 12.3.0 is GPL-3 with the runtime exception | `doc/toolchain.md`, `LICENSE.md` | headers and facts; GCC as a tool for OpenBIOS and the nugget tests only; `libpsn00b` is never linked into an own fixture |
-| libretro/libretro-database `12c21cf79f1e` [PV.16] | `LICENSE`: CC BY-SA 4.0 | `dat/System.dat` L498 to L519 (20 PS1 BIOS rows plus the PSP and PS3 images), `metadat/redump/Sony - PlayStation.dat` header | digests as facts (ASSET_POLICY 4); DAT titles for the ledger with the CC-BY-SA notice; no bulk redistribution |
+| libretro/libretro-database `12c21cf79f1e` [PV.16] | `LICENSE`: CC BY-SA 4.0 | `dat/System.dat` L498 to L519 (20 PS1 BIOS rows plus the PSP and PS3 images), `metadat/redump/Sony - PlayStation.dat` header | digests as facts (ASSET_POLICY 4); the pinned DAT is counted locally and only its aggregate totals and sparse ledger rows are retained, with attribution; no bulk redistribution |
 | psx-spx/psx-spx.github.io `6d7d1bc106a7` (`stable`) [PV.17] | no licence; README: not clean-room, relies on fair use | n/a | facts in our own words with a citation; paraphrase only (section 7) |
 | spicyjpeg/psxavenc `bdc24e897ed0` [PV.18] | Zlib | repository metadata | as a tool for fixture XA and STR streams; output is ours |
 | danifunker/libchdman-rs `7f71bdf3d4099dc38bded49c6745e453005d6e41` [PV.20] | root `LICENSE`: BSD-3-Clause; MAME CHD sources carry per-file BSD-3-Clause/public-domain headers; bundled codec notices are enumerated in `.planning/phases/09-chd-disc-images/09-GENERATOR-AUDIT.md` | exact source archive SHA-256 `7346f16486f114af808c6b361228ce9c816156bfd910c8ca8f7727a21d2b6a89`; embedded MAME base commit `f34f02505e32c1993c6a782b6814232cbfc74e36`; build-only C/C++ fixture tool, no Rust/Cargo or prebuilt archive |
@@ -161,7 +161,8 @@ documentation, changelogs, issue trackers, release notes and released binaries; 
   Suite (GPL-2, and it has no PlayStation port) [PV.03][PV.08].
 - **Unlicensed:** simias/psx-guide (`a89043ea499a`, prose only, not cited); simias/psx-hardware-tests
   (`f9569e7c8aac`, rejected); PeterLemon/PSX (`6d20c132aba0`, fetch-only binary oracle, never committed); amidog's
-  psxtest zips (no stated terms; the wiki is CC BY-NC-SA 3.0); Redump DATs (no terms text found) [PV.19].
+  psxtest zips (no stated terms; the wiki is CC BY-NC-SA 3.0); Redump DAT copies other than the specifically
+  licensed libretro-database source pinned in section 2 [PV.19].
 - **Closed:** ePSXe, XEBRA, no$psx, pSX. Their documentation is T4; no$psx's author wrote psx-spx, which is cited
   through the edition.
 - **Why the line is drawn here.** A permissive licence today does not clear a repository's history or the bytes
@@ -235,7 +236,7 @@ claim; the asset policy handles that side by keeping firmware and game bytes out
 | PV.13 | T1 | github.com/Kingcom/armips `LICENSE.txt`, `contents/ext`; commit tarball hashed in PSXDEV-EXTRACTS 4 | `62adab4ef30d` | assembler licence and pin |
 | PV.14 | T1 | github.com/Lameguy64/mkpsxiso `LICENSE.md`, `git/ref/tags/v2.30` (tag object `b6f9a25c8a96` → commit `54fb1644ed87`, tested) | v2.30 | tool licence and pin |
 | PV.15 | T1 | github.com/Lameguy64/PSn00bSDK `LICENSE.md`, `doc/toolchain.md`, release v0.24 | `5d9aa2d3dfc7` | MPL core, GPL tools |
-| PV.16 | T1 | github.com/libretro/libretro-database `LICENSE` (CC BY-SA 4.0), `dat/System.dat` L498 to L519 (tested) | `12c21cf79f1e` | digests, DAT terms |
+| PV.16 | T1 | github.com/libretro/libretro-database `LICENSE` (CC BY-SA 4.0), `dat/System.dat` L498 to L519, `metadat/redump/Sony - PlayStation.dat` header | `12c21cf79f1e` | BIOS digests, pinned Redump inventory and DAT terms |
 | PV.17 | T2 | github.com/psx-spx/psx-spx.github.io README, `docs/` tree; problemkaputt.de/psx-spx.htm | `6d7d1bc106a7`; accessed 2026-10-19 | documentation rules |
 | PV.18 | T1 | github.com/spicyjpeg/psxavenc licence field | `bdc24e897ed0` | Zlib tool |
 | PV.19 | T1 | github.com/simias/psx-guide tree; simias/psx-hardware-tests tree; PeterLemon/PSX README; psx.amidog.se download pages; redump.org/downloads | `a89043ea499a`; `f9569e7c8aac`; `6d20c132aba0`; accessed 2026-10-19 | unlicensed list |

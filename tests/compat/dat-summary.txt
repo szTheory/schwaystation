@@ -1,0 +1,14 @@
+Source: libretro-database contributors, Sony PlayStation Redump DAT
+Source URL: https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation.dat
+Source commit: 12c21cf79f1e20eff6ac68b80875816c717d0a7a
+License: CC BY-SA 4.0; see THIRD-PARTY-NOTICES.md
+SHA-256: 52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8
+Entries: 13407
+Pass: 0
+Fail: 0
+Unknown: 13407
+Missing serial: 177
+Duplicate-serial entries: 988
+Evidence commands (each exited 0): `gh api repos/libretro/libretro-database/commits/12c21cf79f1e20eff6ac68b80875816c717d0a7a --jq .sha`; `gh api 'repos/libretro/libretro-database/contents/LICENSE?ref=12c21cf79f1e20eff6ac68b80875816c717d0a7a' --jq .content | base64 -d | sed -n '1,2p'`; `gh api -H 'Accept: application/vnd.github.raw' repos/libretro/libretro-database/git/blobs/4d198d81a06e11577cc9160358ac1b02d3dc65a0 > build/ci/metadata/Sony-PlayStation.dat`; `shasum -a 256 build/ci/metadata/Sony-PlayStation.dat`; `build/ci/schwaystation-run --library-inventory build/ci/metadata/Sony-PlayStation.dat` with assertions for the source pin/digest, 13407 entries, reconciled status totals, 177 missing serials, and 988 duplicate-serial entries.
+Observed result: the exact source pin and digest, all 13407 occurrences, status reconciliation, missing serials, and duplicate-serial entries verified; every occurrence remains unknown. The DAT remains in ignored build output and is not committed.
+Inventory is not playability evidence.
