@@ -2432,7 +2432,11 @@ int main(int argc, char **argv)
                     schway__dat_inventory_status_string(inventory_status));
             status = SCHWAY__EXIT_FAILURE;
         } else {
-            printf("source_pin=%s\n", "12c21cf79f1e20eff6ac68b80875816c717d0a7a");
+            const char *source_pin =
+                strcmp(result.source_sha256,
+                       "52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8") == 0 ?
+                "12c21cf79f1e20eff6ac68b80875816c717d0a7a" : "unverified";
+            printf("source_pin=%s\n", source_pin);
             printf("source_sha256=%s\n", result.source_sha256);
             printf("entries=%llu\n", (unsigned long long)result.entries);
             printf("pass=%llu\n", (unsigned long long)result.pass);
