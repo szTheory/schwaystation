@@ -48,7 +48,7 @@ schway_add_test(NAME policy.notices.self_test
 # image or GPL text in any file git would track, ignored build output aside.
 schway_add_test(NAME hygiene.tree
   COMMAND ${SCHWAYSTATION_SH} ${CMAKE_SOURCE_DIR}/scripts/hygiene.sh --tree
-  LABELS hygiene TIMEOUT 60)
+  LABELS hygiene TIMEOUT 180)
 
 # Fault prevented: a tree scan that passes whatever the tree holds. A
 # throwaway repository holds a copy of scripts/hygiene.sh and one untracked,

@@ -114,6 +114,7 @@ static size_t build_bps_sample(uint8_t patch[512], const uint8_t *source, uint8_
 {
     static const uint8_t first[] = {0xa1u, 0xb2u};
     static const uint8_t last[] = {0xe1u, 0xe2u, 0xe3u, 0xe4u};
+    static const uint8_t unused_literal[] = {0u};
     size_t size = 4u;
     size_t output = 0u;
 #define ADD_BPS_ACTION(action_, length_, relative_, literal_) do { \
@@ -125,16 +126,16 @@ static size_t build_bps_sample(uint8_t patch[512], const uint8_t *source, uint8_
     if (!bps_test_number(patch, &size, PATCH_SOURCE_BYTES) ||
         !bps_test_number(patch, &size, PATCH_BPS_TARGET_BYTES) ||
         !bps_test_number(patch, &size, 0u)) return 0u;
-    ADD_BPS_ACTION(0u, 2351u, 0, NULL);
+    ADD_BPS_ACTION(0u, 2351u, 0, unused_literal);
     ADD_BPS_ACTION(1u, 2u, 0, first);
-    ADD_BPS_ACTION(2u, 3u, 50, NULL);
-    ADD_BPS_ACTION(2u, 2u, -21, NULL);
-    ADD_BPS_ACTION(3u, 16u, 2348, NULL);
+    ADD_BPS_ACTION(2u, 3u, 50, unused_literal);
+    ADD_BPS_ACTION(2u, 2u, -21, unused_literal);
+    ADD_BPS_ACTION(3u, 16u, 2348, unused_literal);
     output = 2351u + 23u;
-    ADD_BPS_ACTION(0u, PATCH_SOURCE_BYTES - 40u - output, 0, NULL);
+    ADD_BPS_ACTION(0u, PATCH_SOURCE_BYTES - 40u - output, 0, unused_literal);
     ADD_BPS_ACTION(1u, 4u, 0, last);
-    ADD_BPS_ACTION(2u, 4u, 266, NULL);
-    ADD_BPS_ACTION(3u, 32u, 37580, NULL);
+    ADD_BPS_ACTION(2u, 4u, 266, unused_literal);
+    ADD_BPS_ACTION(3u, 32u, 37580, unused_literal);
     memcpy(expected, source, PATCH_BPS_TARGET_BYTES);
     expected[2351u] = first[0];
     expected[2352u] = first[1];

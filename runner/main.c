@@ -2280,7 +2280,7 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
             break;
         }
-        if (!schway__host_cheats_apply(&opt->cheats, inst)) {
+        if (opt->cheat_count != 0u && !schway__host_cheats_apply(&opt->cheats, inst)) {
             fprintf(stderr, "schwaystation-run: applying cheat options failed\n");
             status = SCHWAY__EXIT_FAILURE;
             break;
