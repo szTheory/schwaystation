@@ -6688,6 +6688,100 @@ cleanup:
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_cheats_state(void)
+{
+    const size_t ram_size = 2u * 1024u * 1024u;
+    unsigned char *ram = NULL;
+    unsigned char *saved_ram = NULL;
+    unsigned char *expected_ram = NULL;
+    unsigned char *empty = NULL;
+    unsigned char *configured = NULL;
+    unsigned char *saved = NULL;
+    unsigned char *expected_after = NULL;
+    size_t state_size = 0u;
+    size_t configured_size = 0u;
+    size_t saved_size = 0u;
+    size_t expected_after_size = 0u;
+    int loaded = p_load_game(NULL) ? 1 : 0;
+
+    CHECK(loaded);
+    if (!loaded) goto cleanup;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    saved_ram = ram != NULL ? (unsigned char *)malloc(ram_size) : NULL;
+    expected_ram = ram != NULL ? (unsigned char *)malloc(ram_size) : NULL;
+    CHECK(ram != NULL);
+    CHECK(saved_ram != NULL);
+    CHECK(expected_ram != NULL);
+    if (ram == NULL || saved_ram == NULL || expected_ram == NULL) goto cleanup;
+
+    p_cheat_reset();
+    memcpy(saved_ram, ram, ram_size);
+    empty = save_libretro_state(&state_size);
+    CHECK(empty != NULL);
+    CHECK(state_size != 0u);
+    if (empty == NULL || state_size == 0u) goto cleanup;
+
+    p_cheat_set(0u, true, "30080020 0011");
+    configured = save_libretro_state(&configured_size);
+    CHECK(configured != NULL);
+    CHECK_EQ_U64(configured_size, state_size);
+    CHECK(memcmp(saved_ram, ram, ram_size) == 0);
+    if (configured != NULL && configured_size == state_size) {
+        CHECK(memcmp(empty, configured, state_size) != 0);
+    }
+
+    p_cheat_reset();
+    p_cheat_set(1u, false, "30080020 0011");
+    unsigned char *disabled = save_libretro_state(&configured_size);
+    CHECK(disabled != NULL);
+    CHECK_EQ_U64(configured_size, state_size);
+    if (configured != NULL && disabled != NULL && configured_size == state_size) {
+        CHECK(memcmp(configured, disabled, state_size) != 0);
+    }
+    free(disabled);
+
+    p_cheat_reset();
+    p_cheat_set(3u, true, "30080030 007E");
+    p_cheat_set(4u, false, "30080031 0099");
+    ram[0x80030u] = 0xA5u;
+    ram[0x80031u] = 0x5Au;
+    saved = save_libretro_state(&saved_size);
+    CHECK(saved != NULL);
+    CHECK_EQ_U64(saved_size, state_size);
+    if (saved == NULL || saved_size != state_size) goto cleanup;
+
+    run_one();
+    CHECK_EQ_U64(ram[0x80030u], 0x7Eu);
+    CHECK_EQ_U64(ram[0x80031u], 0x5Au);
+    memcpy(expected_ram, ram, ram_size);
+    expected_after = save_libretro_state(&expected_after_size);
+    CHECK(expected_after != NULL);
+    CHECK_EQ_U64(expected_after_size, state_size);
+    if (expected_after == NULL || expected_after_size != state_size) goto cleanup;
+
+    p_cheat_reset();
+    p_cheat_set(3u, true, "30080030 00BE");
+    p_cheat_set(4u, true, "30080031 0044");
+    run_one();
+    CHECK_EQ_U64(p_unserialize(saved, saved_size), true);
+    CHECK(libretro_state_matches(saved, saved_size));
+    run_one();
+    CHECK(libretro_state_matches(expected_after, expected_after_size));
+    CHECK(memcmp(expected_ram, ram, ram_size) == 0);
+
+cleanup:
+    free(expected_after);
+    free(saved);
+    free(configured);
+    free(empty);
+    free(expected_ram);
+    free(saved_ram);
+    if (loaded) p_unload_game();
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -6732,6 +6826,7 @@ int main(int argc, char **argv)
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
     int cheats_apply_mode = argc == 3 && strcmp(argv[2], "cheats-apply") == 0;
     int cheats_controls_mode = argc == 3 && strcmp(argv[2], "cheats-controls") == 0;
+    int cheats_state_mode = argc == 3 && strcmp(argv[2], "cheats-state") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
@@ -6749,7 +6844,7 @@ int main(int argc, char **argv)
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
-         !cheats_apply_mode && !cheats_controls_mode &&
+         !cheats_apply_mode && !cheats_controls_mode && !cheats_state_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                         argv[5][0] == '\0')) ||
@@ -6825,6 +6920,7 @@ int main(int argc, char **argv)
                         card_persistence_mode || input_multitap_mode || input_special_mode ||
                         input_lightgun_mode || input_pointer_mode || input_gun_unavailable_mode ||
                         cards_multitap_mode || cheats_apply_mode || cheats_controls_mode;
+    inspect_card2 = inspect_card2 || cheats_state_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -6879,6 +6975,10 @@ int main(int argc, char **argv)
 
     if (cheats_controls_mode) {
         return test_cheats_controls();
+    }
+
+    if (cheats_state_mode) {
+        return test_cheats_state();
     }
 
     if (audio_mode) {
