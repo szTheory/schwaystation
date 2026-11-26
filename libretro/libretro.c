@@ -62,6 +62,9 @@
 #define LR_GUN_SOURCE_POINTER 2u
 #define LR_GUN_SOURCE_UNSUPPORTED 3u
 #define LR_ANALOG_TOGGLE_FRAMES 60u
+#define LR_STATE_HEADER_SIZE 32u
+#define LR_STATE_VERSION 1u
+#define LR_STATE_CHECKSUM_OFFSET 20u
 #define LR_ANALOG_TOGGLE_BUTTONS                                                            \
     ((1u << RETRO_DEVICE_ID_JOYPAD_SELECT) | (1u << RETRO_DEVICE_ID_JOYPAD_START) |        \
      (1u << RETRO_DEVICE_ID_JOYPAD_L) | (1u << RETRO_DEVICE_ID_JOYPAD_L2) |               \
@@ -1987,22 +1990,130 @@ void retro_run(void)
     lr_audio();
 }
 
-/* L8966-8989: the library's state, little-endian and checked on load. The
-   .info still claims no save states until a release proves them in
-   RetroArch. */
+static void lr_state_put_u16(uint8_t *bytes, uint16_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8u);
+}
+
+static void lr_state_put_u32(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8u);
+    bytes[2] = (uint8_t)(value >> 16u);
+    bytes[3] = (uint8_t)(value >> 24u);
+}
+
+static uint16_t lr_state_get_u16(const uint8_t *bytes)
+{
+    return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8u));
+}
+
+static uint32_t lr_state_get_u32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) |
+           ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
+}
+
+static int lr_state_zero_bytes(const uint8_t *bytes, size_t size)
+{
+    for (size_t i = 0u; i < size; i++) {
+        if (bytes[i] != 0u) return 0;
+    }
+    return 1;
+}
+
+static uint32_t lr_state_checksum(const uint8_t *bytes, size_t size)
+{
+    uint32_t crc = UINT32_MAX;
+    for (size_t i = 0u; i < size; i++) {
+        const uint8_t byte = i >= LR_STATE_CHECKSUM_OFFSET &&
+                                     i < LR_STATE_CHECKSUM_OFFSET + sizeof(uint32_t)
+                                 ? 0u
+                                 : bytes[i];
+        crc ^= byte;
+        for (unsigned bit = 0u; bit < 8u; bit++) {
+            crc = (crc >> 1u) ^ ((0u - (crc & 1u)) & UINT32_C(0xEDB88320));
+        }
+    }
+    return ~crc;
+}
+
+static size_t lr_state_serialized_size(void)
+{
+    const size_t core_size = inst != NULL ? schway_state_size(inst) : 0u;
+    const size_t envelope_size = LR_STATE_HEADER_SIZE + SCHWAY_HOST_CHEAT_SERIALIZED_SIZE;
+    if (core_size == 0u || core_size > UINT32_MAX ||
+        core_size > SIZE_MAX - envelope_size || core_size > UINT32_MAX - envelope_size) {
+        return 0u;
+    }
+    return envelope_size + core_size;
+}
+
+/* L8953-9007: a fixed-size little-endian host envelope saves the canonical
+   cheat table beside the unchanged, validated library state. The .info
+   savestate claim remains disabled until release evidence covers RetroArch. */
 size_t retro_serialize_size(void)
 {
-    return inst != NULL ? schway_state_size(inst) : 0u;
+    return lr_state_serialized_size();
 }
 
 bool retro_serialize(void *data, size_t len)
 {
-    return inst != NULL && data != NULL && schway_save_state(inst, data, len) == SCHWAY_STATUS_OK;
+    uint8_t *bytes = (uint8_t *)data;
+    const size_t serialized_size = lr_state_serialized_size();
+    const size_t core_size = inst != NULL ? schway_state_size(inst) : 0u;
+    const size_t cheat_size = SCHWAY_HOST_CHEAT_SERIALIZED_SIZE;
+    if (inst == NULL || bytes == NULL || serialized_size == 0u || len != serialized_size ||
+        !schway__host_cheats_validate(&lr_cheats)) {
+        return false;
+    }
+
+    memset(bytes, 0, LR_STATE_HEADER_SIZE);
+    memcpy(bytes, "SCHL", 4u);
+    lr_state_put_u16(bytes + 4u, LR_STATE_VERSION);
+    lr_state_put_u16(bytes + 6u, LR_STATE_HEADER_SIZE);
+    lr_state_put_u32(bytes + 8u, (uint32_t)serialized_size);
+    lr_state_put_u32(bytes + 12u, (uint32_t)core_size);
+    lr_state_put_u32(bytes + 16u, (uint32_t)cheat_size);
+    if (!schway__host_cheats_encode(&lr_cheats, bytes + LR_STATE_HEADER_SIZE, cheat_size) ||
+        schway_save_state(inst, bytes + LR_STATE_HEADER_SIZE + cheat_size, core_size) !=
+            SCHWAY_STATUS_OK) {
+        return false;
+    }
+    lr_state_put_u32(bytes + LR_STATE_CHECKSUM_OFFSET,
+                     lr_state_checksum(bytes, serialized_size));
+    return true;
 }
 
 bool retro_unserialize(const void *data, size_t len)
 {
-    return inst != NULL && data != NULL && schway_load_state(inst, data, len) == SCHWAY_STATUS_OK;
+    const uint8_t *bytes = (const uint8_t *)data;
+    const size_t serialized_size = lr_state_serialized_size();
+    const size_t core_size = inst != NULL ? schway_state_size(inst) : 0u;
+    const size_t cheat_size = SCHWAY_HOST_CHEAT_SERIALIZED_SIZE;
+    const size_t cheat_offset = LR_STATE_HEADER_SIZE;
+    const size_t core_offset = cheat_offset + cheat_size;
+    if (inst == NULL || bytes == NULL || serialized_size == 0u || len != serialized_size ||
+        len < LR_STATE_HEADER_SIZE || memcmp(bytes, "SCHL", 4u) != 0 ||
+        lr_state_get_u16(bytes + 4u) != LR_STATE_VERSION ||
+        lr_state_get_u16(bytes + 6u) != LR_STATE_HEADER_SIZE ||
+        lr_state_get_u32(bytes + 8u) != serialized_size ||
+        lr_state_get_u32(bytes + 12u) != core_size ||
+        lr_state_get_u32(bytes + 16u) != cheat_size ||
+        !lr_state_zero_bytes(bytes + 24u, LR_STATE_HEADER_SIZE - 24u) ||
+        lr_state_get_u32(bytes + LR_STATE_CHECKSUM_OFFSET) !=
+            lr_state_checksum(bytes, serialized_size)) {
+        return false;
+    }
+
+    schway__host_cheats candidate;
+    if (!schway__host_cheats_decode(&candidate, bytes + cheat_offset, cheat_size) ||
+        schway_load_state(inst, bytes + core_offset, core_size) != SCHWAY_STATUS_OK) {
+        return false;
+    }
+    lr_cheats = candidate;
+    return true;
 }
 
 void retro_cheat_reset(void)
