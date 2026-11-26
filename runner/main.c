@@ -4,8 +4,9 @@
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
  *                     [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]
- *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N]
- *                     [--stop-on mailbox] [--inputs FILE] [--cheat CODE ...] [--hash] [--hash-audio]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast]
+ *                     [--patch FILE [--patch-source-sha256 HEX]] [--frames N] [--stop-on mailbox] [--inputs FILE]
+ *                     [--cheat CODE ...] [--hash] [--hash-audio]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
  *                     [--cheat CODE ...] [--hash-audio] [--hash-state]
@@ -56,7 +57,10 @@
  * it for 600 frames by default. Its file name does not determine recognition.
  *
  * --disc FILE attaches a cue sheet, ISO image or m3u playlist before the first
- * BIOS frame. The provider stays alive until the instance is destroyed.
+ * BIOS frame. --patch FILE validates and overlays one supported patch before
+ * the first frame. PPF requires --patch-source-sha256; BPS uses its CRC checks.
+ * The source image stays unchanged and the provider lives until the instance
+ * is destroyed.
  *
  * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
  * instance is made and no frame runs. It is valid only alone.
@@ -145,11 +149,14 @@ static void run_free(void *user, void *ptr, size_t size)
 
 static const char synopsis[] =
     "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
-    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n";
+
+static const char synopsis_rest[] =
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
     "                         [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
     "                         [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]\n"
-    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast]\n"
+    "                         [--patch FILE [--patch-source-sha256 HEX]] [--frames N | --bench N] [--tty]\n"
     "                         [--stop-on mailbox] [--inputs FILE] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...]\n"
     "                         [--hash] [--hash-audio]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
@@ -178,6 +185,8 @@ static const char synopsis[] =
     "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
     "  --disc FILE        attach a cue sheet, ISO image or m3u playlist (needs --bios)\n"
     "  --boot MODE        full (default) or fast for eligible BIOS-backed discs\n"
+    "  --patch FILE       apply one validated PPF1/2/3 or BPS overlay (needs --disc; no --bench)\n"
+    "  --patch-source-sha256 HEX  bind PPF to the whole raw source image; optional for BPS\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print guest text as tty lines; needs --exe or --bios\n"
     "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe or --disc\n"
@@ -188,9 +197,16 @@ static const char synopsis[] =
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
 
+static void runner_print_synopsis(FILE *stream)
+{
+    fputs(synopsis, stream);
+    fputs(synopsis_rest, stream);
+}
+
 static int usage(const char *why)
 {
-    fprintf(stderr, "schwaystation-run: %s\n%s", why, synopsis);
+    fprintf(stderr, "schwaystation-run: %s\n", why);
+    runner_print_synopsis(stderr);
     return SCHWAY__EXIT_USAGE;
 }
 
@@ -298,7 +314,7 @@ static int runner_print_bios_info(const schway *inst)
 
 static void help(void)
 {
-    fputs(synopsis, stdout);
+    runner_print_synopsis(stdout);
     fputs("exit status:\n", stdout);
     for (size_t i = 0; i < sizeof schway__exit_statuses / sizeof schway__exit_statuses[0]; i++) {
         printf("  %d  %-7s  %s\n", schway__exit_statuses[i].code, schway__exit_statuses[i].name,
@@ -395,6 +411,9 @@ typedef struct options {
 #endif
     const char *bios;  /* --bios FILE, else NULL */
     const char *disc;  /* --disc FILE, else NULL */
+    const char *patch; /* --patch FILE, else NULL */
+    uint8_t patch_source_sha256[SCHWAY_DISC_PATCH_SHA256_BYTES];
+    int patch_source_sha256_set;
     const char *exe;   /* --exe FILE, else NULL */
     int boot_set;      /* --boot was supplied */
     int boot_fast;     /* --boot fast, else full/default */
@@ -409,8 +428,223 @@ typedef struct options {
     int test_save_failure;
     int test_disc_identity_read_failure;
     int test_audio_failure;
+    int test_patch_sector_zero;
 #endif
 } options;
+
+#define RUNNER_BPS_PATCH_MAX_BYTES (64u * 1024u * 1024u)
+
+static int runner_patch_hex_value(char value)
+{
+    if (value >= '0' && value <= '9') return value - '0';
+    if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+    if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+    return -1;
+}
+
+static int runner_patch_parse_sha256(const char *text, uint8_t out[32])
+{
+    if (text == NULL || strlen(text) != 64u) return 0;
+    for (size_t i = 0u; i < 32u; i++) {
+        int high = runner_patch_hex_value(text[i * 2u]);
+        int low = runner_patch_hex_value(text[i * 2u + 1u]);
+        if (high < 0 || low < 0) return 0;
+        out[i] = (uint8_t)((high << 4) | low);
+    }
+    return 1;
+}
+
+static schway_disc_patch_format runner_patch_format(const uint8_t *bytes,
+                                                    size_t size)
+{
+    if (size >= 5u && memcmp(bytes, "PPF10", 5u) == 0) {
+        return SCHWAY_DISC_PATCH_FORMAT_PPF1;
+    }
+    if (size >= 5u && memcmp(bytes, "PPF20", 5u) == 0) {
+        return SCHWAY_DISC_PATCH_FORMAT_PPF2;
+    }
+    if (size >= 5u && memcmp(bytes, "PPF30", 5u) == 0) {
+        return SCHWAY_DISC_PATCH_FORMAT_PPF3;
+    }
+    if (size >= 4u && memcmp(bytes, "BPS1", 4u) == 0) {
+        return SCHWAY_DISC_PATCH_FORMAT_BPS;
+    }
+    return 0;
+}
+
+static const char *runner_patch_format_name(uint32_t format)
+{
+    switch (format) {
+    case SCHWAY_DISC_PATCH_FORMAT_PPF1: return "PPF1";
+    case SCHWAY_DISC_PATCH_FORMAT_PPF2: return "PPF2";
+    case SCHWAY_DISC_PATCH_FORMAT_PPF3: return "PPF3";
+    case SCHWAY_DISC_PATCH_FORMAT_BPS: return "BPS";
+    default: return "unknown";
+    }
+}
+
+static void runner_patch_error_set(schway_disc_patch_error *error,
+                                   schway_disc_patch_status status,
+                                   const char *message)
+{
+    memset(error, 0, sizeof *error);
+    error->size = (uint32_t)sizeof *error;
+    error->status = (uint32_t)status;
+    (void)snprintf(error->message, sizeof error->message, "%s", message);
+}
+
+static schway_disc_patch_status runner_patch_read_file(
+    const char *path, schway_disc_patch_format *format, uint8_t **out_bytes,
+    size_t *out_size, schway_disc_patch_error *error)
+{
+    FILE *file = fopen(path, "rb");
+    uint8_t prefix[5];
+    size_t prefix_size;
+    long file_size;
+    size_t maximum;
+    uint8_t *bytes;
+    size_t read_size;
+    int close_error;
+    if (file == NULL) {
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_IO,
+                               "cannot open patch file");
+        return SCHWAY_DISC_PATCH_IO;
+    }
+    prefix_size = fread(prefix, 1u, sizeof prefix, file);
+    if (ferror(file) || fseek(file, 0L, SEEK_END) != 0) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_IO,
+                               "cannot read patch file");
+        return SCHWAY_DISC_PATCH_IO;
+    }
+    *format = runner_patch_format(prefix, prefix_size);
+    if (*format == 0) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_UNSUPPORTED,
+                               "patch is not PPF1, PPF2, PPF3, or BPS");
+        return SCHWAY_DISC_PATCH_UNSUPPORTED;
+    }
+    file_size = ftell(file);
+    if (file_size < 0L) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_IO,
+                               "cannot size patch file");
+        return SCHWAY_DISC_PATCH_IO;
+    }
+    maximum = *format == SCHWAY_DISC_PATCH_FORMAT_BPS ?
+              RUNNER_BPS_PATCH_MAX_BYTES : SCHWAY_DISC_PATCH_MAX_BYTES;
+    if (file_size == 0L) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                               "patch file is empty");
+        return SCHWAY_DISC_PATCH_BAD_PATCH;
+    }
+    if ((unsigned long)file_size > (unsigned long)maximum) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_LIMIT,
+                               "patch exceeds its format size limit");
+        return SCHWAY_DISC_PATCH_LIMIT;
+    }
+    if (fseek(file, 0L, SEEK_SET) != 0) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_IO,
+                               "cannot rewind patch file");
+        return SCHWAY_DISC_PATCH_IO;
+    }
+    bytes = (uint8_t *)malloc((size_t)file_size);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_OUT_OF_MEMORY,
+                               "out of memory reading patch");
+        return SCHWAY_DISC_PATCH_OUT_OF_MEMORY;
+    }
+    read_size = fread(bytes, 1u, (size_t)file_size, file);
+    close_error = fclose(file);
+    if (read_size != (size_t)file_size || close_error != 0) {
+        free(bytes);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_IO,
+                               "cannot read complete patch file");
+        return SCHWAY_DISC_PATCH_IO;
+    }
+    *out_bytes = bytes;
+    *out_size = read_size;
+    return SCHWAY_DISC_PATCH_OK;
+}
+
+static schway_disc_patch_status runner_patch_load_image(
+    const options *opt, schway_disc_image *image,
+    schway_disc_patch_report *report, schway_disc_patch_error *error)
+{
+    schway_disc_patch_source source;
+    schway_disc_patch_candidate *candidate = NULL;
+    schway_disc_patch_format format = 0;
+    uint8_t *patch_bytes = NULL;
+    size_t patch_size = 0u;
+    schway_disc_patch_status status;
+    status = runner_patch_read_file(opt->patch, &format, &patch_bytes,
+                                    &patch_size, error);
+    if (status != SCHWAY_DISC_PATCH_OK) return status;
+    if (format != SCHWAY_DISC_PATCH_FORMAT_BPS &&
+        !opt->patch_source_sha256_set) {
+        free(patch_bytes);
+        runner_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_ARGUMENT,
+                               "PPF requires --patch-source-sha256");
+        return SCHWAY_DISC_PATCH_BAD_ARGUMENT;
+    }
+    memset(&source, 0, sizeof source);
+    source.size = (uint32_t)sizeof source;
+    status = schway_disc_image_patch_source(image, &source, error);
+    if (status == SCHWAY_DISC_PATCH_OK) {
+        status = schway_disc_patch_load(
+            &source, format, patch_bytes, patch_size,
+            opt->patch_source_sha256_set ? opt->patch_source_sha256 : NULL,
+            &candidate, report, error);
+    }
+    free(patch_bytes);
+    if (status == SCHWAY_DISC_PATCH_OK) {
+        status = schway_disc_image_patch_replace(image, &candidate, error);
+    }
+    schway_disc_patch_candidate_destroy(candidate);
+    return status;
+}
+
+static void runner_print_patch_report(const schway_disc_patch_report *report)
+{
+    static const struct {
+        uint32_t flag;
+        const char *name;
+    } checks[] = {
+        { SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256, "source-sha256" },
+        { SCHWAY_DISC_PATCH_CHECK_PPF2_SOURCE_SIZE, "ppf2-source-size" },
+        { SCHWAY_DISC_PATCH_CHECK_PPF2_BLOCK, "ppf2-block" },
+        { SCHWAY_DISC_PATCH_CHECK_PPF3_BLOCK, "ppf3-block" },
+        { SCHWAY_DISC_PATCH_CHECK_BPS_SOURCE_CRC, "bps-source-crc" },
+        { SCHWAY_DISC_PATCH_CHECK_BPS_TARGET_CRC, "bps-target-crc" },
+        { SCHWAY_DISC_PATCH_CHECK_BPS_PATCH_CRC, "bps-patch-crc" }
+    };
+    printf("patch format=%s source-sha256=",
+           runner_patch_format_name(report->format));
+    if ((report->checks & SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256) != 0u) {
+        for (size_t i = 0u; i < sizeof report->source_sha256; i++) {
+            printf("%02x", (unsigned)report->source_sha256[i]);
+        }
+    } else {
+        fputs("not-supplied", stdout);
+    }
+    fputs(" checks=", stdout);
+    int separator = 0;
+    for (size_t i = 0u; i < sizeof checks / sizeof checks[0]; i++) {
+        if ((report->checks & checks[i].flag) != 0u) {
+            printf("%s%s", separator ? "," : "", checks[i].name);
+            separator = 1;
+        }
+    }
+    if (!separator) fputs("none", stdout);
+    printf(" records=%lu source-bytes=%llu patch-bytes=%llu\n",
+           (unsigned long)report->records,
+           (unsigned long long)report->source_bytes,
+           (unsigned long long)report->patch_bytes);
+}
 
 /* Returns 0 when the options are valid, else 2 after a usage message. Any
    option not listed in the synopsis, and any other argument, is a usage
@@ -602,6 +836,11 @@ static int parse_options(int argc, char **argv, options *o)
             }
             o->test_audio_file = value;
             i++;
+        } else if (strcmp(arg, "--test-patch-sector-zero") == 0) {
+            if (o->test_patch_sector_zero) {
+                return usage("give --test-patch-sector-zero once");
+            }
+            o->test_patch_sector_zero = 1;
 #endif
         } else if (strcmp(arg, "--png") == 0) {
             if (o->png_frame != 0u) {
@@ -670,6 +909,22 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--disc needs a file");
             }
             o->disc = value;
+            i++;
+        } else if (strcmp(arg, "--patch") == 0) {
+            if (o->patch != NULL) {
+                return usage("give --patch once");
+            }
+            if (value == NULL || value[0] == '\0' || value[0] == '-') {
+                return usage("--patch needs a file");
+            }
+            o->patch = value;
+            i++;
+        } else if (strcmp(arg, "--patch-source-sha256") == 0) {
+            if (o->patch_source_sha256_set || value == NULL ||
+                !runner_patch_parse_sha256(value, o->patch_source_sha256)) {
+                return usage("--patch-source-sha256 needs 64 hexadecimal digits once");
+            }
+            o->patch_source_sha256_set = 1;
             i++;
         } else if (strcmp(arg, "--boot") == 0) {
             if (o->boot_set || value == NULL) {
@@ -758,6 +1013,15 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->disc != NULL && o->hash_state) {
         return usage("--hash-state is unavailable with --disc");
     }
+    if (o->patch != NULL && o->disc == NULL) {
+        return usage("--patch needs --disc");
+    }
+    if (o->patch_source_sha256_set && o->patch == NULL) {
+        return usage("--patch-source-sha256 needs --patch");
+    }
+    if (o->patch != NULL && o->bench) {
+        return usage("--patch is unavailable with --bench");
+    }
 #ifdef SCHWAY_RUN_TEST_HOOKS
     if (o->probe != NULL) {
         int any_test_input = o->test_ledger != NULL || o->test_dat != NULL ||
@@ -772,6 +1036,7 @@ static int parse_options(int argc, char **argv, options *o)
             o->hash_state || o->hash_vram || o->cheat_count != 0u || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
             o->region_set || o->machine_set || o->boot_set || o->test_audio_failure ||
+            o->test_patch_sector_zero ||
             o->multitap_set[0] || o->multitap_set[1]) {
             return usage("--probe cannot be combined with run options or partial test metadata");
         }
@@ -821,6 +1086,9 @@ static int parse_options(int argc, char **argv, options *o)
         return usage("--serial needs --memcard-names serial");
     }
 #ifdef SCHWAY_RUN_TEST_HOOKS
+    if (o->test_patch_sector_zero && (o->patch == NULL || o->disc == NULL)) {
+        return usage("--test-patch-sector-zero needs --disc and --patch");
+    }
     if ((o->test_card_write != 0 || o->test_save_failure != 0) && o->save_dir == NULL) {
         return usage("card test options need --save-dir");
     }
@@ -1632,7 +1900,7 @@ static int run(const options *opt)
                     fprintf(stderr, ": %s", error.reason);
                 }
                 fputc('\n', stderr);
-                fputs(synopsis, stderr);
+                runner_print_synopsis(stderr);
                 return SCHWAY__EXIT_USAGE;
             }
             fprintf(stderr, "schwaystation-run: %s\n",
@@ -1694,6 +1962,48 @@ static int run(const options *opt)
         }
         disc_count = schway_disc_image_count(disc_image);
     }
+    if (opt->patch != NULL) {
+        schway_disc_patch_report report;
+        schway_disc_patch_error error;
+        memset(&report, 0, sizeof report);
+        report.size = (uint32_t)sizeof report;
+        memset(&error, 0, sizeof error);
+        error.size = (uint32_t)sizeof error;
+        schway_disc_patch_status patch_status =
+            runner_patch_load_image(opt, disc_image, &report, &error);
+        if (patch_status != SCHWAY_DISC_PATCH_OK) {
+            fprintf(stderr, "schwaystation-run: patch: %s\n",
+                    error.message[0] != '\0' ? error.message : "patch refused");
+            schway_disc_image_close(disc_image);
+            free(samples);
+            free(bios);
+            free(exe);
+            schway__inputs_release(&movie);
+            return patch_status == SCHWAY_DISC_PATCH_UNSUPPORTED ?
+                   SCHWAY__EXIT_UNSUPPORTED :
+                   patch_status == SCHWAY_DISC_PATCH_BAD_ARGUMENT ?
+                   SCHWAY__EXIT_USAGE : SCHWAY__EXIT_FAILURE;
+        }
+        runner_print_patch_report(&report);
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        if (opt->test_patch_sector_zero) {
+            const schway_disc *disc = schway_disc_image_disc(disc_image);
+            uint8_t sector[2352];
+            uint8_t subcode[96];
+            if (disc == NULL || disc->read_sector == NULL ||
+                disc->read_sector(disc->user, 0u, sector, subcode) == 0u) {
+                fprintf(stderr, "schwaystation-run: patch test provider read failed\n");
+                schway_disc_image_close(disc_image);
+                free(samples);
+                free(bios);
+                free(exe);
+                schway__inputs_release(&movie);
+                return SCHWAY__EXIT_FAILURE;
+            }
+            printf("patch test sector0 byte24=%02X\n", (unsigned)sector[24]);
+        }
+#endif
+    }
     if (opt->inputs != NULL) {
         schway__inputs_error error;
         schway__inputs_status input_status =
@@ -1703,7 +2013,7 @@ static int run(const options *opt)
             if (error.line != 0u) fprintf(stderr, " at line %lu", (unsigned long)error.line);
             if (error.reason != NULL) fprintf(stderr, ": %s", error.reason);
             fputc('\n', stderr);
-            fputs(synopsis, stderr);
+            runner_print_synopsis(stderr);
             schway_disc_image_close(disc_image);
             free(samples);
             free(bios);
