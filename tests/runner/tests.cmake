@@ -116,9 +116,25 @@ with open(sys.argv[1], "wb") as output:
     string(TOLOWER "${invalid_out}${invalid_err}" invalid_output_lower)
     if(NOT invalid_rc STREQUAL "2" OR
        NOT invalid_output_lower MATCHES "(cheat|unsupported|unknown option)" OR
-       "${invalid_out}${invalid_err}" MATCHES "(^|\n)(tty |frame )" OR EXISTS "${rejected_png}")
+       "${invalid_out}${invalid_err}" MATCHES "(tty [YN]|frame [0-9])" OR EXISTS "${rejected_png}")
       message(FATAL_ERROR "runner did not reject invalid cheat text before execution or output mutation:\n"
         "exit ${invalid_rc}\n${invalid_out}${invalid_err}")
+    endif()
+
+    set(excess_args "")
+    foreach(index RANGE 1 33)
+      list(APPEND excess_args --cheat "30000100 00A5")
+    endforeach()
+    set(excess_png "${OUT}/runner-cheat-too-many.png")
+    file(REMOVE "${excess_png}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --png "1:${excess_png}" ${excess_args}
+      RESULT_VARIABLE excess_rc OUTPUT_VARIABLE excess_out ERROR_VARIABLE excess_err)
+    string(TOLOWER "${excess_out}${excess_err}" excess_output_lower)
+    if(NOT excess_rc STREQUAL "2" OR NOT excess_output_lower MATCHES "too many --cheat entries" OR
+       "${excess_out}${excess_err}" MATCHES "(tty [YN]|frame [0-9])" OR EXISTS "${excess_png}")
+      message(FATAL_ERROR "runner did not reject an over-cap cheat list before execution or output mutation:\n"
+        "exit ${excess_rc}\n${excess_out}${excess_err}")
     endif()
   elseif(CASE STREQUAL "cheats_hash")
     message(FATAL_ERROR "runner cheat state hashing is not implemented")
