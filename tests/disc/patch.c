@@ -14,6 +14,7 @@
 #define PATCH_PPF_BLOCK_OFFSET 0x9320u
 #define PATCH_PPF_BLOCK_BYTES 1024u
 #define PATCH_PPF2_HEADER_BYTES (60u + PATCH_PPF_BLOCK_BYTES)
+#define PATCH_BPS_TARGET_BYTES PATCH_SOURCE_BYTES
 
 static const char *test_case;
 
@@ -62,6 +63,114 @@ static int write_text(const char *path, const char *text)
         return 0;
     }
     return fclose(file) == 0;
+}
+
+static uint32_t bps_test_crc32(const uint8_t *bytes, size_t size)
+{
+    uint32_t crc = UINT32_MAX;
+    for (size_t i = 0u; i < size; i++) {
+        crc ^= bytes[i];
+        for (unsigned int bit = 0u; bit < 8u; bit++) {
+            crc = (crc >> 1) ^ ((crc & 1u) != 0u ? 0xedb88320u : 0u);
+        }
+    }
+    return ~crc;
+}
+
+static int bps_test_byte(uint8_t bytes[512], size_t *size, uint8_t value)
+{
+    if (*size >= 512u) return 0;
+    bytes[(*size)++] = value;
+    return 1;
+}
+
+static int bps_test_number(uint8_t bytes[512], size_t *size, uint64_t value)
+{
+    for (;;) {
+        uint8_t part = (uint8_t)(value & 0x7fu);
+        value >>= 7;
+        if (value == 0u) return bps_test_byte(bytes, size, (uint8_t)(part | 0x80u));
+        if (!bps_test_byte(bytes, size, part)) return 0;
+        value--;
+    }
+}
+
+static int bps_test_action(uint8_t bytes[512], size_t *size,
+                           uint8_t action, uint64_t length)
+{
+    return length != 0u && length <= (UINT64_MAX >> 2) &&
+           bps_test_number(bytes, size, ((length - 1u) << 2) | action);
+}
+
+static int bps_test_relative(uint8_t bytes[512], size_t *size, int64_t offset)
+{
+    uint64_t magnitude = offset < 0 ? (uint64_t)(-(offset + 1)) + 1u : (uint64_t)offset;
+    return magnitude <= (UINT64_MAX >> 1) &&
+           bps_test_number(bytes, size, (magnitude << 1) | (offset < 0 ? 1u : 0u));
+}
+
+static void bps_test_u32(uint8_t bytes[512], size_t *size, uint32_t value)
+{
+    (void)bps_test_byte(bytes, size, (uint8_t)value);
+    (void)bps_test_byte(bytes, size, (uint8_t)(value >> 8));
+    (void)bps_test_byte(bytes, size, (uint8_t)(value >> 16));
+    (void)bps_test_byte(bytes, size, (uint8_t)(value >> 24));
+}
+
+static size_t build_bps_sample(uint8_t patch[512], const uint8_t *source,
+                               uint8_t expected[PATCH_BPS_TARGET_BYTES])
+{
+    static const uint8_t first_literal[] = {0xa1u, 0xb2u};
+    static const uint8_t last_literal[] = {0xe1u, 0xe2u, 0xe3u, 0xe4u};
+    size_t size = 4u;
+    size_t output = 0u;
+    memcpy(patch, "BPS1", 4u);
+    if (!bps_test_number(patch, &size, PATCH_SOURCE_BYTES) ||
+        !bps_test_number(patch, &size, PATCH_BPS_TARGET_BYTES) ||
+        !bps_test_number(patch, &size, 0u) ||
+        !bps_test_action(patch, &size, 0u, 2351u)) return 0u;
+    output += 2351u;
+    if (!bps_test_action(patch, &size, 1u, sizeof first_literal)) return 0u;
+    memcpy(patch + size, first_literal, sizeof first_literal);
+    size += sizeof first_literal;
+    output += sizeof first_literal;
+    if (!bps_test_action(patch, &size, 2u, 3u) ||
+        !bps_test_relative(patch, &size, 50)) return 0u;
+    output += 3u;
+    if (!bps_test_action(patch, &size, 2u, 2u) ||
+        !bps_test_relative(patch, &size, -21)) return 0u;
+    output += 2u;
+    if (!bps_test_action(patch, &size, 3u, 16u) ||
+        !bps_test_relative(patch, &size, 2348)) return 0u;
+    output += 16u;
+    if (!bps_test_action(patch, &size, 0u, PATCH_SOURCE_BYTES - 40u - output)) return 0u;
+    output = PATCH_SOURCE_BYTES - 40u;
+    if (!bps_test_action(patch, &size, 1u, sizeof last_literal)) return 0u;
+    memcpy(patch + size, last_literal, sizeof last_literal);
+    size += sizeof last_literal;
+    output += sizeof last_literal;
+    if (!bps_test_action(patch, &size, 2u, 4u) ||
+        !bps_test_relative(patch, &size, 266)) return 0u;
+    output += 4u;
+    if (!bps_test_action(patch, &size, 3u, 32u) ||
+        !bps_test_relative(patch, &size, 37580)) return 0u;
+    output += 32u;
+    if (output != PATCH_BPS_TARGET_BYTES || size > 500u) return 0u;
+    memcpy(expected, source, PATCH_BPS_TARGET_BYTES);
+    expected[2351u] = first_literal[0];
+    expected[2352u] = first_literal[1];
+    memcpy(expected + 2353u, source + 50u, 3u);
+    memcpy(expected + 2356u, source + 32u, 2u);
+    for (size_t i = 0u; i < 16u; i++) expected[2358u + i] = expected[2348u + i];
+    memcpy(expected + PATCH_SOURCE_BYTES - 40u, last_literal, sizeof last_literal);
+    memcpy(expected + PATCH_SOURCE_BYTES - 36u, source + 300u, 4u);
+    for (size_t i = 0u; i < 32u; i++) {
+        expected[PATCH_SOURCE_BYTES - 32u + i] = expected[PATCH_SOURCE_BYTES - 40u + i];
+    }
+    bps_test_u32(patch, &size, bps_test_crc32(source, PATCH_SOURCE_BYTES));
+    bps_test_u32(patch, &size, bps_test_crc32(expected, PATCH_BPS_TARGET_BYTES));
+    bps_test_u32(patch, &size, bps_test_crc32(patch, size));
+    return size;
 }
 
 static int open_raw_cue(const char *root, const char *cue_name,
@@ -281,6 +390,55 @@ static int run_mapping(const char *root)
 cleanup:
     schway_disc_image_close(pregap_image);
     schway_disc_image_close(mode1_image);
+    schway_disc_image_close(image);
+    free(raw);
+    return result;
+}
+
+static int run_bps(const char *root)
+{
+    schway_disc_image *image = NULL;
+    schway_disc_patch_source source;
+    schway_disc_patch_candidate *candidate = NULL;
+    schway_disc_patch_report report;
+    schway_disc_patch_error error;
+    uint8_t *raw = make_raw_source();
+    uint8_t expected[PATCH_BPS_TARGET_BYTES];
+    uint8_t actual[PATCH_SOURCE_BYTES];
+    uint8_t patch[512];
+    char source_path[1024];
+    size_t patch_size;
+    int result = 0;
+    CHECK(raw != NULL, "allocate BPS source");
+    CHECK(make_path(source_path, root, "bps.bin"), "build BPS source path");
+    CHECK(write_bytes(source_path, raw, PATCH_SOURCE_BYTES), "write BPS source");
+    CHECK(open_raw_cue(root, "bps.cue", "bps.bin", "MODE2/2352", NULL, &image),
+          "open supported raw CUE");
+    CHECK(schway_disc_image_patch_source(image, &source, &error) == SCHWAY_DISC_PATCH_OK,
+          "obtain immutable raw patch source");
+    patch_size = build_bps_sample(patch, raw, expected);
+    CHECK(patch_size != 0u, "build independent BPS actions and checksums");
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_BPS,
+                                 patch, patch_size, NULL, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_OK &&
+          report.checks == (SCHWAY_DISC_PATCH_CHECK_BPS_SOURCE_CRC |
+                            SCHWAY_DISC_PATCH_CHECK_BPS_TARGET_CRC |
+                            SCHWAY_DISC_PATCH_CHECK_BPS_PATCH_CRC),
+          "validate complete BPS candidate and all native checks");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, raw, PATCH_SOURCE_BYTES) == 0,
+          "staged BPS bytes stay private before candidate replacement");
+    CHECK(schway_disc_image_patch_replace(image, &candidate, &error) ==
+              SCHWAY_DISC_PATCH_OK && candidate == NULL,
+          "publish only the complete validated BPS candidate");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, expected, PATCH_BPS_TARGET_BYTES) == 0,
+          "all BPS actions produce the complete expected target");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, expected, PATCH_BPS_TARGET_BYTES) == 0,
+          "BPS target remains deterministic across complete sector reads");
+cleanup:
+    schway_disc_patch_candidate_destroy(candidate);
     schway_disc_image_close(image);
     free(raw);
     return result;
@@ -917,7 +1075,8 @@ static int known_case(const char *name)
 {
     return strcmp(name, "mapping") == 0 || strcmp(name, "ppf1") == 0 ||
            strcmp(name, "ppf2") == 0 || strcmp(name, "ppf3") == 0 ||
-           strcmp(name, "atomic") == 0 || strcmp(name, "bounds") == 0;
+           strcmp(name, "bps") == 0 || strcmp(name, "atomic") == 0 ||
+           strcmp(name, "bounds") == 0;
 }
 
 int main(int argc, char **argv)
@@ -932,6 +1091,7 @@ int main(int argc, char **argv)
         return 2;
     }
     test_case = argv[1];
+    if (strcmp(test_case, "bps") == 0) return run_bps(argv[2]);
     if (strcmp(test_case, "mapping") == 0) return run_mapping(argv[2]);
     if (strcmp(test_case, "atomic") == 0) return run_atomic(argv[2]);
     if (strcmp(test_case, "bounds") == 0) return run_bounds(argv[2]);
