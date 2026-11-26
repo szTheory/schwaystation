@@ -18,7 +18,6 @@
 #define SCHWAY__DAT_MAX_TOKEN 8192u
 #define SCHWAY__DAT_MAX_NESTING 64u
 #define SCHWAY__DAT_MAX_ENTRIES 32768u
-#define SCHWAY__DAT_SERIAL_MAX 64u
 #define SCHWAY__DAT_EVIDENCE_MAX (4u * 1024u * 1024u)
 #define SCHWAY__DAT_EVIDENCE_LINE_MAX 8192u
 #define SCHWAY__DAT_CONTEXT_MAX 128u
@@ -46,7 +45,7 @@ typedef struct schway__dat_token {
 typedef struct schway__dat_entry {
     char entry_sha256[65];
     char content_sha256[65];
-    char serial[SCHWAY__DAT_SERIAL_MAX + 1u];
+    char serial_sha256[65];
     char status;
     size_t evidence_offset;
     size_t evidence_length;
@@ -209,9 +208,12 @@ static int schway__dat_token_is(const schway__dat_token *token, const char *text
            memcmp(token->text, text, length) == 0;
 }
 
-static int schway__dat_decode_serial(const schway__dat_token *token,
-                                     char serial[SCHWAY__DAT_SERIAL_MAX + 1u])
+static int schway__dat_hash_serial(const schway__dat_token *token, char serial_sha256[65],
+                                   int *has_serial)
 {
+    schway__sha256 hash;
+    unsigned char digest[32];
+    schway__sha256_init(&hash);
     size_t written = 0u;
     for (size_t i = 0u; i < token->length; i++) {
         unsigned char value = token->text[i];
@@ -219,11 +221,13 @@ static int schway__dat_decode_serial(const schway__dat_token *token,
             if (i + 1u >= token->length) return 0;
             value = token->text[++i];
         }
-        if (value < 0x20u || value > 0x7eu ||
-            written == SCHWAY__DAT_SERIAL_MAX) return 0;
-        serial[written++] = (char)value;
+        if (value < 0x20u || value == 0x7fu) return 0;
+        schway__sha256_update(&hash, &value, 1u);
+        written++;
     }
-    serial[written] = '\0';
+    schway__sha256_final(&hash, digest);
+    schway__sha256_hex(digest, serial_sha256);
+    *has_serial = written != 0u;
     return 1;
 }
 
@@ -282,9 +286,9 @@ static int schway__dat_parse_group(schway__dat_parser *parser, unsigned depth,
         } else if ((value.type == SCHWAY__DAT_TOKEN_WORD ||
                     value.type == SCHWAY__DAT_TOKEN_STRING) &&
                    game != NULL && depth == 1u && schway__dat_token_is(&key, "serial")) {
-            if (game->serial_seen || !schway__dat_decode_serial(&value, game->serial)) return 0;
+            if (game->serial_seen ||
+                !schway__dat_hash_serial(&value, game->serial_sha256, &game->has_serial)) return 0;
             game->serial_seen = 1;
-            game->has_serial = game->serial[0] != '\0';
         } else if (value.type != SCHWAY__DAT_TOKEN_WORD &&
                    value.type != SCHWAY__DAT_TOKEN_STRING) {
             return 0;
@@ -330,7 +334,7 @@ static int schway__dat_compare_serials(const void *left, const void *right)
 {
     const schway__dat_entry *const *a = (const schway__dat_entry *const *)left;
     const schway__dat_entry *const *b = (const schway__dat_entry *const *)right;
-    return strcmp((*a)->serial, (*b)->serial);
+    return strcmp((*a)->serial_sha256, (*b)->serial_sha256);
 }
 
 static uint64_t schway__dat_count_duplicates(const schway__dat_parser *parser,
@@ -350,7 +354,8 @@ static uint64_t schway__dat_count_duplicates(const schway__dat_parser *parser,
     size_t i = 0u;
     while (i < serial_count) {
         size_t end = i + 1u;
-        while (end < serial_count && strcmp(serials[i]->serial, serials[end]->serial) == 0) end++;
+        while (end < serial_count &&
+               strcmp(serials[i]->serial_sha256, serials[end]->serial_sha256) == 0) end++;
         if (end - i > 1u) duplicate_entries += (uint64_t)(end - i);
         i = end;
     }
