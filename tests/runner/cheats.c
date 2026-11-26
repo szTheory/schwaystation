@@ -161,15 +161,19 @@ static int append_repeated_code(char *text, size_t capacity, uint32_t count, siz
 
 static int parser_bounds(void)
 {
-    static const char lower[] = "30000000 00AB\n301FFFFF 005A";
-    static const char upper_halfword[] = "801FFFFE BEEF";
+    static const char lower[] = "30000000 00AB";
+    static const char upper_halfword[] = "801FFFFE BEEF\n301FFFFF 005A";
     static const char unsupported[] = "D0000010 0001";
     static const char high_byte[] = "30000010 0101";
     static const char odd_halfword[] = "80000001 1234";
     static const char past_ram[] = "80200000 1234";
+    static const char surplus_code_digits[] = "300000100 00A5";
+    static const char surplus_value_digits[] = "30000010 00A50";
     static const char surplus[] = "30000010 00A5 extra";
     static const char comment[] = "30000010 00A5 # comment";
     static const char invalid_last_line[] = "30000010 00A5\nD0000010 0001";
+    static const char empty[] = "";
+    static const char whitespace_only[] = " \t\r\n";
     schway__host_cheats cheats;
     schway__host_cheats_reset(&cheats);
     if (!schway__host_cheats_replace(&cheats, 0u, true, lower, sizeof lower - 1u) ||
@@ -184,7 +188,7 @@ static int parser_bounds(void)
     if (create_test_core(&inst) != 0) return 1;
     if (!schway__host_cheats_apply(&cheats, inst) || expect_ram(inst, 0u, 1u, 0xABu) != 0 ||
         expect_ram(inst, 0x1FFFFFu, 1u, 0x5Au) != 0 ||
-        expect_ram(inst, 0x1FFFFEu, 2u, 0xBEEFu) != 0) {
+        expect_ram(inst, 0x1FFFFEu, 2u, 0x5AEFu) != 0) {
         schway_destroy(inst);
         return 1;
     }
@@ -197,9 +201,13 @@ static int parser_bounds(void)
         {high_byte, sizeof high_byte - 1u},
         {odd_halfword, sizeof odd_halfword - 1u},
         {past_ram, sizeof past_ram - 1u},
+        {surplus_code_digits, sizeof surplus_code_digits - 1u},
+        {surplus_value_digits, sizeof surplus_value_digits - 1u},
         {surplus, sizeof surplus - 1u},
         {comment, sizeof comment - 1u},
         {invalid_last_line, sizeof invalid_last_line - 1u},
+        {empty, 0u},
+        {whitespace_only, sizeof whitespace_only - 1u},
     };
     for (size_t i = 0u; i < sizeof invalid / sizeof invalid[0]; i++) {
         if (rejected_replacement_preserves_table(&cheats, 0u, invalid[i].text,

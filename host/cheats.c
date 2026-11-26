@@ -20,7 +20,8 @@ static bool schway__host_cheats_zero_write(const schway__host_cheat_write *write
 
 static bool schway__host_cheat_is_separator(char byte)
 {
-    return byte == ' ' || byte == '\t' || byte == '\r' || byte == '\n';
+    return byte == ' ' || byte == '\t' || byte == '\r' || byte == '\n' || byte == '\v' ||
+           byte == '\f' || byte == '+';
 }
 
 static int schway__host_cheat_hex(char byte)
@@ -49,35 +50,56 @@ static bool schway__host_cheat_parse_hex(const char *text, size_t size, size_t *
     return true;
 }
 
-static bool schway__host_cheat_parse_one(const char *text, size_t text_size,
-                                         schway__host_cheat_write *write)
+static bool schway__host_cheat_parse_text(const char *text, size_t text_size,
+                                          schway__host_cheat_entry *entry)
 {
-    if (text == NULL || write == NULL || text_size == 0u ||
+    if (text == NULL || entry == NULL || text_size == 0u ||
         text_size > SCHWAY_HOST_CHEAT_ENTRY_TEXT_MAX) {
         return false;
     }
 
+    memset(entry, 0, sizeof *entry);
     size_t position = 0u;
-    while (position < text_size && schway__host_cheat_is_separator(text[position])) position++;
-    uint32_t code = 0u;
-    if (!schway__host_cheat_parse_hex(text, text_size, &position, 8u, &code) ||
-        position == text_size || !schway__host_cheat_is_separator(text[position])) {
-        return false;
+    uint32_t line_count = 0u;
+    while (position < text_size) {
+        while (position < text_size && schway__host_cheat_is_separator(text[position])) position++;
+        if (position == text_size) break;
+        if (line_count >= SCHWAY_HOST_CHEAT_LINES_PER_ENTRY) return false;
+
+        uint32_t code = 0u;
+        if (!schway__host_cheat_parse_hex(text, text_size, &position, 8u, &code) ||
+            position == text_size || !schway__host_cheat_is_separator(text[position])) {
+            return false;
+        }
+        while (position < text_size && schway__host_cheat_is_separator(text[position])) position++;
+        uint32_t data = 0u;
+        if (!schway__host_cheat_parse_hex(text, text_size, &position, 4u, &data) ||
+            (position < text_size && !schway__host_cheat_is_separator(text[position]))) {
+            return false;
+        }
+
+        const uint32_t type = code >> 24u;
+        const uint32_t offset = code & 0x00FFFFFFu;
+        schway__host_cheat_write write;
+        memset(&write, 0, sizeof write);
+        if (type == 0x30u) {
+            if ((data & 0xFF00u) != 0u) return false;
+            write.width = 1u;
+        } else if (type == 0x80u) {
+            write.width = 2u;
+        } else {
+            return false;
+        }
+        write.offset = offset;
+        write.value = (uint16_t)data;
+        if (!schway__host_cheat_write_valid(&write)) return false;
+        entry->lines[line_count] = write;
+        line_count++;
     }
-    while (position < text_size && schway__host_cheat_is_separator(text[position])) position++;
-    uint32_t data = 0u;
-    if (!schway__host_cheat_parse_hex(text, text_size, &position, 4u, &data)) return false;
-    while (position < text_size && schway__host_cheat_is_separator(text[position])) position++;
-    if (position != text_size) return false;
 
-    const uint32_t type = code >> 24u;
-    const uint32_t offset = code & 0x00FFFFFFu;
-    if (type != 0x30u || offset > 0x1FFFFFu || (data & 0xFF00u) != 0u) return false;
-
-    write->width = 1u;
-    write->offset = offset;
-    write->value = (uint16_t)data;
-    return schway__host_cheat_write_valid(write);
+    if (line_count == 0u) return false;
+    entry->line_count = line_count;
+    return true;
 }
 
 void schway__host_cheats_reset(schway__host_cheats *cheats)
@@ -119,13 +141,13 @@ bool schway__host_cheats_replace(schway__host_cheats *cheats, uint32_t index, bo
 
     schway__host_cheat_entry candidate;
     memset(&candidate, 0, sizeof candidate);
-    if (!schway__host_cheat_parse_one(text, text_size, &candidate.lines[0])) return false;
+    if (!schway__host_cheat_parse_text(text, text_size, &candidate)) return false;
     candidate.enabled = enabled ? 1u : 0u;
-    candidate.line_count = 1u;
 
     const schway__host_cheat_entry *previous = &cheats->entries[index];
-    const uint32_t total_lines = cheats->total_lines - previous->line_count + candidate.line_count;
-    if (total_lines > SCHWAY_HOST_CHEAT_TOTAL_LINES) return false;
+    const uint32_t other_lines = cheats->total_lines - previous->line_count;
+    if (candidate.line_count > SCHWAY_HOST_CHEAT_TOTAL_LINES - other_lines) return false;
+    const uint32_t total_lines = other_lines + candidate.line_count;
 
     schway__host_cheats updated = *cheats;
     updated.entries[index] = candidate;
