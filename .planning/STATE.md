@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Phase 16 wave 4 complete; wave 5 plans 16-05, 16-10 and 16-11 are ready
-last_updated: "2026-11-26T03:25:04Z"
+stopped_at: Phase 16 wave 5 complete; wave 6 plan 16-12 is ready
+last_updated: "2026-11-26T04:21:26Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 plans 16-04, 16-06 and 16-09 complete; wave 5 ready
-state_head: 612891ff90490eb87847e8fb06f2e5676dac1cec
+last_activity_desc: Phase 16 plans 16-05, 16-10 and 16-11 complete; wave 6 ready
+state_head: 0324953155adbc7614c664e0ab3803cb914811ec
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 115
-  percent: 92
+  completed_plans: 118
+  percent: 90
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 18
 Status: Ready to execute
 Last activity: 2026-11-26 — Phase 16 wave 4 complete; wave 5 ready
-Progress: [█████████░] 92% (9/10 v2.0 phases released; Phase 16 has 8/18 plans complete and wave 5 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 11/18 plans complete and wave 6 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -64,6 +64,12 @@ After merge, `git diff --check 542580e..HEAD`, the ABI/runner/disc inventory sor
 Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-04 took 31 minutes, Plan 16-06 took 40 minutes, and Plan 16-09 took 63m51s. Plan 16-04 connected libretro cheat callbacks to frame execution and preserved state across `retro_reset`; its two focused selectors and docs budget passed. Plan 16-06 added repeatable runner `--cheat` options and normalized-configuration hash contribution while preserving no-cheat hash pins; the exact six-selector run passed with a pinned OpenBIOS fixture built through the repository's named container producer. Its hash implementation landed with Task 1; the later Task 2 tests passed against it, and the actual TDD ordering was documented without rewriting the passing commit. All generated BIOS/toolchain/source files and task-owned container resources were removed. Plan 16-09 added bounded BPS transformation and complete-target staging (memory through 1 MiB, private temporary file above that); its regression set includes malformed cursors/varints/CRCs, late failures, large targets and injected source-I/O failure. It took 63m51s, including large-target coverage and compaction needed to keep `tests/disc/patch.c` below its existing 1,200-line cap; the final file has 1,199 lines. Its Task 2 tests were already satisfied by Task 1, so the executor retained the regressions and documented the overlap without redundant production changes. These measured durations exceed the plan's 30-minute target; use them when estimating future work and split materially larger plans before execution.
 
 All three worktrees started at `445d699`, ended clean, and had resolved commit-scope checks. `git diff --check 445d699..HEAD`, runner/disc/libretro/ABI inventory sorts, `cmake --preset ci`, unique-selector preflight, and the combined builds passed. The 17 targeted post-merge API, cheat, libretro, PPF/BPS, disc-image and docs-budget selectors passed 17/17. The hygiene preset's `policy.gate_budget` passed 1/1; the measured repository checks remain 3,901/3,901. The exact `runner.hashes_file` case passed earlier in Plan 16-06 with its pinned OpenBIOS fixture; it is not in the post-merge 17-selector set because that generated fixture was cleaned after the plan. The full workflow remains for final phase verification after source review. No hosted CI or Act was run; the plan-owned OpenBIOS container and outputs were cleaned. Current plan is 5; wave 5 plans 16-05, 16-10 and 16-11 are ready.
+
+### Phase 16 wave 5 execution (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-05 took 33m19s, Plan 16-10 took 44m, and Plan 16-11 took 31m21s. Plan 16-05 added atomic libretro cheat configuration state; its five required selectors passed. Its optional content-profile probe could not run because the generated OpenBIOS fixture was absent after cleanup. Plan 16-10 added runner `--patch` transactional handling and passed eight required selectors plus `runner.hash_state` and repository/documentation budget checks. Its Task 2 tests were already green after Task 1; the test-harness argument mismatch was corrected, actual ordering recorded, and no artificial RED was introduced. Plan 16-11 added patch/cheat replay seeds and nightly fuzz routing; replay passed 2/2, exact seed and workflow checks passed, and `act --dryrun --container-architecture linux/arm64 -W .github/workflows/nightly.yml -j fuzz` exited 0. It added 14 PPF and 10 cheat seeds; local sanitizer execution was unavailable because clang-21 was not installed. Temporary seed/cache data was removed and no task-owned Docker resources remained.
+
+The isolated worktrees completed clean with resolved scope checks and merged. `verify-summary` flagged heuristic false positives for Plans 16-05 and 16-11; both summaries explicitly report `Self-Check: PASSED`, and their created files, commits and checks were verified. After merge, `git diff --check 3d19212..HEAD`, sorted test inventories, `cmake --preset ci`, the combined affected target builds and all 19 focused API/cheat/libretro/patch/fuzz/runner/disc/documentation selectors passed. The hygiene selectors `hygiene.timeout_comments`, `policy.action_pins` and `policy.gate_budget` passed 3/3. No hosted CI ran in this wave. Current plan is 6; wave 6 Plan 16-12 is ready.
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2645,9 +2651,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T23:48:12.002Z
-Stopped at: Phase 16 plans passed independent verification; execution ready
-Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01-PLAN.md
+Last session: 2026-11-26T04:21:26Z
+Stopped at: Phase 16 wave 5 integration passed; proceeding with Plan 16-12
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-12-PLAN.md
 
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
 
