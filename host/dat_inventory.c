@@ -51,6 +51,7 @@ typedef struct schway__dat_entry {
     size_t evidence_offset;
     size_t evidence_length;
     int has_serial;
+    int serial_seen;
     int has_evidence;
 } schway__dat_entry;
 
@@ -281,7 +282,8 @@ static int schway__dat_parse_group(schway__dat_parser *parser, unsigned depth,
         } else if ((value.type == SCHWAY__DAT_TOKEN_WORD ||
                     value.type == SCHWAY__DAT_TOKEN_STRING) &&
                    game != NULL && depth == 1u && schway__dat_token_is(&key, "serial")) {
-            if (game->has_serial || !schway__dat_decode_serial(&value, game->serial)) return 0;
+            if (game->serial_seen || !schway__dat_decode_serial(&value, game->serial)) return 0;
+            game->serial_seen = 1;
             game->has_serial = game->serial[0] != '\0';
         } else if (value.type != SCHWAY__DAT_TOKEN_WORD &&
                    value.type != SCHWAY__DAT_TOKEN_STRING) {
