@@ -18,6 +18,7 @@ schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]
+                  [--patch FILE [--patch-source-sha256 HEX]]
                   [--stop-on mailbox] [--inputs FILE] [--cheat CODE ...] [--hash] [--hash-audio]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
@@ -34,6 +35,8 @@ schwaystation-run --help | --version
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
 | `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
 | `--disc FILE` | Attach a supported CUE, ISO, M3U, unencrypted PBP, ECM or CloneCD image to a BIOS run. A `.cue` names BINARY or ECM track files; `.ccd` uses its same-stem `.img` and optional `.sub`; an `.m3u` selects initial disc 0. Needs `--bios`. Give it once. |
+| `--patch FILE` | Validate and apply one PPF1, PPF2, PPF3 or BPS patch to the supported raw CUE source before emulation. Needs `--disc`; unavailable with `--bench` and `--probe`. See [patches](patches.md). |
+| `--patch-source-sha256 HEX` | Bind PPF to the whole source file's SHA-256 using 64 hexadecimal digits. Required for PPF; optional for BPS, which has its own CRC checks. Give it once with `--patch`. |
 | `--boot MODE` | Choose `full` (the default) or `fast` for a BIOS-backed disc run. Fast requires a valid boot executable found through the disc's ISO9660 boot metadata. Give it once. |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
 | `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
@@ -60,7 +63,7 @@ schwaystation-run --help | --version
 Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
 `--metadata-dat` pair. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--disc`, `--exe` or `--probe`,
-`--bios`, `--disc` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--boot` without both `--bios` and `--disc`, `--exe` with `--probe`, `--tty` without `--exe` or
+`--bios`, `--disc`, `--exe` or `--patch` twice, either patch option without its required companion, `--patch` without `--disc`, `--patch` with `--bench` or `--probe`, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--boot` without both `--bios` and `--disc`, `--exe` with `--probe`, `--tty` without `--exe` or
 `--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
 `--trace` with anything but `first-fault`, `--hash-state` with `--disc`, `--serial` without serial naming, serial naming
 without `--save-dir`, or serial naming without either a standalone `--exe` or a literal `--serial`, and any option
@@ -117,6 +120,20 @@ sectors, then closes it after destroying the instance. It never extracts or side
 ```sh
 schwaystation-run --bios ./openbios.bin --disc ./game.cue --frames 900 --stop-on mailbox --hash
 ```
+
+To run a supported patch, pass one patch file with the disc. PPF needs the SHA-256 of the complete raw source file;
+BPS uses its source, target and patch CRCs and accepts the SHA-256 option as an additional source check:
+
+```sh
+schwaystation-run --bios ./openbios.bin --disc ./game.cue --patch ./game.ppf \
+  --patch-source-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --frames 900
+```
+
+The runner validates the disc mapping, patch and applicable source checks before creating the emulator instance or
+running frames. It prints the patch format and checks performed without printing either input path. A rejected patch
+exits before frame output or PNG creation, and the source image remains unchanged. The patch provider and the core's
+existing sector callback share the overlay; patch parsing and transformation stay in the host. See
+[the supported patch formats and limits](patches.md).
 
 The BIOS-backed disc path defaults to `--boot full`; spelling `--boot full` produces the same ordinary firmware
 startup. `--boot fast` opts into the core's initialized shell handoff only after the runner has loaded the supplied
