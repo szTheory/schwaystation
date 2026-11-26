@@ -153,6 +153,7 @@ The plan ledger measured three task commits from 3d19212fec1794284941793b9102a8b
 ## Issues Encountered
 
 - The first expanded CLI run was not behavioral RED evidence: it passed the hook-only option to the production runner and used literal backslash-n bytes in the generated CUE. Later setup runs also caught a missing Python helper and an output detector that matched --frames in the usage text. All were fixed before the passing focused run.
+- The first summary-only commit was rejected by the hygiene hook because the recorded report path had an absolute user-directory prefix. Replaced it with the worktree-relative ignored evidence path; the normal GSD summary commit then passed.
 - STATE.md and ROADMAP.md were not changed in the isolated plan worktree, as instructed by the orchestrator.
 
 ## Known Stubs
