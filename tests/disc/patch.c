@@ -11,6 +11,9 @@
 #define PATCH_SECTOR_BYTES 2352u
 #define PATCH_SECTOR_COUNT 17u
 #define PATCH_SOURCE_BYTES ((size_t)PATCH_SECTOR_BYTES * PATCH_SECTOR_COUNT)
+#define PATCH_PPF_BLOCK_OFFSET 0x9320u
+#define PATCH_PPF_BLOCK_BYTES 1024u
+#define PATCH_PPF2_HEADER_BYTES (60u + PATCH_PPF_BLOCK_BYTES)
 
 static const char *test_case;
 
@@ -99,6 +102,74 @@ static size_t begin_ppf1(uint8_t *patch, size_t capacity)
     patch[5] = 0u;
     memset(patch + 6u, ' ', 50u);
     return 56u;
+}
+
+static void write_u32_le(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 16);
+    bytes[3] = (uint8_t)(value >> 24);
+}
+
+static void write_u64_le(uint8_t *bytes, uint64_t value)
+{
+    for (size_t i = 0u; i < 8u; i++) bytes[i] = (uint8_t)(value >> (8u * i));
+}
+
+static size_t begin_ppf2(uint8_t *patch, size_t capacity,
+                         const uint8_t *source, size_t source_size)
+{
+    if (capacity < PATCH_PPF2_HEADER_BYTES ||
+        source_size < PATCH_PPF_BLOCK_OFFSET + PATCH_PPF_BLOCK_BYTES ||
+        source_size > UINT32_MAX) return 0u;
+    memcpy(patch, "PPF20", 5u);
+    patch[5] = 1u;
+    memset(patch + 6u, ' ', 50u);
+    write_u32_le(patch + 56u, (uint32_t)source_size);
+    memcpy(patch + 60u, source + PATCH_PPF_BLOCK_OFFSET,
+           PATCH_PPF_BLOCK_BYTES);
+    return PATCH_PPF2_HEADER_BYTES;
+}
+
+static size_t begin_ppf3(uint8_t *patch, size_t capacity,
+                         const uint8_t *source, uint8_t blockcheck,
+                         uint8_t undo)
+{
+    size_t header_bytes = blockcheck != 0u ? 1084u : 60u;
+    if (capacity < header_bytes ||
+        (blockcheck != 0u &&
+         PATCH_SOURCE_BYTES < PATCH_PPF_BLOCK_OFFSET + PATCH_PPF_BLOCK_BYTES)) {
+        return 0u;
+    }
+    memcpy(patch, "PPF30", 5u);
+    patch[5] = 2u;
+    memset(patch + 6u, ' ', 50u);
+    patch[56] = 0u;
+    patch[57] = blockcheck;
+    patch[58] = undo;
+    patch[59] = 0u;
+    if (blockcheck != 0u) {
+        memcpy(patch + 60u, source + PATCH_PPF_BLOCK_OFFSET,
+               PATCH_PPF_BLOCK_BYTES);
+    }
+    return header_bytes;
+}
+
+static size_t add_ppf3_record(uint8_t *patch, size_t position, uint64_t offset,
+                              const uint8_t *bytes, uint8_t count,
+                              const uint8_t *undo, uint8_t has_undo)
+{
+    write_u64_le(patch + position, offset);
+    position += 8u;
+    patch[position++] = count;
+    memcpy(patch + position, bytes, count);
+    position += count;
+    if (has_undo != 0u) {
+        memcpy(patch + position, undo, count);
+        position += count;
+    }
+    return position;
 }
 
 static size_t make_ppf1(uint8_t *patch, size_t capacity,
@@ -281,6 +352,148 @@ cleanup:
     return result;
 }
 
+static int run_ppf2(const char *root)
+{
+    static const uint8_t first[] = {0x91u, 0x92u, 0x93u};
+    static const uint8_t last[] = {0xe1u};
+    schway_disc_image *image = NULL;
+    schway_disc_patch_source source;
+    schway_disc_patch_candidate *candidate = NULL;
+    schway_disc_patch_report report;
+    schway_disc_patch_error error;
+    uint8_t *raw = make_raw_source();
+    uint8_t expected[PATCH_SOURCE_BYTES];
+    uint8_t actual[PATCH_SOURCE_BYTES];
+    uint8_t patch[1200];
+    uint8_t source_sha[32];
+    uint8_t wrong_sha[32];
+    char source_path[1024];
+    size_t patch_size = 0u;
+    int result = 0;
+    CHECK(raw != NULL, "allocate generated raw source");
+    CHECK(make_path(source_path, root, "ppf2.bin"), "build source path");
+    CHECK(write_bytes(source_path, raw, PATCH_SOURCE_BYTES), "write generated raw source");
+    CHECK(open_raw_cue(root, "ppf2.cue", "ppf2.bin", "MODE2/2352", NULL, &image),
+          "open supported raw CUE");
+    CHECK(schway_disc_image_patch_source(image, &source, &error) == SCHWAY_DISC_PATCH_OK,
+          "obtain immutable raw patch source");
+    patch_size = begin_ppf2(patch, sizeof patch, raw, PATCH_SOURCE_BYTES);
+    CHECK(patch_size == PATCH_PPF2_HEADER_BYTES, "build PPF2 source checks");
+    patch_size = add_ppf1_record(patch, patch_size, PATCH_PPF_BLOCK_OFFSET,
+                                 first, (uint8_t)sizeof first);
+    patch_size = add_ppf1_record(patch, patch_size,
+                                 (uint32_t)(PATCH_SOURCE_BYTES - 1u),
+                                 last, (uint8_t)sizeof last);
+    memcpy(expected, raw, PATCH_SOURCE_BYTES);
+    memcpy(expected + PATCH_PPF_BLOCK_OFFSET, first, sizeof first);
+    expected[PATCH_SOURCE_BYTES - 1u] = last[0];
+    digest(raw, PATCH_SOURCE_BYTES, source_sha);
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF2,
+                                 patch, patch_size, source_sha, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_OK,
+          "load and validate PPF2 candidate");
+    CHECK(candidate != NULL && report.format == SCHWAY_DISC_PATCH_FORMAT_PPF2 &&
+          report.records == 2u &&
+          report.checks == (SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256 |
+                            SCHWAY_DISC_PATCH_CHECK_PPF2_SOURCE_SIZE |
+                            SCHWAY_DISC_PATCH_CHECK_PPF2_BLOCK),
+          "report PPF2 SHA-256, exact size and block checks");
+    CHECK(schway_disc_image_patch_replace(image, &candidate, &error) ==
+              SCHWAY_DISC_PATCH_OK && candidate == NULL,
+          "attach validated PPF2 candidate");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, expected, PATCH_SOURCE_BYTES) == 0,
+          "apply PPF2 32-bit records at source and final-byte boundaries");
+    memcpy(wrong_sha, source_sha, sizeof wrong_sha);
+    wrong_sha[0] ^= 1u;
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF2,
+                                 patch, patch_size, wrong_sha, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_BAD_IDENTITY &&
+          candidate == NULL,
+          "reject PPF2 with a wrong whole-source SHA-256");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, expected, PATCH_SOURCE_BYTES) == 0,
+          "wrong PPF2 SHA-256 leaves the active overlay unchanged");
+cleanup:
+    schway_disc_patch_candidate_destroy(candidate);
+    schway_disc_image_close(image);
+    free(raw);
+    return result;
+}
+
+static int run_ppf3(const char *root)
+{
+    static const uint8_t across[] = {0x71u, 0x72u, 0x73u, 0x74u};
+    static const uint8_t last[] = {0xe5u};
+    uint8_t undo[sizeof across];
+    schway_disc_image *image = NULL;
+    schway_disc_patch_source source;
+    schway_disc_patch_candidate *candidate = NULL;
+    schway_disc_patch_report report;
+    schway_disc_patch_error error;
+    uint8_t *raw = make_raw_source();
+    uint8_t expected[PATCH_SOURCE_BYTES];
+    uint8_t actual[PATCH_SOURCE_BYTES];
+    uint8_t patch[1200];
+    uint8_t source_sha[32];
+    char source_path[1024];
+    size_t patch_size = 0u;
+    int result = 0;
+    CHECK(raw != NULL, "allocate generated raw source");
+    CHECK(make_path(source_path, root, "ppf3.bin"), "build source path");
+    CHECK(write_bytes(source_path, raw, PATCH_SOURCE_BYTES), "write generated raw source");
+    CHECK(open_raw_cue(root, "ppf3.cue", "ppf3.bin", "MODE2/2352", NULL, &image),
+          "open supported raw CUE");
+    CHECK(schway_disc_image_patch_source(image, &source, &error) == SCHWAY_DISC_PATCH_OK,
+          "obtain immutable raw patch source");
+    memcpy(undo, raw + PATCH_SECTOR_BYTES - 1u, sizeof undo);
+    patch_size = begin_ppf3(patch, sizeof patch, raw, 1u, 1u);
+    CHECK(patch_size == 1084u, "build PPF3 block-check and undo header");
+    patch_size = add_ppf3_record(patch, patch_size, PATCH_SECTOR_BYTES - 1u,
+                                 across, (uint8_t)sizeof across, undo, 1u);
+    memcpy(expected, raw, PATCH_SOURCE_BYTES);
+    memcpy(expected + PATCH_SECTOR_BYTES - 1u, across, sizeof across);
+    digest(raw, PATCH_SOURCE_BYTES, source_sha);
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF3,
+                                 patch, patch_size, source_sha, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_OK,
+          "load and validate PPF3 candidate with undo bytes");
+    CHECK(candidate != NULL && report.format == SCHWAY_DISC_PATCH_FORMAT_PPF3 &&
+          report.records == 1u &&
+          report.checks == (SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256 |
+                            SCHWAY_DISC_PATCH_CHECK_PPF3_BLOCK),
+          "report PPF3 SHA-256 and enabled block check");
+    CHECK(schway_disc_image_patch_replace(image, &candidate, &error) ==
+              SCHWAY_DISC_PATCH_OK && candidate == NULL,
+          "attach validated PPF3 candidate");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, expected, PATCH_SOURCE_BYTES) == 0,
+          "apply PPF3 64-bit record while consuming but not applying undo bytes");
+
+    patch_size = begin_ppf3(patch, sizeof patch, raw, 0u, 0u);
+    CHECK(patch_size == 60u, "build PPF3 header with block check disabled");
+    patch_size = add_ppf3_record(patch, patch_size,
+                                 (uint64_t)(PATCH_SOURCE_BYTES - 1u),
+                                 last, (uint8_t)sizeof last, NULL, 0u);
+    expected[PATCH_SOURCE_BYTES - 1u] = last[0];
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF3,
+                                 patch, patch_size, source_sha, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_OK,
+          "load PPF3 candidate with optional block check disabled");
+    CHECK(report.checks == SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256 &&
+          schway_disc_image_patch_replace(image, &candidate, &error) ==
+              SCHWAY_DISC_PATCH_OK && candidate == NULL,
+          "report only the checks performed for a disabled block check");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, expected, PATCH_SOURCE_BYTES) == 0,
+          "apply PPF3 record at the final source byte");
+cleanup:
+    schway_disc_patch_candidate_destroy(candidate);
+    schway_disc_image_close(image);
+    free(raw);
+    return result;
+}
+
 static int run_atomic(const char *root)
 {
     static const uint8_t first_value[] = {0xa5u};
@@ -403,6 +616,7 @@ cleanup:
 static int known_case(const char *name)
 {
     return strcmp(name, "mapping") == 0 || strcmp(name, "ppf1") == 0 ||
+           strcmp(name, "ppf2") == 0 || strcmp(name, "ppf3") == 0 ||
            strcmp(name, "atomic") == 0;
 }
 
@@ -420,5 +634,7 @@ int main(int argc, char **argv)
     test_case = argv[1];
     if (strcmp(test_case, "mapping") == 0) return run_mapping(argv[2]);
     if (strcmp(test_case, "atomic") == 0) return run_atomic(argv[2]);
+    if (strcmp(test_case, "ppf2") == 0) return run_ppf2(argv[2]);
+    if (strcmp(test_case, "ppf3") == 0) return run_ppf3(argv[2]);
     return run_ppf1(argv[2]);
 }
