@@ -106,10 +106,12 @@ Nightly run [45897859841](https://github.com/szTheory/schwaystation/actions/runs
 
 The WASI size check passed within the active 1,014,617–1,014,665-byte interval. The hosted CMake quality step does not print a bounded successful measurement; the pinned local producer remains the exact available size at 1,014,617 bytes, so no quality bound changed. ASan completed successfully in 30m14s. The full CI critical path was the BE32 job.
 
-The inventory tests now pass the configured `CMAKE_CROSSCOMPILING_EMULATOR` through their existing script-mode `EMULATOR` transport. Local checks exited 0:
+CI run [45902217602](https://github.com/szTheory/schwaystation/actions/runs/45902217602) started on the first emulator fix, `647a11d`, and was canceled after 2m11s when the refreshed review found two remaining direct calls to the cross-compiled private-report test helper. It was canceled before the BE32 lane reached those calls; no BE32 result is inferred from that run.
+
+Both inventory tests now pass the configured `CMAKE_CROSSCOMPILING_EMULATOR` through their existing script-mode `EMULATOR` transport, including the private-report helper in the controls case. Local checks exited 0:
 
 - `cmake --build --preset ci --target schwaystation-run schwaystation-test-library && ctest --preset ci --no-tests=error -R '^compat[.]inventory[.](accounting|controls)$' --output-on-failure` — fixture preflight and both inventory tests passed.
-- `cmake -DSOURCE_ROOT=. -DWORK_ROOT=build/ci -DRUN=build/ci/schwaystation-run '-DEMULATOR=/usr/bin/env|--' -DTEST_BINARY=build/ci/tests/schwaystation-test-library -DCASE=compat_inventory_accounting -P tests/compat/tests.cmake` and the corresponding `compat_inventory_controls` command — both script-mode cases passed with a multi-part emulator value.
+- `cmake -DSOURCE_ROOT=. -DWORK_ROOT=build/ci -DRUN=build/ci/schwaystation-run '-DEMULATOR=/usr/bin/env|--' -DTEST_BINARY=build/ci/tests/schwaystation-test-library -DCASE=compat_inventory_controls -P tests/compat/tests.cmake` — the controls script and its cross-compiled-helper invocation passed with a multi-part emulator value.
 - `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4694 -P tests/cmake/line_budget.cmake`, inventory selector preflight, and `git diff --check` — passed; the repository-check total remains at the approved 4,694-line ceiling.
 
-A changed-head CI run is required to validate the BE32 emulator path and downstream hash comparison.
+A changed-head CI run is required to validate both BE32 emulator paths and downstream hash comparison.

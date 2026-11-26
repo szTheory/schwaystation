@@ -1492,7 +1492,7 @@ game (
   if(output MATCHES "Shared|SLUS-00001|Missing serial|No matching evidence")
     message(FATAL_ERROR "public inventory output disclosed per-occurrence data: ${output}")
   endif()
-  execute_process(COMMAND "${TEST_BINARY}" inventory "${report}" 4 0 0 4
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" inventory "${report}" 4 0 0 4
     RESULT_VARIABLE report_rc OUTPUT_QUIET ERROR_QUIET)
   if(NOT report_rc STREQUAL "0")
     message(FATAL_ERROR "private inventory report lost an ordinal or failed total reconciliation")
@@ -1550,7 +1550,7 @@ game (
       message(FATAL_ERROR "evidence totals omitted ${field}: ${output}")
     endif()
   endforeach()
-  execute_process(COMMAND "${TEST_BINARY}" inventory "${report}" 4 1 1 2
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" inventory "${report}" 4 1 1 2
     RESULT_VARIABLE report_rc OUTPUT_QUIET ERROR_QUIET)
   if(NOT report_rc STREQUAL "0")
     message(FATAL_ERROR "private inventory report lost an evidence status or ordinal")
