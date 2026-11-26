@@ -79,7 +79,8 @@ function(library_assert_snapshot root before)
   file(GLOB_RECURSE paths LIST_DIRECTORIES FALSE RELATIVE "${root}" "${root}/*")
   set(entries)
   foreach(path IN LISTS paths)
-    if(NOT path STREQUAL "build/library/results.csv")
+    if(NOT path STREQUAL "build/library/results.csv" AND
+       NOT path STREQUAL "build/library/dat-summary.txt")
       file(SHA256 "${root}/${path}" digest)
       list(APPEND entries "${path}|${digest}")
     endif()
@@ -421,6 +422,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   endif()
   file(COPY_FILE "${LIBRARY_LEDGER}" "${ordinary_root}/tests/compat/ledger.csv")
   file(COPY_FILE "${LIBRARY_DAT}" "${ordinary_root}/build/library/Sony - PlayStation.dat")
+  file(SHA256 "${LIBRARY_DAT}" synthetic_dat_sha256)
   file(WRITE "${ordinary_root}/.env.local"
     "SCHWAYSTATION_DISC_DIR=${duplicate_root}/discs\nSCHWAYSTATION_BIOS_DIR=${duplicate_root}/bios\n")
   set(fake_cmake "${fake_bin}/cmake")
@@ -433,6 +435,28 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   endif()
   set(mirror_path "${fake_bin}${path_separator}$ENV{PATH}")
   library_snapshot("${ordinary_root}" before_ordinary)
+  file(WRITE "${ordinary_root}/build/library/results.csv" "previous report\n")
+  file(WRITE "${ordinary_root}/build/library/dat-summary.txt" "previous inventory\n")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
+      "${ordinary_root}/scripts/library.sh"
+    WORKING_DIRECTORY "${ordinary_root}"
+    RESULT_VARIABLE cached_digest_rc OUTPUT_VARIABLE cached_digest_out ERROR_VARIABLE cached_digest_err)
+  if(cached_digest_rc STREQUAL "0" OR
+     NOT cached_digest_err MATCHES "digest" OR
+     cached_digest_err MATCHES "Sony - PlayStation[.]dat")
+    message(FATAL_ERROR "ordinary library mode accepted a cached DAT with the wrong digest: ${cached_digest_rc}: ${cached_digest_out}${cached_digest_err}")
+  endif()
+  file(READ "${ordinary_root}/build/library/results.csv" cached_digest_report)
+  file(READ "${ordinary_root}/build/library/dat-summary.txt" cached_digest_summary)
+  if(NOT cached_digest_report STREQUAL "previous report\n" OR
+     NOT cached_digest_summary STREQUAL "previous inventory\n")
+    message(FATAL_ERROR "wrong cached DAT digest replaced a prior report")
+  endif()
+  file(READ "${ordinary_root}/scripts/library.sh" library_script)
+  string(REPLACE "dat_sha256=52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8"
+    "dat_sha256=${synthetic_dat_sha256}" library_script "${library_script}")
+  string(REPLACE "dat_entries=13407" "dat_entries=1" library_script "${library_script}")
+  file(WRITE "${ordinary_root}/scripts/library.sh" "${library_script}")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
       "${ordinary_root}/scripts/library.sh"
     WORKING_DIRECTORY "${ordinary_root}"
@@ -441,6 +465,13 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
     message(FATAL_ERROR "ordinary library mode failed against its temporary provider: ${ordinary_rc}: ${ordinary_out}${ordinary_err}")
   endif()
   library_assert_snapshot("${ordinary_root}" "${before_ordinary}")
+  execute_process(COMMAND ${EMULATOR} "${LIBRARY_TEST}" inventory-summary
+      "${ordinary_root}/build/library/dat-summary.txt" 1 0 0 1 0 0 "${synthetic_dat_sha256}"
+    RESULT_VARIABLE inventory_summary_rc OUTPUT_VARIABLE inventory_summary_out
+    ERROR_VARIABLE inventory_summary_err)
+  if(NOT inventory_summary_rc STREQUAL "0")
+    message(FATAL_ERROR "ordinary library DAT aggregate was missing, inconsistent, or disclosed title data: ${inventory_summary_rc}: ${inventory_summary_out}${inventory_summary_err}")
+  endif()
   file(READ "${ordinary_root}/build/library/results.csv" ordinary_report)
   if(NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata[.]identity,pass,synthetic:iso9660-known-answer,2026-11-12" OR
      NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable:boots@600," OR
@@ -451,6 +482,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   endif()
 
   file(SHA256 "${ordinary_root}/build/library/results.csv" old_report)
+  file(SHA256 "${ordinary_root}/build/library/dat-summary.txt" old_inventory)
   file(WRITE "${duplicate_root}/discs/PRIVATE_SENTINEL_INVALID.bin" "not a raw 2048-sector image")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
       "${ordinary_root}/scripts/library.sh"
@@ -462,6 +494,10 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   file(SHA256 "${ordinary_root}/build/library/results.csv" actual_report)
   if(NOT actual_report STREQUAL old_report)
     message(FATAL_ERROR "ordinary mode replaced the previous report after an invalid BIN")
+  endif()
+  file(SHA256 "${ordinary_root}/build/library/dat-summary.txt" actual_inventory)
+  if(NOT actual_inventory STREQUAL old_inventory)
+    message(FATAL_ERROR "ordinary mode replaced the previous DAT summary after an invalid BIN")
   endif()
   message(STATUS "library controls rejected unsafe configuration and joins without leaking or replacing results")
   return()
