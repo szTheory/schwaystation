@@ -18,6 +18,39 @@ static bool schway__host_cheats_zero_write(const schway__host_cheat_write *write
     return write->offset == 0u && write->value == 0u && write->width == 0u;
 }
 
+static bool schway__host_cheats_zero_bytes(const uint8_t *bytes, size_t size)
+{
+    for (size_t i = 0u; i < size; i++) {
+        if (bytes[i] != 0u) return false;
+    }
+    return true;
+}
+
+static void schway__host_cheats_put_u16(uint8_t *bytes, uint16_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8u);
+}
+
+static void schway__host_cheats_put_u32(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8u);
+    bytes[2] = (uint8_t)(value >> 16u);
+    bytes[3] = (uint8_t)(value >> 24u);
+}
+
+static uint16_t schway__host_cheats_get_u16(const uint8_t *bytes)
+{
+    return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8u));
+}
+
+static uint32_t schway__host_cheats_get_u32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) | ((uint32_t)bytes[2] << 16u) |
+           ((uint32_t)bytes[3] << 24u);
+}
+
 static bool schway__host_cheat_is_separator(char byte)
 {
     return byte == ' ' || byte == '\t' || byte == '\r' || byte == '\n' || byte == '\v' ||
@@ -178,17 +211,91 @@ bool schway__host_cheats_apply(const schway__host_cheats *cheats, schway *inst)
 bool schway__host_cheats_encode(const schway__host_cheats *cheats, uint8_t *bytes,
                                 size_t bytes_size)
 {
-    (void)cheats;
-    (void)bytes;
-    (void)bytes_size;
-    return false;
+    if (bytes == NULL || bytes_size != SCHWAY_HOST_CHEAT_SERIALIZED_SIZE ||
+        !schway__host_cheats_validate(cheats)) {
+        return false;
+    }
+
+    memset(bytes, 0, bytes_size);
+    memcpy(bytes, "SCHT", 4u);
+    bytes[4] = SCHWAY_HOST_CHEAT_FORMAT_VERSION;
+    schway__host_cheats_put_u16(bytes + 6u, (uint16_t)SCHWAY_HOST_CHEAT_ENTRY_COUNT);
+    schway__host_cheats_put_u32(bytes + 8u, cheats->total_lines);
+
+    size_t entry_position = 16u;
+    for (uint32_t index = 0u; index < SCHWAY_HOST_CHEAT_ENTRY_COUNT; index++) {
+        const schway__host_cheat_entry *entry = &cheats->entries[index];
+        bytes[entry_position] = entry->enabled;
+        schway__host_cheats_put_u32(bytes + entry_position + 4u, entry->line_count);
+        size_t line_position = entry_position + 8u;
+        for (uint32_t line = 0u; line < SCHWAY_HOST_CHEAT_LINES_PER_ENTRY; line++) {
+            if (line < entry->line_count) {
+                const schway__host_cheat_write *write = &entry->lines[line];
+                bytes[line_position] = write->width;
+                schway__host_cheats_put_u32(bytes + line_position + 2u, write->offset);
+                schway__host_cheats_put_u16(bytes + line_position + 6u, write->value);
+            }
+            line_position += 8u;
+        }
+        entry_position += 8u + SCHWAY_HOST_CHEAT_LINES_PER_ENTRY * 8u;
+    }
+    return true;
 }
 
 bool schway__host_cheats_decode(schway__host_cheats *cheats, const uint8_t *bytes,
                                 size_t bytes_size)
 {
-    (void)cheats;
-    (void)bytes;
-    (void)bytes_size;
-    return false;
+    if (cheats == NULL || bytes == NULL || bytes_size != SCHWAY_HOST_CHEAT_SERIALIZED_SIZE ||
+        memcmp(bytes, "SCHT", 4u) != 0 || bytes[4] != SCHWAY_HOST_CHEAT_FORMAT_VERSION ||
+        bytes[5] != 0u || schway__host_cheats_get_u16(bytes + 6u) !=
+                                  SCHWAY_HOST_CHEAT_ENTRY_COUNT ||
+        !schway__host_cheats_zero_bytes(bytes + 12u, 4u)) {
+        return false;
+    }
+
+    const uint32_t encoded_total = schway__host_cheats_get_u32(bytes + 8u);
+    if (encoded_total > SCHWAY_HOST_CHEAT_TOTAL_LINES) return false;
+
+    schway__host_cheats candidate;
+    schway__host_cheats_reset(&candidate);
+    uint32_t total_lines = 0u;
+    size_t entry_position = 16u;
+    for (uint32_t index = 0u; index < SCHWAY_HOST_CHEAT_ENTRY_COUNT; index++) {
+        schway__host_cheat_entry *entry = &candidate.entries[index];
+        const uint8_t *entry_bytes = bytes + entry_position;
+        if (entry_bytes[0] > 1u || !schway__host_cheats_zero_bytes(entry_bytes + 1u, 3u)) {
+            return false;
+        }
+        const uint32_t line_count = schway__host_cheats_get_u32(entry_bytes + 4u);
+        if (line_count > SCHWAY_HOST_CHEAT_LINES_PER_ENTRY ||
+            line_count > SCHWAY_HOST_CHEAT_TOTAL_LINES - total_lines) {
+            return false;
+        }
+        entry->enabled = entry_bytes[0];
+        entry->line_count = line_count;
+        total_lines += line_count;
+
+        size_t line_position = entry_position + 8u;
+        for (uint32_t line = 0u; line < SCHWAY_HOST_CHEAT_LINES_PER_ENTRY; line++) {
+            const uint8_t *line_bytes = bytes + line_position;
+            if (line < line_count) {
+                schway__host_cheat_write *write = &entry->lines[line];
+                if (line_bytes[1] != 0u) return false;
+                write->width = line_bytes[0];
+                write->offset = schway__host_cheats_get_u32(line_bytes + 2u);
+                write->value = schway__host_cheats_get_u16(line_bytes + 6u);
+                if (!schway__host_cheat_write_valid(write)) return false;
+            } else if (!schway__host_cheats_zero_bytes(line_bytes, 8u)) {
+                return false;
+            }
+            line_position += 8u;
+        }
+        entry_position += 8u + SCHWAY_HOST_CHEAT_LINES_PER_ENTRY * 8u;
+    }
+
+    if (total_lines != encoded_total) return false;
+    candidate.total_lines = total_lines;
+    if (!schway__host_cheats_validate(&candidate)) return false;
+    *cheats = candidate;
+    return true;
 }

@@ -32,3 +32,16 @@ The shared table has 32 indexed entries, 64 writes per entry, 1,024 input bytes 
 writes total across all entries. Its deterministic order is ascending entry index, then text order. Overlapping
 writes therefore use last-write-wins behavior. Disabled entries are retained but skipped during application;
 disabling an entry does not undo writes already made to RAM. Reset clears every entry and its enabled state.
+
+## Canonical host state
+
+The shared table encodes to exactly 16,656 bytes, independent of C structure padding. It starts with the four
+bytes `SCHT`, format version 1, and the fixed entry count; all multi-byte fields are little-endian. The header
+stores the total write count. Each of the 32 entries stores its enabled flag and write count, followed by 64
+fixed eight-byte record slots. A used record stores width, physical offset, and value. Reserved fields and
+unused records are zero.
+
+Decoding checks the exact size, version, counts, reserved bytes, enabled flags, record widths, RAM ranges, and
+alignment in a candidate table. It publishes the candidate only after the full table is valid, so malformed
+state leaves the current table unchanged. The format captures normalized text results, entry ordering, and
+enabled state; it does not include or change RAM contents.
