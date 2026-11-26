@@ -2,7 +2,7 @@
 
 `schwaystation-run --library-inventory DAT` parses a Sony PlayStation DAT and prints public aggregate counts. It counts every game occurrence, including entries with no serial and every occurrence of a repeated serial. `duplicate_serial_entries` counts all entries belonging to repeated-serial groups. These counts describe the DAT only; they do not establish that a title, disc, or console is playable.
 
-Use the pinned library source from `.planning/preparation/DECISIONS.md` (D-06) to reproduce the project inventory. The runner reports the source as pinned only when the input file's SHA-256 matches the pinned DAT digest; other files are labeled `unverified`.
+Use the pinned library source from `.planning/preparation/DECISIONS.md` (D-06) to reproduce the project inventory. The runner reports the source as pinned only when the input file's SHA-256 matches the pinned DAT digest; other files are labeled `unverified`. The local library route verifies the digest of both newly downloaded and already cached DAT files before parsing, then writes aggregate counts to `build/library/dat-summary.txt` beside the sparse `results.csv` ledger. The summary contains no title or serial rows. Inventory is not playability evidence.
 
 ```sh
 cmake --build --preset ci --target schwaystation-run schwaystation-test-library
@@ -11,6 +11,8 @@ build/ci/schwaystation-run --library-inventory 'path/to/Sony - PlayStation.dat'
 ```
 
 The project does not redistribute the DAT or a generated title table. Keep the source file local; public output contains only the source digest and aggregate counts.
+
+The committed aggregate for the pinned source, its attribution and the exact reproduction evidence are in [`tests/compat/dat-summary.txt`](../tests/compat/dat-summary.txt). It records all unmeasured occurrences as unknown; inventory does not establish playability.
 
 ## Private occurrence report
 
