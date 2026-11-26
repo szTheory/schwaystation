@@ -475,6 +475,7 @@ static int run_ppf3(const char *root)
     patch_size = add_ppf3_record(patch, patch_size,
                                  (uint64_t)(PATCH_SOURCE_BYTES - 1u),
                                  last, (uint8_t)sizeof last, NULL, 0u);
+    memcpy(expected, raw, PATCH_SOURCE_BYTES);
     expected[PATCH_SOURCE_BYTES - 1u] = last[0];
     CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF3,
                                  patch, patch_size, source_sha, &candidate,
