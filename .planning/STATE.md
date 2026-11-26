@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Phase 16 wave 2 complete; wave 3 plans 16-03 and 16-08 are ready
-last_updated: "2026-11-26T01:31:54Z"
+stopped_at: Phase 16 wave 3 complete; wave 4 plans 16-04, 16-06 and 16-09 are ready
+last_updated: "2026-11-26T02:11:43Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 plans 16-02 and 16-07 complete; wave 3 ready
-state_head: ffa29d5eeb9658427cdd0c0aa1054851b773bcd3
+last_activity_desc: Phase 16 plans 16-03 and 16-08 complete; wave 4 ready
+state_head: 11d982442fd3e03ff999e19e3e1225fe020a9d11
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 110
-  percent: 88
+  completed_plans: 112
+  percent: 90
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 18
 Status: Ready to execute
-Last activity: 2026-11-26 — Phase 16 wave 2 complete; wave 3 ready
-Progress: [█████████░] 88% (9/10 v2.0 phases released; Phase 16 has 3/18 plans complete and wave 3 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Last activity: 2026-11-26 — Phase 16 wave 3 complete; wave 4 ready
+Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 5/18 plans complete and wave 4 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -50,6 +50,14 @@ Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. The inde
 Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-02 took 16m41s; Plan 16-07 took 34m. Their isolated worktrees started from `1e5a01c`, completed with clean status, passed summary and commit-scope checks, and merged as two disjoint commits. Plan 16-02 added checked API v11 physical-RAM writes while preserving released v9/v10 callers; its four ABI/API selectors passed. Plan 16-07 added identity-bound PPF1 loading and a sparse overlay for one exact raw CUE track mapping; its three patch selectors, runner/libretro consumer builds, and `disc.image.iso_sector` passed. Its Task 2 regression was already green after Task 1; source inspection confirmed the implementation already met the behavior, so the test and documentation were retained and the ordering deviation recorded without redundant production changes.
 
 After merge, `git diff --check 1e5a01c..HEAD`, both affected sorted test inventories, `cmake --preset ci`, and a unique-selector preflight passed. The combined API, PPF1, and disc-image targets plus `schwaystation-run` and `schwaystation_libretro` built successfully; the eight focused selectors passed 8/8. The broad workflow remains for final phase verification after source review. No hosted CI, Act, or Docker work was needed at this wave boundary. Current plan is 3; wave 3 plans 16-03 and 16-08 are ready.
+
+### Phase 16 wave 3 execution (2026-11-26)
+
+Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-03 took 31 minutes; Plan 16-08 took 20m23s. Plan 16-03 added the bounded shared `30`/`80` cheat parser and checked RAM consumer with a fixed 16,656-byte canonical state format. Plan 16-08 added PPF2 source-size/block checks and PPF3 BIN, block, 64-bit-record, undo, and bounded FileID validation. The PPF malformed-input tests were already green from Task 1; the executor retained the regression coverage and documented the overlap without redundant production changes. Plan 16-03's measured 31-minute closeout exceeded the 30-minute planning threshold by one minute; its implementation and focused checks had completed before summary and hook closeout extended elapsed time.
+
+Both isolated worktrees started at `542580e`, ended clean, and had resolved commit-scope checks. `verify-summary` produced heuristic false positives: it treated Plan 16-03's documented test failure as a failed self-check and Plan 16-08's inventory-check command as a created file. Both summaries explicitly report `Self-Check: PASSED`; direct inspection confirmed the declared files exist, their task commits and checks match the records, and no changes were needed to the artifacts.
+
+After merge, `git diff --check 542580e..HEAD`, the ABI/runner/disc inventory sorts, `cmake --preset ci`, and the 11-selector preflight passed. The cheat, API, PPF and documentation-budget targets plus runner and libretro consumers built successfully; all 11 focused selectors passed. The broad workflow remains for final phase verification after code review. No hosted CI, Act, or Docker work was needed at this wave boundary. Current plan is 4; wave 4 plans 16-04, 16-06 and 16-09 are ready.
 
 ### Phase 15 discussion (2026-11-24)
 
