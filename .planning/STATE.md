@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 1
+current_plan: 2
 status: executing
-stopped_at: Phase 16 plans passed independent verification; execution ready
-last_updated: "2026-11-25T23:58:21.407Z"
-last_activity: 2026-11-25
-last_activity_desc: Phase 16 execution started
-state_head: 3759f75bde60bf562c839ffb0115ebbc195c25f3
+stopped_at: Phase 16 Plan 16-01 complete; wave 2 plans 16-02 and 16-07 are ready
+last_updated: "2026-11-26T00:40:25.405Z"
+last_activity: 2026-11-26
+last_activity_desc: Phase 16 Plan 16-01 complete; wave 2 ready
+state_head: 7126f6334cdb7e6b89c49acfca6d94ec2fee4d56
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 107
+  completed_plans: 108
   percent: 86
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 1
+Current Plan: 2
 Total Plans in Phase: 18
-Status: Executing Phase 16
+Status: Ready to execute
 Last activity: 2026-11-25 — Phase 16 execution started
-Progress: [█████████░] 86% (9/10 v2.0 phases released; Phase 16 has 18 implementation plans awaiting plan checks and execution. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Progress: [█████████░] 86% (9/10 v2.0 phases released; Phase 16 has 1/18 plans complete and wave 2 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -2632,6 +2632,10 @@ Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
 
 Phase 16 execution started on `phase/16-patches-cheats-compatibility`. Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); GSD executor `codex exec` pinned to gpt-6-luna xhigh. Parallelization and GSD worktrees are enabled to follow the project’s disjoint-wave execution rule.
+
+Plan 16-01 completed on 2026-11-26 in 17 minutes. Runtime/model: Codex/OpenGSD 1.23.0; typed `gsd-executor` gpt-6-luna xhigh. The released API-v10 caller and exact patch, cheat, compatibility and fuzz selector graph are committed; the six intentional fail-first stubs are tracked for their owning plans. `git diff --check HEAD`, all six inventory sort checks, `cmake --preset ci`, the four target build, and the focused `abi.api_v10` plus `runner.cheats.memory_read` CTest selection exited 0. The 24-selector preflight exited 0 after accounting for CTest’s `compat.features.preflight` fixture dependency. GSD worktree cleanup/merge exited 0. The broad workflow remains for the phase closeout because Plan 01 deliberately registers gating selectors that their later implementation plans make pass; no test is removed or made non-gating.
+
+The GSD `verify-summary` helper exited 0 but returned `passed: false`: its matcher treated `## Verification Evidence` as the self-check section and then classified the later `fail-first` notes as a failure. The actual `## Self-Check: PASSED`, first two created files and plan-scoped commits were verified. This is a validator false positive, not an implementation failure. Process-spawned `codex exec` could not initialize its in-process app-server in this environment (`Operation not permitted`), so the plan ran through the typed GSD executor in a GSD-created worktree. Continue wave dispatch with typed executors and explicit worktree paths. Next: plans 16-02 and 16-07.
 
 Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
 

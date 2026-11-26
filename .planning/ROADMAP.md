@@ -389,10 +389,10 @@ Plans:
   3. The generated compatibility report accounts for all 13,407 entries at the pinned, licensed DAT revision and links supported pass and fail results to evidence. Untested entries and combinations remain explicitly unknown.
   4. `is_experimental` is false only when the committed required-capability matrix passes every row, with zero unknown or failing required rows. It stays true when that evidence is missing or fails. The matrix covers the specified boot-to-play disc families, region and board tuples, peripheral classes, card persistence, patches and cheats. DAT-wide playability is outside that claim.
 
-**Plans**: 18 plans
+**Plans**: 1/18 plans executed
 
 Plans:
-- [ ] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
+- [x] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
 - [ ] 16-02-PLAN.md — Register api_v11 and expose checked RAM writes
 - [ ] 16-03-PLAN.md — Wire shared host cheats and complete the bounded parser and canonical bytes
 - [ ] 16-04-PLAN.md — Apply GameShark entries through libretro callbacks
@@ -428,4 +428,4 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
-| 16. Patches, cheats and compatibility evidence | 0/18 | Planning | - |
+| 16. Patches, cheats and compatibility evidence | 1/18 | Planning | - |
