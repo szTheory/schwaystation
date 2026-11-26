@@ -14,6 +14,12 @@ Every version rejects empty records, out-of-source ranges, malformed tails, and 
 
 The limits are 16 MiB for patch bytes and 262,144 records. Records are resolved in file order while the candidate is built, so a later record wins for every byte it overlaps. Reads use the resulting sparse overlay; they do not scan the input record stream.
 
+## BPS1
+
+BPS1 supports SourceRead, TargetRead, SourceCopy and TargetCopy, including overlapping TargetCopy from bytes already produced. The complete target is staged and checked before it can replace the current overlay. Source, target and patch CRC-32 values cover the complete source, complete target and all patch bytes before the trailing patch-CRC field, respectively. CRCs detect accidental corruption but do not provide cryptographic identity. A caller may also supply the complete source SHA-256 when stronger source binding is needed; BPS's native checks remain required. Format details follow the [BPS File Format Specification](https://floating.muncher.se/byuu/bps/bps_spec.html).
+
+BPS source and target images are limited to 1 GiB, patch bytes to 64 MiB and metadata to 1 MiB. The target byte count must equal the source byte count, preserving raw-sector geometry. Targets up to 1 MiB use memory; larger targets use a private temporary file. If staging or I/O fails, the candidate is rejected and its temporary storage is closed; the source and any active overlay remain unchanged.
+
 ## Supported raw track mapping
 
 The patch source must be exactly one CUE `FILE` with one data `TRACK`, using `MODE1/2352` or `MODE2/2352`. `INDEX 01` must begin at file offset zero. The provider rejects `INDEX 00`, any physical or virtual pregap, additional indexes or tracks, playlists, cooked 2048-byte sectors, and compressed or provider-specific images.
