@@ -64,3 +64,18 @@ text order, so the last overlapping write wins. Disabling an entry stops its fut
 already written. `retro_cheat_reset` clears all entries; `retro_reset` preserves them. Unload, deinit, and a new
 content load clear the configuration. The `.info` `cheats` claim remains false until the state tests and claim
 guard cover this behavior.
+
+## Serialized state
+
+`retro_serialize_size` includes a 32-byte host header, the fixed 16,656-byte canonical cheat table, and the
+existing core state. The size is independent of the configured cheat entries. Envelope version 1 starts with
+`SCHL`, followed by little-endian version, header size, total size, core-state size, cheat-table size, and a
+CRC-32/ISO-HDLC checksum. Header bytes 24–31 are reserved and must be zero. The checksum covers the complete
+envelope with its own four-byte field treated as zero; it detects accidental corruption and is not an
+authentication mechanism.
+
+The payload contains the `SCHT` version 1 cheat table followed by the unchanged core-state bytes. Loading
+requires the exact total and component lengths, valid reserved fields, a matching checksum, and a fully valid
+cheat table before the core state is considered. The host replaces its current cheat configuration only after
+the core accepts its state, so a rejected envelope leaves both states unchanged. Older raw core-state buffers and
+unknown envelope versions are rejected. This envelope does not change the `.info` save-state metadata claim.
