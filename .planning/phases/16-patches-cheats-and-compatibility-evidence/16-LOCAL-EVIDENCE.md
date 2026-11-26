@@ -98,4 +98,18 @@ The first push of the stack/hash correction, CI run [45897157925](https://github
 
 The Phase 16-approved 4,694 ceiling is now consistent across both hosted preflights, the hygiene budget test and the workflow-registration assertions. The local line-budget producer measured 4,694 lines at the ceiling (exit 0). The action-pin check, timeout-comment check and hosted workflow wiring check each exited 0. `act --dryrun` also exited 0 for the CI `changes` job on `pull_request` and the Nightly `fuzz` job on `workflow_dispatch`, using `ubuntu:26.04` as an explicit dry-run mapping and a task-local action cache. These dry runs verified job/step routing only; Windows, ARM64, macOS, GitHub-hosted permissions and hosted integrations still require the actual CI run.
 
-The next changed-head hosted run remains required for the corrected preflight, Windows matrix, full WASI test job and exact hosted WASM size.
+## BE32 inventory emulator follow-up
+
+CI run [45897859856](https://github.com/szTheory/schwaystation/actions/runs/45897859856) ran on `0cfd7b67351c4df1d11c3e91b49d023771ce6a04` and completed in 31m16s. Its Windows x64/ARM64, WASI, ASan, Linux, macOS, RetroArch, performance, hygiene, and rehearsal jobs passed. The BE32 job failed `compat.inventory.accounting`: its script-mode test invoked `schwaystation-run` directly, so the shell tried to parse the big-endian ELF instead of running it through `qemu-ppc`. BE32 completed in 26m44s; the failed CTest run took 1,459.10s. The aggregate CI job failed, and dependent hash-equality did not run.
+
+Nightly run [45897859841](https://github.com/szTheory/schwaystation/actions/runs/45897859841) passed in 15m31s. Vectors, all four benchmark legs, and all 13 bounded fuzz campaigns passed; fuzz was the critical path at 15m20s. Its performance values remained 1,620,381 testcard and 138,406,446 GPU-motion instructions per frame.
+
+The WASI size check passed within the active 1,014,617–1,014,665-byte interval. The hosted CMake quality step does not print a bounded successful measurement; the pinned local producer remains the exact available size at 1,014,617 bytes, so no quality bound changed. ASan completed successfully in 30m14s. The full CI critical path was the BE32 job.
+
+The inventory tests now pass the configured `CMAKE_CROSSCOMPILING_EMULATOR` through their existing script-mode `EMULATOR` transport. Local checks exited 0:
+
+- `cmake --build --preset ci --target schwaystation-run schwaystation-test-library && ctest --preset ci --no-tests=error -R '^compat[.]inventory[.](accounting|controls)$' --output-on-failure` — fixture preflight and both inventory tests passed.
+- `cmake -DSOURCE_ROOT=. -DWORK_ROOT=build/ci -DRUN=build/ci/schwaystation-run '-DEMULATOR=/usr/bin/env|--' -DTEST_BINARY=build/ci/tests/schwaystation-test-library -DCASE=compat_inventory_accounting -P tests/compat/tests.cmake` and the corresponding `compat_inventory_controls` command — both script-mode cases passed with a multi-part emulator value.
+- `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4694 -P tests/cmake/line_budget.cmake`, inventory selector preflight, and `git diff --check` — passed; the repository-check total remains at the approved 4,694-line ceiling.
+
+A changed-head CI run is required to validate the BE32 emulator path and downstream hash comparison.

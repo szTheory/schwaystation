@@ -1350,7 +1350,7 @@ game (
 )
 ]=])
   file(SHA256 "${dat}" expected_sha256)
-  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "inventory accounting command failed (${rc}): ${error}")
@@ -1395,7 +1395,7 @@ game (
  serial "SLES-00001"
 )
 ]=])
-  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
     RESULT_VARIABLE utf8_rc OUTPUT_VARIABLE utf8_output ERROR_VARIABLE utf8_error)
   if(NOT utf8_rc STREQUAL "0")
     message(FATAL_ERROR "inventory rejected a valid encoded serial value: ${utf8_error}")
@@ -1418,7 +1418,7 @@ game (
  serial "SLUS-00001"
 )
 ]=])
-  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(rc STREQUAL "0")
     message(FATAL_ERROR "inventory accepted duplicate serial fields with an empty first value")
@@ -1476,7 +1476,7 @@ game (
 )
 ]=])
   set(report "${root}/occurrences.csv")
-  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
       --library-inventory-output "${report}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(NOT rc STREQUAL "0")
@@ -1538,7 +1538,7 @@ game (
       set(content_sha_2 "${content_sha256}")
     endif()
   endforeach()
-  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
       --library-inventory-output "${report}" --library-evidence "${evidence}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(NOT rc STREQUAL "0")
@@ -1559,11 +1559,11 @@ game (
   function(inventory_expect_rejection input private_report evidence_path)
     file(SHA256 "${private_report}" before)
     if("${evidence_path}" STREQUAL "")
-      execute_process(COMMAND "${RUN}" --library-inventory "${input}"
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${input}"
           --library-inventory-output "${private_report}"
         RESULT_VARIABLE rejected_rc OUTPUT_VARIABLE rejected_out ERROR_VARIABLE rejected_err)
     else()
-      execute_process(COMMAND "${RUN}" --library-inventory "${input}"
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${input}"
           --library-inventory-output "${private_report}" --library-evidence "${evidence_path}"
         RESULT_VARIABLE rejected_rc OUTPUT_VARIABLE rejected_out ERROR_VARIABLE rejected_err)
     endif()
@@ -1617,7 +1617,7 @@ game (
 
   set(escaped_report "${root}/../compat-inventory-escape.csv")
   file(REMOVE "${escaped_report}")
-  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
       --library-inventory-output "${escaped_report}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(rc STREQUAL "0" OR NOT output STREQUAL "" OR EXISTS "${escaped_report}")
@@ -1763,6 +1763,7 @@ foreach(case accounting controls)
   schway_add_test(NAME compat.inventory.${case}
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
       -DRUN=$<TARGET_FILE:schwaystation-run>
+      "-DEMULATOR=${schway__probe_emulator}"
       -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-library>
       -DCASE=compat_inventory_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
     LABELS compat portable TIMEOUT 30)
