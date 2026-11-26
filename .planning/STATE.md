@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Phase 16 Plan 16-01 complete; wave 2 plans 16-02 and 16-07 are ready
-last_updated: "2026-11-26T00:40:25.405Z"
+stopped_at: Phase 16 wave 2 complete; wave 3 plans 16-03 and 16-08 are ready
+last_updated: "2026-11-26T01:31:54Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 Plan 16-01 complete; wave 2 ready
-state_head: 7126f6334cdb7e6b89c49acfca6d94ec2fee4d56
+last_activity_desc: Phase 16 plans 16-02 and 16-07 complete; wave 3 ready
+state_head: ffa29d5eeb9658427cdd0c0aa1054851b773bcd3
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 108
-  percent: 86
+  completed_plans: 110
+  percent: 88
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 18
 Status: Ready to execute
-Last activity: 2026-11-25 — Phase 16 execution started
-Progress: [█████████░] 86% (9/10 v2.0 phases released; Phase 16 has 1/18 plans complete and wave 2 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Last activity: 2026-11-26 — Phase 16 wave 2 complete; wave 3 ready
+Progress: [█████████░] 88% (9/10 v2.0 phases released; Phase 16 has 3/18 plans complete and wave 3 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -44,6 +44,12 @@ Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. Eighteen
 ### Phase 16 plan-check revision (2026-11-25)
 
 Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. The independent check found that Plan 01's 15-file scope reached its blocker threshold and the research retained three open questions. Plan 01 now uses the existing api_v10 baseline and modifies 12 files while preserving the CMake skeleton and all six inventory checks; the plan and audit state the AGENTS.md rule 14 first-plan scope exception. A follow-up scope warning moves shared host-cheat wiring/test ownership from Plan 02 into the existing parser Plan 03. Plan 02 now has eight files in two API-only tasks; Plan 03 has five files in three tasks. Plan 02 creates/registers api_v11, adds the public write and updates only older callers' exact-current-version assertions. Every task remains at or below five files, all wave/dependency order is preserved, and the research records resolved source identity, raw-layout and BPS-staging choices consistent with the plans and current context. No application, build or behavior tests ran in this revision; independent recheck precedes execution.
+
+### Phase 16 wave 2 execution (2026-11-26)
+
+Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-02 took 16m41s; Plan 16-07 took 34m. Their isolated worktrees started from `1e5a01c`, completed with clean status, passed summary and commit-scope checks, and merged as two disjoint commits. Plan 16-02 added checked API v11 physical-RAM writes while preserving released v9/v10 callers; its four ABI/API selectors passed. Plan 16-07 added identity-bound PPF1 loading and a sparse overlay for one exact raw CUE track mapping; its three patch selectors, runner/libretro consumer builds, and `disc.image.iso_sector` passed. Its Task 2 regression was already green after Task 1; source inspection confirmed the implementation already met the behavior, so the test and documentation were retained and the ordering deviation recorded without redundant production changes.
+
+After merge, `git diff --check 1e5a01c..HEAD`, both affected sorted test inventories, `cmake --preset ci`, and a unique-selector preflight passed. The combined API, PPF1, and disc-image targets plus `schwaystation-run` and `schwaystation_libretro` built successfully; the eight focused selectors passed 8/8. The broad workflow remains for final phase verification after source review. No hosted CI, Act, or Docker work was needed at this wave boundary. Current plan is 3; wave 3 plans 16-03 and 16-08 are ready.
 
 ### Phase 15 discussion (2026-11-24)
 
