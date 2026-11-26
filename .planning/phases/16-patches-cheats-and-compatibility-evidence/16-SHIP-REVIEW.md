@@ -33,3 +33,9 @@ Reviewed the follow-up corrections based on `25ba6bb749c968018e23618df35951a12c0
 - `tests/disc/patch.c` — the malformed two-byte record now has two readable fixture bytes, so the test reaches the intended source-bound rejection without an out-of-bounds test read. The seven focused cases passed in normal and ASan builds.
 
 No correctness, security, or maintainability findings remain in this correction. Windows compilation and the complete CI/Nightly results remain pending a fresh hosted run. Commands and current hosted outcomes are recorded in `16-LOCAL-EVIDENCE.md`.
+
+## MSVC inventory file-open correction review
+
+Reviewed `host/dat_inventory.c` after CI run [45888744986](https://github.com/szTheory/schwaystation/actions/runs/45888744986) exposed MSVC C4996 for `fopen()` in the private report writer. The new helper uses `fopen_s()` under MSVC for both DAT reads and exclusive report creation, restores its error code to `errno` for the existing `EEXIST` retry, and leaves other C libraries on `fopen()`. The compatibility inventory tests passed after this change. Microsoft's CRT documentation confirms `fopen_s()` accepts the C11 exclusive-create `x` mode: [Microsoft Learn](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fopen-s-wfopen-s?view=msvc-170).
+
+No findings remain in this correction. The hosted Windows build and full CI/Nightly validation must run again on the next head.

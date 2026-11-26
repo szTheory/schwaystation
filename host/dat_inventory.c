@@ -73,10 +73,25 @@ static void schway__dat_hash_hex(const unsigned char *bytes, size_t length, char
     schway__sha256_hex(digest, output);
 }
 
+static FILE *schway__dat_open_file(const char *path, const char *mode)
+{
+#if defined(_MSC_VER)
+    FILE *file = NULL;
+    int open_error = fopen_s(&file, path, mode);
+    if (open_error != 0) {
+        errno = open_error;
+        return NULL;
+    }
+    return file;
+#else
+    return fopen(path, mode);
+#endif
+}
+
 static int schway__dat_read_file(const char *path, size_t limit,
                                  unsigned char **bytes_out, size_t *length_out)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__dat_open_file(path, "rb");
     if (file == NULL) return -1;
     if (fseek(file, 0L, SEEK_END) != 0) {
         (void)fclose(file);
@@ -551,7 +566,7 @@ static schway__dat_inventory_status schway__dat_write_private(
     for (unsigned attempt = 0u; attempt < 16u; attempt++) {
         int written = snprintf(temporary, sizeof temporary, "%s.tmp.%u", path, attempt);
         if (written < 0 || (size_t)written >= sizeof temporary) return SCHWAY__DAT_INVENTORY_OUTPUT;
-        file = fopen(temporary, "wbx");
+        file = schway__dat_open_file(temporary, "wbx");
         if (file != NULL) break;
         if (errno != EEXIST) return SCHWAY__DAT_INVENTORY_OUTPUT;
     }
