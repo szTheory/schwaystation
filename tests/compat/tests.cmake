@@ -1644,11 +1644,9 @@ game (
   return()
 endif()
 
-# These script selectors are part of the compatibility contract before their
-# fresh-result implementations land in later plans.
-if(CMAKE_SCRIPT_MODE_FILE AND CASE MATCHES
-    "^(compat_capabilities_coverage|compat_capabilities_results|compat_capabilities_claims)$")
-  message(FATAL_ERROR "compatibility evidence behavior is not implemented: ${CASE}")
+if(CMAKE_SCRIPT_MODE_FILE AND CASE MATCHES "^compat_capabilities_(coverage|results|claims)$")
+  include("${SOURCE_ROOT}/tests/cmake/capabilities_controls.cmake")
+  return()
 endif()
 
 add_executable(schwaystation-test-compat ${CMAKE_CURRENT_LIST_DIR}/compat_tests.c)
@@ -1790,6 +1788,7 @@ endforeach()
 foreach(case coverage results claims)
   schway_add_test(NAME compat.capabilities.${case}
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+      -DINFO_FILE=${PROJECT_BINARY_DIR}/libretro/schwaystation_libretro.info
       -DCASE=compat_capabilities_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
     LABELS compat portable TIMEOUT 30)
 endforeach()
