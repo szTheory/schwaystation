@@ -137,7 +137,59 @@ with open(sys.argv[1], "wb") as output:
         "exit ${excess_rc}\n${excess_out}${excess_err}")
     endif()
   elseif(CASE STREQUAL "cheats_hash")
-    message(FATAL_ERROR "runner cheat state hashing is not implemented")
+    if(NOT DEFINED OUT OR "${OUT}" STREQUAL "")
+      message(FATAL_ERROR "runner cheat hash case requires OUT")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(cheat_state result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state ${ARGN}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ${digits}\n$")
+        message(FATAL_ERROR "runner cheat hash ${ARGN}: expected exit 0 and one state hash, got ${rc}\n${out}${err}")
+      endif()
+      string(REGEX MATCH "state sha256 ([0-9a-f]+)" state_line "${out}")
+      set(${result_name} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    endfunction()
+
+    cheat_state(no_cheat)
+    cheat_state(no_cheat_repeat)
+    cheat_state(normalized_upper --cheat "30000100 00A5")
+    cheat_state(normalized_lower --cheat "30000100+00a5")
+    cheat_state(single_entry --cheat "30000100 00A5")
+    cheat_state(duplicate_entry --cheat "30000100 00A5" --cheat "30000100 00A5")
+    cheat_state(order_ab --cheat "30000100 00A5" --cheat "30000101 00B6")
+    cheat_state(order_ba --cheat "30000101 00B6" --cheat "30000100 00A5")
+    if(no_cheat STREQUAL normalized_upper OR
+       NOT no_cheat STREQUAL no_cheat_repeat OR
+       NOT normalized_upper STREQUAL normalized_lower OR
+       NOT single_entry STREQUAL normalized_upper OR
+       single_entry STREQUAL duplicate_entry OR
+       order_ab STREQUAL order_ba)
+      message(FATAL_ERROR "runner state hashes did not preserve no-cheat and normalized configuration identity:\n"
+        "no-cheat=${no_cheat} repeat=${no_cheat_repeat}\n"
+        "upper=${normalized_upper} lower=${normalized_lower} single=${single_entry} duplicate=${duplicate_entry}\n"
+        "A+B=${order_ab} B+A=${order_ba}")
+    endif()
+
+    set(rejected_png "${OUT}/runner-cheat-invalid-hash.png")
+    file(REMOVE "${rejected_png}")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --png "1:${rejected_png}"
+        --cheat "D0000100 00A5"
+      RESULT_VARIABLE invalid_rc OUTPUT_VARIABLE invalid_out ERROR_VARIABLE invalid_err)
+    string(TOLOWER "${invalid_out}${invalid_err}" invalid_output_lower)
+    if(NOT invalid_rc STREQUAL "2" OR invalid_out MATCHES "state sha256" OR
+       NOT invalid_output_lower MATCHES "(cheat|unsupported|unknown option)" OR EXISTS "${rejected_png}")
+      message(FATAL_ERROR "invalid cheat input produced state output or a file: exit ${invalid_rc}\n${invalid_out}${invalid_err}")
+    endif()
+
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${OUT}/unused.bin"
+        --disc "${OUT}/unused.cue" --hash-state
+      RESULT_VARIABLE disc_rc OUTPUT_VARIABLE disc_out ERROR_VARIABLE disc_err)
+    if(NOT disc_rc STREQUAL "2" OR
+       NOT "${disc_out}${disc_err}" MATCHES "--hash-state is unavailable with --disc")
+      message(FATAL_ERROR "runner accepted --hash-state with --disc: exit ${disc_rc}\n${disc_out}${disc_err}")
+    endif()
   elseif(CASE STREQUAL "patch_cli")
     message(FATAL_ERROR "runner patch CLI behavior is not implemented")
   elseif(CASE STREQUAL "boot_full")
@@ -2096,7 +2148,8 @@ schway_add_test(NAME runner.cheats.cli
     -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cheats -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 schway_add_test(NAME runner.cheats.hash
-  COMMAND ${runner_check} -DCASE=cheats_hash -P ${CMAKE_CURRENT_LIST_FILE}
+  COMMAND ${runner_check} -DCASE=cheats_hash -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cheats
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 schway_add_test(NAME runner.patch.cli
   COMMAND ${runner_check} -DCASE=patch_cli -P ${CMAKE_CURRENT_LIST_FILE}

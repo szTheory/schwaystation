@@ -45,3 +45,15 @@ Decoding checks the exact size, version, counts, reserved bytes, enabled flags, 
 alignment in a candidate table. It publishes the candidate only after the full table is valid, so malformed
 state leaves the current table unchanged. The format captures normalized text results, entry ordering, and
 enabled state; it does not include or change RAM contents.
+
+## Runner state hashes
+
+With `--hash-state` and no `--cheat` options, `schwaystation-run` keeps the existing hash: SHA-256 of the saved
+machine-state body after its 20-byte state header. When one or more `--cheat CODE` options are configured, the
+runner hashes that same body followed by the ASCII domain `schwaystation-run/cheat-state`, a one-byte domain
+version (`01`), and the 16,656-byte canonical table above. The table records enabled entries in command-line
+order, so normalized equivalent spellings produce the same hash, while different entry order or future writes
+produce different hashes even when the current RAM contents match.
+
+This hash covers the runner's saved machine state and configured cheat continuation. It does not identify patched
+disc media or replace a disc-patch identity. The runner continues to reject `--hash-state` with `--disc`.
