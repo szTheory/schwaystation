@@ -253,9 +253,9 @@ jobs:
             build/fuzz/tests/schwaystation-fuzz-exe-replay --write build/fuzz/corpus
             files=$(find build/fuzz/corpus -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')
             test "$files" -eq 42
-            subsystems=(cue cnf m3u cdrom chd mdec pbp ecm ccd sbi)
-            expected=(5 5 7 15 12 6 14 10 10 7)
-            max_lengths=(65536 4096 65536 16384 16384 262144 256 2101249 65536 65536)
+            subsystems=(cue cnf m3u cdrom chd mdec pbp ecm ccd sbi ppf cheat)
+            expected=(5 5 7 15 12 6 14 10 10 7 14 10)
+            max_lengths=(65536 4096 65536 16384 16384 262144 256 2101249 65536 65536 65536 2048)
           else
             subsystems=(pbp)
             expected=(14)
@@ -282,8 +282,19 @@ jobs:
               seed_cap=65536
               seed_fixtures=none
               seed_names=(valid truncated bad_header invalid_format invalid_bcd out_of_range record_bound)
+            elif [[ "$name" == ppf ]]; then
+              seed_cap=65536
+              seed_fixtures=generated-immutable-17x2352-byte-source
+              seed_names=(valid_ppf1 valid_ppf2 valid_ppf3 valid_bps unsupported_format ppf1_truncated ppf1_bounds ppf2_source_size ppf2_block_mismatch ppf3_block_mismatch ppf3_truncated_undo bps_bad_crc bps_geometry ppf1_identity_mismatch)
+            elif [[ "$name" == cheat ]]; then
+              seed_cap=1026
+              seed_fixtures=generated-in-memory-ram-instance
+              seed_names=(valid_single valid_byte_halfword empty unsupported_type misaligned_halfword out_of_range line_limit global_limit global_limit_exceeded text_limit)
             else
               continue
+            fi
+            if [[ "$name" == ppf || "$name" == cheat ]]; then
+              seed_output="$seed_output seed_count=$files file_cap=$seed_cap fixtures=$seed_fixtures"
             fi
             if [[ "$name" != sbi ]]; then
               [[ "$seed_output" == *"seed_count=${expected[$i]} file_cap=$seed_cap fixtures=$seed_fixtures"* ]]
@@ -294,6 +305,9 @@ jobs:
               seed_bytes=$(wc -c < "$seed_file" | tr -d ' ')
               test "$seed_bytes" -le "$seed_cap"
             done
+            if [[ "$name" == ppf || "$name" == cheat ]]; then
+              echo "$name max_len=${max_lengths[$i]} seed_names=${seed_names[*]}"
+            fi
           done
           if [[ "$PBP_ONLY" != 'true' ]]; then
             rc=0
