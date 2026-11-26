@@ -53,3 +53,14 @@ replacing playlist entries.
 
 The frontend owns file access. Keep the cue, its tracks, and any M3U playlist together at stable paths while a game is
 loaded.
+
+## GameShark cheats
+
+The core accepts the bounded unconditional `30` byte-write and `80` halfword-write subset through
+`retro_cheat_set`; see [the cheat syntax and limits](cheats.md). Accepted entries are replaced atomically, and an
+invalid replacement keeps the previous entry and does not touch RAM. Enabled entries apply once after the frame's
+options and input are prepared, immediately before core frame execution. Entries run by ascending index and then
+text order, so the last overlapping write wins. Disabling an entry stops its future writes without undoing bytes
+already written. `retro_cheat_reset` clears all entries; `retro_reset` preserves them. Unload, deinit, and a new
+content load clear the configuration. The `.info` `cheats` claim remains false until the state tests and claim
+guard cover this behavior.
