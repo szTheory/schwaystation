@@ -92,6 +92,15 @@ static size_t add_ppf1_record(uint8_t *patch, size_t position, uint32_t offset,
     return position + count;
 }
 
+static size_t begin_ppf1(uint8_t *patch, size_t capacity)
+{
+    if (capacity < 56u) return 0u;
+    memcpy(patch, "PPF10", 5u);
+    patch[5] = 0u;
+    memset(patch + 6u, ' ', 50u);
+    return 56u;
+}
+
 static size_t make_ppf1(uint8_t *patch, size_t capacity,
                         const uint8_t *source, size_t source_size,
                         uint8_t expected[PATCH_SOURCE_BYTES])
@@ -272,9 +281,129 @@ cleanup:
     return result;
 }
 
+static int run_atomic(const char *root)
+{
+    static const uint8_t first_value[] = {0xa5u};
+    static const uint8_t other_value[] = {0x5au};
+    static const uint8_t overlap_first[] = {0xb1u};
+    static const uint8_t overlap_last[] = {0xb2u};
+    static const uint8_t across[] = {0xc1u, 0xc2u, 0xc3u};
+    static const uint8_t across_later[] = {0xd1u};
+    schway_disc_image *image = NULL;
+    schway_disc_image *other_image = NULL;
+    schway_disc_patch_candidate *candidate = NULL;
+    schway_disc_patch_candidate *other_candidate = NULL;
+    schway_disc_patch_source source;
+    schway_disc_patch_source other_source;
+    schway_disc_patch_report report;
+    schway_disc_patch_error error;
+    const schway_disc *previous_reader = NULL;
+    uint8_t *raw = make_raw_source();
+    uint8_t first_expected[PATCH_SOURCE_BYTES];
+    uint8_t overlap_expected[PATCH_SOURCE_BYTES];
+    uint8_t actual[PATCH_SOURCE_BYTES];
+    uint8_t patch_first[64];
+    uint8_t patch_other[64];
+    uint8_t patch_overlap[96];
+    uint8_t source_sha[32];
+    char source_path[1024];
+    size_t patch_size;
+    int result = 0;
+    CHECK(raw != NULL, "allocate generated raw source");
+    CHECK(make_path(source_path, root, "atomic.bin"), "build primary source path");
+    CHECK(write_bytes(source_path, raw, PATCH_SOURCE_BYTES), "write primary raw source");
+    CHECK(make_path(source_path, root, "other.bin"), "build secondary source path");
+    CHECK(write_bytes(source_path, raw, PATCH_SOURCE_BYTES), "write secondary raw source");
+    CHECK(open_raw_cue(root, "atomic.cue", "atomic.bin", "MODE2/2352", NULL, &image),
+          "open primary source");
+    CHECK(open_raw_cue(root, "other.cue", "other.bin", "MODE2/2352", NULL,
+                       &other_image), "open equal-byte secondary source");
+    CHECK(schway_disc_image_patch_source(image, &source, &error) == SCHWAY_DISC_PATCH_OK &&
+          schway_disc_image_patch_source(other_image, &other_source, &error) ==
+              SCHWAY_DISC_PATCH_OK,
+          "obtain both exact raw-track mappings");
+    digest(raw, PATCH_SOURCE_BYTES, source_sha);
+
+    patch_size = begin_ppf1(patch_first, sizeof patch_first);
+    CHECK(patch_size != 0u, "start primary PPF1 fixture");
+    patch_size = add_ppf1_record(patch_first, patch_size, 1000u,
+                                 first_value, (uint8_t)sizeof first_value);
+    memcpy(first_expected, raw, PATCH_SOURCE_BYTES);
+    first_expected[1000u] = first_value[0];
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF1,
+                                 patch_first, patch_size, source_sha, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_OK,
+          "load initial candidate");
+    CHECK(schway_disc_image_patch_replace(image, &candidate, &error) ==
+              SCHWAY_DISC_PATCH_OK && candidate == NULL,
+          "attach initial overlay");
+    previous_reader = schway_disc_image_disc(image);
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, first_expected, PATCH_SOURCE_BYTES) == 0,
+          "observe initial overlay before replacement");
+
+    patch_size = begin_ppf1(patch_other, sizeof patch_other);
+    CHECK(patch_size != 0u, "start secondary PPF1 fixture");
+    patch_size = add_ppf1_record(patch_other, patch_size, 1000u,
+                                 other_value, (uint8_t)sizeof other_value);
+    CHECK(schway_disc_patch_load(&other_source, SCHWAY_DISC_PATCH_FORMAT_PPF1,
+                                 patch_other, patch_size, source_sha,
+                                 &other_candidate, &report, &error) ==
+              SCHWAY_DISC_PATCH_OK,
+          "load candidate for equal bytes from another image");
+    CHECK(schway_disc_image_patch_replace(image, &other_candidate, &error) ==
+              SCHWAY_DISC_PATCH_BAD_SOURCE && other_candidate != NULL,
+          "reject candidate bound to a different raw source");
+    CHECK(schway_disc_image_disc(image) == previous_reader &&
+          read_all_sectors(image, actual) &&
+          memcmp(actual, first_expected, PATCH_SOURCE_BYTES) == 0,
+          "failed replacement retains prior reader and overlay bytes");
+    schway_disc_patch_candidate_destroy(other_candidate);
+    other_candidate = NULL;
+
+    patch_size = begin_ppf1(patch_overlap, sizeof patch_overlap);
+    CHECK(patch_size != 0u, "start overlapping PPF1 fixture");
+    patch_size = add_ppf1_record(patch_overlap, patch_size, 1000u,
+                                 overlap_first, (uint8_t)sizeof overlap_first);
+    patch_size = add_ppf1_record(patch_overlap, patch_size, 1000u,
+                                 overlap_last, (uint8_t)sizeof overlap_last);
+    patch_size = add_ppf1_record(patch_overlap, patch_size,
+                                 PATCH_SECTOR_BYTES - 1u, across,
+                                 (uint8_t)sizeof across);
+    patch_size = add_ppf1_record(patch_overlap, patch_size, PATCH_SECTOR_BYTES,
+                                 across_later, (uint8_t)sizeof across_later);
+    memcpy(overlap_expected, raw, PATCH_SOURCE_BYTES);
+    overlap_expected[1000u] = overlap_last[0];
+    overlap_expected[PATCH_SECTOR_BYTES - 1u] = across[0];
+    overlap_expected[PATCH_SECTOR_BYTES] = across_later[0];
+    overlap_expected[PATCH_SECTOR_BYTES + 1u] = across[2];
+    CHECK(schway_disc_patch_load(&source, SCHWAY_DISC_PATCH_FORMAT_PPF1,
+                                 patch_overlap, patch_size, source_sha, &candidate,
+                                 &report, &error) == SCHWAY_DISC_PATCH_OK &&
+          report.records == 4u,
+          "load all ordered overlapping records into a replacement candidate");
+    CHECK(schway_disc_image_patch_replace(image, &candidate, &error) ==
+              SCHWAY_DISC_PATCH_OK && candidate == NULL,
+          "atomically attach valid replacement candidate");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, overlap_expected, PATCH_SOURCE_BYTES) == 0,
+          "later overlapping PPF1 records win across sector boundaries");
+    CHECK(read_all_sectors(image, actual) &&
+          memcmp(actual, overlap_expected, PATCH_SOURCE_BYTES) == 0,
+          "replacement sectors remain deterministic on repeated reads");
+cleanup:
+    schway_disc_patch_candidate_destroy(other_candidate);
+    schway_disc_patch_candidate_destroy(candidate);
+    schway_disc_image_close(other_image);
+    schway_disc_image_close(image);
+    free(raw);
+    return result;
+}
+
 static int known_case(const char *name)
 {
-    return strcmp(name, "mapping") == 0 || strcmp(name, "ppf1") == 0;
+    return strcmp(name, "mapping") == 0 || strcmp(name, "ppf1") == 0 ||
+           strcmp(name, "atomic") == 0;
 }
 
 int main(int argc, char **argv)
@@ -290,5 +419,6 @@ int main(int argc, char **argv)
     }
     test_case = argv[1];
     if (strcmp(test_case, "mapping") == 0) return run_mapping(argv[2]);
+    if (strcmp(test_case, "atomic") == 0) return run_atomic(argv[2]);
     return run_ppf1(argv[2]);
 }
