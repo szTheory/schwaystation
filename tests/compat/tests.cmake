@@ -1285,6 +1285,13 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_live")
   return()
 endif()
 
+# These script selectors are part of the compatibility contract before their
+# accounting and fresh-result implementations land in later plans.
+if(CMAKE_SCRIPT_MODE_FILE AND CASE MATCHES
+    "^(compat_inventory_accounting|compat_inventory_controls|compat_capabilities_coverage|compat_capabilities_results|compat_capabilities_claims)$")
+  message(FATAL_ERROR "compatibility evidence behavior is not implemented: ${CASE}")
+endif()
+
 add_executable(schwaystation-test-compat ${CMAKE_CURRENT_LIST_DIR}/compat_tests.c)
 set_target_properties(schwaystation-test-compat PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
@@ -1410,6 +1417,21 @@ schway_add_test(NAME compat.features.preflight
     -DCASE=compat_features_preflight -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 15)
 set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_features_preflight)
+
+# Fault prevented: DAT source occurrences disappearing from inventory totals,
+# or capability claims being derived from stale or incomplete evidence.
+foreach(case accounting controls)
+  schway_add_test(NAME compat.inventory.${case}
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+      -DCASE=compat_inventory_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+    LABELS compat portable TIMEOUT 30)
+endforeach()
+foreach(case coverage results claims)
+  schway_add_test(NAME compat.capabilities.${case}
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+      -DCASE=compat_capabilities_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+    LABELS compat portable TIMEOUT 30)
+endforeach()
 
 # Fault prevented: an uppercase board token bypasses the canonical tuple grammar.
 schway_add_test(NAME compat.features.controls

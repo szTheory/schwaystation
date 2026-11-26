@@ -33,7 +33,13 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   endfunction()
 
-  if(CASE STREQUAL "boot_full")
+  if(CASE STREQUAL "cheats_cli")
+    message(FATAL_ERROR "runner cheat CLI behavior is not implemented")
+  elseif(CASE STREQUAL "cheats_hash")
+    message(FATAL_ERROR "runner cheat state hashing is not implemented")
+  elseif(CASE STREQUAL "patch_cli")
+    message(FATAL_ERROR "runner patch CLI behavior is not implemented")
+  elseif(CASE STREQUAL "boot_full")
     foreach(var RUN BIOS FIXTURES)
       if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
         message(FATAL_ERROR "runner full-boot case requires ${var}")
@@ -1802,6 +1808,13 @@ set_target_properties(schwaystation-test-runner PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-runner)
 
+add_executable(schwaystation-test-cheats ${CMAKE_CURRENT_LIST_DIR}/cheats.c)
+target_link_libraries(schwaystation-test-cheats PRIVATE
+  schwaystation::schwaystation schwaystation-host)
+set_target_properties(schwaystation-test-cheats PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cheats)
+
 # The region precedence resolver is deliberately host-only and has no runner,
 # disc-image or core dependency, so the table test links only this module.
 add_executable(schwaystation-test-region-probe
@@ -1962,6 +1975,29 @@ schway_add_test(NAME runner.disc.unsupported
 # a test-card frame cannot show are not compared across lanes.
 schway_add_test(NAME runner.hash_state
   COMMAND ${runner_check} -DCASE=hash_state -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Released memory reads stay exercised while cheat parsing and ordering are
+# added by later phase plans.
+schway_add_test(NAME runner.cheats.memory_read
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-cheats> memory-read
+  LABELS portable runner TIMEOUT 30)
+foreach(case parser bounds order)
+  schway_add_test(NAME runner.cheats.${case}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-cheats> ${case}
+    LABELS portable runner TIMEOUT 30)
+endforeach()
+
+# Fault prevented: runner options or state hashes silently claim unsupported
+# patch and cheat behavior.
+schway_add_test(NAME runner.cheats.cli
+  COMMAND ${runner_check} -DCASE=cheats_cli -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+schway_add_test(NAME runner.cheats.hash
+  COMMAND ${runner_check} -DCASE=cheats_hash -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+schway_add_test(NAME runner.patch.cli
+  COMMAND ${runner_check} -DCASE=patch_cli -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: a movie applied after the frame latch, rejected after execution starts, or
