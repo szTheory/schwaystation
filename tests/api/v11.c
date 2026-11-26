@@ -88,7 +88,7 @@ _Static_assert(sizeof(((schway_input *)0)->controllers[0]) == 96u,
 _Static_assert(sizeof(((schway_input *)0)->controllers) == 192u,
                "API v9 eight-endpoint stride");
 _Static_assert(sizeof(schway_input) == 228u, "API v9 input size");
-_Static_assert(SCHWAY_API_VERSION >= 10, "API v10 remains available");
+_Static_assert(SCHWAY_API_VERSION == 11, "API v11 current version");
 _Static_assert(SCHWAY_INPUT_DEVICE_GUNCON == 7u, "API v10 GunCon identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_JUSTIFIER == 8u, "API v10 Justifier identifier");
 _Static_assert(SCHWAY_GUN_INPUT_VALID == 1u, "API v10 valid flag");
@@ -255,6 +255,7 @@ static void check_ram_write_api(schway *inst)
     expect_rejected_ram_write(inst, 1u, 2u, 0x1234u);
     expect_rejected_ram_write(inst, 0x200000u, 1u, 0x12u);
     expect_rejected_ram_write(inst, 0x1FFFFFu, 2u, 0x1234u);
+    expect_rejected_ram_write(inst, 0x1F801000u, 2u, 0x1234u);
     expect_rejected_ram_write(inst, UINT32_MAX, 2u, 0x1234u);
     CHECK_EQ_U64(instance_ticks(inst), ticks);
 }
