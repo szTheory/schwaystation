@@ -75,4 +75,3 @@ TODO052 is evaluated using both long tests. The timing/coverage analysis is in s
 ## Plan verification command conventions
 
 Commands inherit the working root-relative CMake/CTest pattern from Phase 15. New exact selectors are registered by Plan 01 before later use. Hygiene-only selectors run with the hygiene preset, and behavior selectors run with ci. `git diff --check HEAD` checks the in-progress tree intentionally. Every CTest selection uses exact names, checks enumeration first and specifies no-tests=error. The new selectors' pass condition remains each underlying assertion's exit status.
-
