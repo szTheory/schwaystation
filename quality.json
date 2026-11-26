@@ -4,7 +4,7 @@
     "gpu_motion": {"floor": 138406436, "ceiling": 138406436}
   },
   "size": {
-    "wasm": {"floor": 957144, "ceiling": 957144}
+    "wasm": {"floor": 1014609, "ceiling": 1014609}
   },
   "state": {
     "bytes": {"floor": 3757754, "ceiling": 3757754}
@@ -38,6 +38,7 @@
     "2026-11-25: Phase 15 before review-fix Cachegrind producer measured testcard at 1649769 and gpu_motion at 138440983 Ir/frame in an x86_64 Ubuntu 26.04 task container with GCC 15.2.0 and Valgrind 3.26.0. The same producer on merge base f08fc08 measured 1649208 and 138364065, so both relative increases were below the unchanged 100-basis-point limit.",
     "2026-11-25: Review fixes f30c7fd and d7ab38e changed GPU scheduling. The Phase 15 task-container Cachegrind run measured testcard 1649488 and gpu_motion 138450971 Ir/frame, but did not match the GitHub perf preset producer. The hosted perf job is authoritative for these bounds.",
     "2026-11-25: The hosted Phase 15 perf producer on PR run 45680980325, job 139441573300, measured testcard 1620373 and gpu_motion 138406436 Ir/frame. Its same-run merge-base measurements were 1620101 and 138319540, +1bp and +6bp; both remain inside the unchanged 100bp regression limit. The exact bounds track the hosted producer: https://github.com/szTheory/schwaystation/actions/runs/45680980325/job/139441573300.",
-    "2026-11-25: After the Phase 15 review fixes, the tests-enabled CHD-on Release WASI producer measured 957144 linked bytes with Clang/LLD 21.1.8 in an x86_64 Ubuntu 26.04 task container. The exact bound tracks this measured value; the hosted runner remains required for final confirmation."
+    "2026-11-25: After the Phase 15 review fixes, the tests-enabled CHD-on Release WASI producer measured 957144 linked bytes with Clang/LLD 21.1.8 in an x86_64 Ubuntu 26.04 task container. The exact bound tracks this measured value; the hosted runner remains required for final confirmation.",
+    "2026-11-26: Phase 16's tests-enabled CHD-on Release WASI producer measured 1014609 linked bytes with Clang/LLD 21.1.8 in an x86_64 Ubuntu 26.04 task container after adding patch and cheat support and fixing WASI staging. The exact bound tracks this measurement. See .planning/phases/16-patches-cheats-and-compatibility-evidence/16-LOCAL-EVIDENCE.md."
   ]
 }

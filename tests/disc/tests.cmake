@@ -47,6 +47,10 @@ target_link_libraries(schwaystation-test-disc-patch PRIVATE
 set_target_properties(schwaystation-test-disc-patch PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-patch)
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  # Clang's Release frames for main and its overlay check total about 200 KiB.
+  target_link_options(schwaystation-test-disc-patch PRIVATE "LINKER:-z,stack-size=262144")
+endif()
 
 schway_add_test(NAME disc.image.sbi
   COMMAND schwaystation-test-disc-sbi ${PROJECT_BINARY_DIR}/tests

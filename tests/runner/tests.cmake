@@ -199,7 +199,7 @@ with open(sys.argv[1], "wb") as output:
     file(MAKE_DIRECTORY "${OUT}")
     set(program [=[
 import hashlib, os, struct, subprocess, sys, tempfile, zlib
-runner, hooked_runner, work_root = sys.argv[1:]
+runner, hooked_runner, work_root, *emulator = sys.argv[1:]
 os.makedirs(work_root, exist_ok=True)
 
 def write(path, data):
@@ -294,11 +294,10 @@ def invoke(executable, bios, disc, patch, source_sha=None, hooked=False,
     if hooked:
         args.append("--test-patch-sector-zero")
     args.extend(extra)
-    return subprocess.run([executable] + args, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True, check=False)
+    return run(executable, args)
 
 def run(executable, args):
-    return subprocess.run([executable] + args, stdout=subprocess.PIPE,
+    return subprocess.run([*emulator, executable, *args], stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, text=True, check=False)
 
 def valid(name, executable, bios, cue, patch, fmt, source_sha,
@@ -436,7 +435,7 @@ with tempfile.TemporaryDirectory(prefix="runner-patch-cli-", dir=work_root) as r
         raise AssertionError("patch CLI cases changed the original raw source")
 print("PASS runner.patch.cli: PPF/BPS loading, provider reads and refusal boundaries")
 ]=])
-    execute_process(COMMAND "${PYTHON3}" -c "${program}" "${RUN}" "${RUN_HOOKED}" "${OUT}"
+    execute_process(COMMAND "${PYTHON3}" -c "${program}" "${RUN}" "${RUN_HOOKED}" "${OUT}" ${EMULATOR}
       RESULT_VARIABLE fixture_rc OUTPUT_VARIABLE fixture_out ERROR_VARIABLE fixture_err)
     if(NOT fixture_rc STREQUAL "0")
       message(FATAL_ERROR "runner patch CLI integration failed: ${fixture_rc}\n${fixture_out}${fixture_err}")
@@ -2216,6 +2215,10 @@ target_link_libraries(schwaystation-test-cheats PRIVATE
 set_target_properties(schwaystation-test-cheats PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-cheats)
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  # Clang's Release frames for main and its rollback check total about 147 KiB.
+  target_link_options(schwaystation-test-cheats PRIVATE "LINKER:-z,stack-size=262144")
+endif()
 
 # The region precedence resolver is deliberately host-only and has no runner,
 # disc-image or core dependency, so the table test links only this module.

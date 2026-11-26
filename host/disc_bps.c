@@ -1,4 +1,7 @@
 /* Host-only BPS1 transformation into an unpublished, validated target. */
+#ifdef __wasi__
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include "disc_patch.h"
 
 #include "crc32.h"
@@ -7,6 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef __wasi__
+#include <fcntl.h>
+#include <inttypes.h>
+#include <unistd.h>
+#include <wasi/api.h>
+#endif
 
 #define SCHWAY__DISC_BPS_MAX_IMAGE_BYTES (UINT64_C(1) << 30)
 #define SCHWAY__DISC_BPS_MAX_PATCH_BYTES (64u * 1024u * 1024u)
@@ -94,6 +104,32 @@ static schway_disc_patch_status schway__disc_bps_source_crc(
     return SCHWAY_DISC_PATCH_OK;
 }
 
+static FILE *schway__disc_bps_open_stage(void)
+{
+#ifdef __wasi__
+    /* WASI has no tmpfile(). Open exclusively under the preopened working
+       directory and unlink before writing any patch data. */
+    uint64_t token;
+    char path[sizeof(".schwaystation-bps-") + 16u];
+    int fd;
+    FILE *file;
+    if (__wasi_random_get((uint8_t *)&token, sizeof token) != 0u) return NULL;
+    (void)snprintf(path, sizeof path, ".schwaystation-bps-%016" PRIx64, token);
+    fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0600);
+    if (fd < 0) return NULL;
+    if (unlink(path) != 0) {
+        (void)close(fd);
+        (void)unlink(path);
+        return NULL;
+    }
+    file = fdopen(fd, "w+b");
+    if (file == NULL) (void)close(fd);
+    return file;
+#else
+    return tmpfile();
+#endif
+}
+
 static struct schway__disc_bps_target *schway__disc_bps_target_create(
     uint64_t size)
 {
@@ -108,7 +144,7 @@ static struct schway__disc_bps_target *schway__disc_bps_target_create(
             return NULL;
         }
     } else {
-        target->file = tmpfile();
+        target->file = schway__disc_bps_open_stage();
         if (target->file == NULL) {
             free(target);
             return NULL;

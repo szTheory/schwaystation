@@ -206,7 +206,8 @@ A production split requires an exact hosted JUnit union and a measured improveme
 
 Main CI compares historical feature rows and required capabilities with the protected PR base. Package staging reads the completed CTest report for the current build and keeps the libretro core experimental while any required result is unknown.
 To render a build-local copy of the compatibility report, set `COMPAT_CAPABILITIES_BUILD` to the build directory
-when invoking `scripts/compat-doc.sh`. Leave it unset when regenerating the checked-in snapshot.
+when invoking `scripts/compat-doc.sh`. Include `compat.capabilities.coverage` in the CTest report so the importer
+can match the report to its configure record. Leave the variable unset when regenerating the checked-in snapshot.
 
 A feature allowance uses `<date> <provider> <profile> <protection>!<peripheral>!<predicate> behavior-rev=4 expires=<date> <reason>`
 and covers at most 60 days.
