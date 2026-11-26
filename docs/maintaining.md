@@ -199,6 +199,10 @@ line per difference and exits 1 if there was any (`no drift on <repository>` oth
 and after changing anything on the repository's settings page. Change a setting in the script, not by hand, then
 apply it.
 
+## Compatibility evidence
+
+Main CI compares historical feature rows and required capabilities with the protected PR base. Package staging reads the completed CTest report for the current build and keeps the libretro core experimental while any required result is unknown.
+
 ## The nightly run
 
 `.github/workflows/nightly.yml` runs the 300,000-frame bench of the test card every night on `ubuntu-26.04`,

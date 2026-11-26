@@ -1038,47 +1038,15 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
       message(FATAL_ERROR "feature ratchet test requires ${required}")
     endif()
   endforeach()
-  set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
-  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nccd,ntsc-u,none,cdrom,disc_boot.mixed.64data+158audio+toc+indexes+pregap+subcode+guest.boot+read+audio+fmv,pass,disc.image.ccd.exit0;disc.image.legacy_parity.ccd.222x1+sub.21312.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ccd.boot+read+audio+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22\nccd,ntsc-u,none,cdrom,sbi.selected_provider+bad_q_data+previous_good_getlocp,pass,disc.image.sbi.provider_binding.exit0;cdrom.sbi.selected_child_bad_q.exit0,2026-11-23\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\necm,ntsc-u,none,cdrom,disc_boot.one_data_track.64x1+toc+sectors+guest.boot+read+fmv,pass,disc.image.ecm.literal+modeled.exit0;disc.image.legacy_parity.ecm.64x1.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ecm.boot+read+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22\npbp,ntsc-u,none,cdrom,disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame,pass,provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run,2026-11-21\n")
-  set(expected_profiles
-    ntsc-j.pm41-2.v2 ntsc-j.pm41.v2 ntsc-j.pu18.v2 ntsc-j.pu20.v2 ntsc-j.pu22.v2
-    ntsc-j.pu23.v2 ntsc-j.pu7.v0 ntsc-j.pu8-early.v0 ntsc-j.pu8-late.v2
-    ntsc-u.pm41-2.v2 ntsc-u.pm41.v2 ntsc-u.pu18.v2 ntsc-u.pu20.v2 ntsc-u.pu22.v2
-    ntsc-u.pu23.v2 ntsc-u.pu7.v0 ntsc-u.pu8-early.v0 ntsc-u.pu8-late.v2
-    pal.pm41-2.v2 pal.pm41.v2 pal.pu18.v2 pal.pu20.v2 pal.pu22.v2 pal.pu23.v2
-    pal.pu7.v0 pal.pu8-early.v0 pal.pu8-late.v2)
-  set(expected_profile_rows "")
-  foreach(profile IN LISTS expected_profiles)
-    if(profile STREQUAL "ntsc-u.pu8-late.v2")
-      string(APPEND expected_profile_rows
-        "core,ntsc-u.pu8-late.v2,none,dual-analog-flight,buttons.axes.frame_latch+unsupported_mode.refusal+host.mapping,pass,sio.special.flight.exit0;libretro.input.special.exit0,2026-11-24\n"
-      "core,ntsc-u.pu8-late.v2,none,guncon,poll.active_low+xy_units+frame_latch+state_continuation,pass,sio.gun.guncon.exit0;sio.gun.latch.exit0;sio.gun.state.exit0,2026-11-25\n"
-        "core,ntsc-u.pu8-late.v2,none,jogcon,native_poll_payload+config_refusal+host.mapping,pass,sio.special.jogcon.exit0;libretro.input.special.exit0,2026-11-24\n"
-      "core,ntsc-u.pu8-late.v2,none,justifier,buttons_enable+irq10_timer_order+state_continuation,pass,sio.gun.justifier.exit0;gpu.gun.irq_order.exit0;gpu.gun.state.exit0,2026-11-25\n"
-      "core,ntsc-u.pu8-late.v2,none,lightgun,host.lightgun+pointer_subset+fail_closed+frame_latch+direct_ports,pass,libretro.input.lightgun.exit0;libretro.input.pointer.exit0;libretro.input.gun_unavailable.exit0;libretro.input.multitap.exit0,2026-11-25\n"
-        "core,ntsc-u.pu8-late.v2,none,mouse,relative_motion.frame_latch+active_low_buttons+host.mapping,pass,sio.special.mouse.exit0;libretro.input.special.exit0,2026-11-24\n"
-        "core,ntsc-u.pu8-late.v2,none,multitap,eight_socket.card_protocol+independent.persistence,pass,card.tap.protocol.exit0;card.tap.state.exit0;runner.cards.multitap.exit0;runner.cards.persistence.exit0;libretro.cards.multitap.exit0;libretro.cards.persistence.exit0,2026-11-24\n"
-        "core,ntsc-u.pu8-late.v2,none,multitap,poll_methods+request_history+host.topology,pass,sio.tap.history_edges.exit0;sio.tap.poll_methods.exit0;libretro.input.multitap.exit0;libretro.input.descriptors.exit0,2026-11-24\n"
-        "core,ntsc-u.pu8-late.v2,none,negcon,native_poll_payload+host.mapping,pass,sio.special.negcon.exit0;libretro.input.special.exit0,2026-11-24\n")
-    endif()
-    string(APPEND expected_profile_rows
-      "core,${profile},none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23\n")
-    if(profile STREQUAL "ntsc-u.pu8-late.v2")
-      string(APPEND expected_profile_rows
-        "core,ntsc-u.pu8-late.v2,none,sensor,beam.bright_dark+threshold48+edge+offscreen_reload,pass,gpu.gun.sample.exit0;gpu.gun.geometry.exit0;gpu.gun.irq_order.exit0,2026-11-25\n"
-        "core,ntsc-u.pu8-late.v2,none,state,malformed_reject+host_pending_excluded+stable_bytes,pass,sio.gun.state.exit0;gpu.gun.state.exit0;core.state.stable_bytes.exit0,2026-11-25\n")
-    endif()
-  endforeach()
-  file(READ "${expected_features}" expected_content)
-  string(REPLACE "\necm," "\n${expected_profile_rows}ecm," expected_content
-    "${expected_content}")
-  file(WRITE "${expected_features}" "${expected_content}")
-  execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
-      sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
-      "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-23 features
+  # This route protects historical records. The package importer produces
+  # current capability evidence after CTest has written its JUnit report.
+  set(features "${SOURCE_ROOT}/tests/compat/features.csv")
+  string(TIMESTAMP today "%Y-%m-%d" UTC)
+  execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh"
+      "${features}" "${features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" "${today}" features
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
-  if(NOT "${result}" STREQUAL "0")
-    message(FATAL_ERROR "checked-in feature ledger differs from independent expected unknown results: ${result}: ${output}${error}")
+  if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "protected feature ledger check failed: ${result}: ${output}${error}")
   endif()
   execute_process(COMMAND "${CMAKE_COMMAND}"
       -DSOURCE_ROOT=${SOURCE_ROOT} -DWORK_ROOT=${WORK_ROOT} -DCASE=features
@@ -1100,7 +1068,9 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   string(RANDOM LENGTH 10 ALPHABET 0123456789abcdef suffix)
   set(work "${WORK_ROOT}/compat-controls-${suffix}")
   set(head "${work}/head")
-  file(MAKE_DIRECTORY "${head}/scripts" "${head}/tests/cmake")
+  file(MAKE_DIRECTORY "${head}/scripts" "${head}/tests/cmake" "${head}/tests/compat")
+  set(matrix_path tests/compat/required-capabilities.csv)
+  configure_file("${SOURCE_ROOT}/${matrix_path}" "${head}/${matrix_path}" COPYONLY)
   configure_file("${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${head}/scripts/compat-ratchet.sh" COPYONLY)
   configure_file("${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake" "${head}/tests/cmake/compat-ratchet.cmake" COPYONLY)
   configure_file("${SOURCE_ROOT}/tests/cmake/date_days.cmake" "${head}/tests/cmake/date_days.cmake" COPYONLY)
@@ -1141,6 +1111,10 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
       file(MAKE_DIRECTORY "${base}/tests/compat")
       file(WRITE "${base}/tests/compat/features.csv" "${feature_header}\n${feature_row}\n")
       list(APPEND stage_files tests/compat/features.csv)
+    endif()
+    if(ARGC GREATER 6)
+      configure_file("${SOURCE_ROOT}/${matrix_path}" "${base}/${matrix_path}" COPYONLY)
+      list(APPEND stage_files "${matrix_path}")
     endif()
     if(include_judge)
       file(MAKE_DIRECTORY "${base}/scripts")
@@ -1227,6 +1201,14 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   file(WRITE "${allow}" "2026-09-21 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-20 approved measured correction\n")
   check_feature_base("feature matching allowance" "${BASE_feature_protected_pass}" "${SHA_feature_protected_pass}"
     "${feature_fail}" "${feature_fail}" "${allow}" TRUE)
+  make_base(capabilities FALSE TRUE TRUE "${feature_pass}" TRUE protect_matrix)
+  check_feature_base("protected matrix intact" "${BASE_capabilities}" "${SHA_capabilities}"
+    "${feature_pass}" "${feature_pass}" "${allow}" TRUE)
+  file(READ "${head}/${matrix_path}" complete_matrix)
+  string(REGEX REPLACE "provider[.]iso,[^\n]*\n" "" shortened_matrix "${complete_matrix}")
+  file(WRITE "${head}/${matrix_path}" "${shortened_matrix}")
+  check_feature_base("removed protected matrix row" "${BASE_capabilities}" "${SHA_capabilities}"
+    "${feature_pass}" "${feature_pass}" "${allow}" FALSE)
   if(DEFINED ENV{COMPAT_BASE_DIR} AND EXISTS "$ENV{COMPAT_BASE_DIR}/scripts/compat-ratchet.sh" AND
      DEFINED ENV{COMPAT_BASE_SHA} AND NOT "$ENV{COMPAT_BASE_SHA}" STREQUAL "")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env

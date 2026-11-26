@@ -397,6 +397,8 @@ jobs:
             tests/cmake/compat-ratchet.cmake
             tests/cmake/date_days.cmake
             tests/compat/ledger.csv
+            tests/compat/features.csv
+            tests/compat/required-capabilities.csv
           sparse-checkout-cone-mode: false
       - name: Preserve protected base checkout for ratchet
         if: github.event_name == 'pull_request'
