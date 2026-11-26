@@ -39,3 +39,12 @@ No correctness, security, or maintainability findings remain in this correction.
 Reviewed `host/dat_inventory.c` after CI run [45888744986](https://github.com/szTheory/schwaystation/actions/runs/45888744986) exposed MSVC C4996 for `fopen()` in the private report writer. The new helper uses `fopen_s()` under MSVC for both DAT reads and exclusive report creation, restores its error code to `errno` for the existing `EEXIST` retry, and leaves other C libraries on `fopen()`. The compatibility inventory tests passed after this change. Microsoft's CRT documentation confirms `fopen_s()` accepts the C11 exclusive-create `x` mode: [Microsoft Learn](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fopen-s-wfopen-s?view=msvc-170).
 
 No findings remain in this correction. The hosted Windows build and full CI/Nightly validation must run again on the next head.
+
+## Windows test-host and WASI replay correction review
+
+Reviewed the follow-up corrections prompted by CI [45889677135](https://github.com/szTheory/schwaystation/actions/runs/45889677135):
+
+- `tests/libretro/host.c` — `core_size` now has a defined zero fallback before the conditional load path, satisfying MSVC's `/W4 /WX` analysis without changing the valid loaded-size path.
+- `tests/fuzz/tests.cmake` — the 256 KiB linker stack applies only to the WASI PPF regression replay executable. Its nested source/target buffers and baseline patch exceed WASI's 128 KiB default; the previously trapping replay now passes under pinned Wasmtime.
+
+No correctness, security, or maintainability findings remain. The targeted native host build and WASI PPF regression passed locally. The corrected hosted Windows matrix and full CI/Nightly results remain pending.

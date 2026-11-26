@@ -65,3 +65,14 @@ Focused local follow-up checks exited 0:
 - `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4693 -P tests/cmake/line_budget.cmake` — the repository-check budget remained at 4,693 lines under the 4,694-line limit.
 - `git diff --check` — passed after the final evidence and source edits.
 - `cmake --build --preset ci --target schwaystation-run schwaystation-test-library && ctest --preset ci --no-tests=error -R '^compat[.]inventory[.]' --output-on-failure` exited 0 — the DAT compatibility preflight and both inventory cases passed after the MSVC file-open change.
+
+The second corrected-head attempt, CI [45889677135](https://github.com/szTheory/schwaystation/actions/runs/45889677135) and Nightly [45889677194](https://github.com/szTheory/schwaystation/actions/runs/45889677194), was canceled after Windows x64 and ARM64 both failed MSVC `/WX` with C4701 for the test host's potentially uninitialized `core_size`. The WASI lane also trapped in `fuzz.regress.ppf` after 358 of its 361 replay inputs: the nested PPF case keeps four 39,984-byte buffers and a 2 KiB baseline on the 128 KiB default stack. `core_size` now starts at zero, and that WASI replay target links with a 256 KiB stack.
+
+Local checks for these two corrections exited 0:
+
+- `cmake --build --preset ci --target schwaystation-test-libretro-host` — the libretro host test compiled after initializing `core_size`.
+- In the Ubuntu 26.04 Clang/LLD 21.1.8 WASI container, `cmake -S /workspace -B /workspace/build/wasi-ppf-repro -G Ninja -DCMAKE_TOOLCHAIN_FILE=/workspace/cmake/toolchains/wasm32-wasi.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DSCHWAYSTATION_CHD=OFF -DSCHWAYSTATION_BUILD_LIBRETRO=OFF -DSCHWAYSTATION_INVENTORY=wasm32 -DSCHWAYSTATION_TIMEOUT_SCALE=5 "-DCMAKE_CROSSCOMPILING_EMULATOR=/workspace/scripts/wasm-test-emulator.sh;/workspace/build/wasi-ppf-repro/pins/wasmtime/wasmtime;/workspace;/workspace/build/wasi-ppf-repro"` configured successfully, and `cmake --build build/wasi-ppf-repro --target schwaystation-fuzz-ppf-replay` linked the replay target with the larger stack.
+- `ctest --test-dir /workspace/build/wasi-ppf-repro --no-tests=error -R '^fuzz[.]regress[.]ppf$' --output-on-failure` exited 0; the formerly trapping PPF replay passed in 0.55 seconds under pinned Wasmtime 48.0.7.
+- `git diff --check` exited 0.
+
+The hosted platform matrix and Nightly results still need a fresh run on this correction.

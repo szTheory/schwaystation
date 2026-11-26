@@ -7039,7 +7039,7 @@ int main(int argc, char **argv)
     schway_versions v;
     schway *ref;
     unsigned char *state, *ref_state;
-    size_t size, core_size;
+    size_t size, core_size = 0u;
     unsigned run, lo, other_lo;
     uint32_t region, other;
     int audio_batch_mode = argc == 6 && strcmp(argv[2], "audio-equality-batch") == 0;
