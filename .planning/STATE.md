@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 9
-status: executing
-stopped_at: Plan 16-14 integrated; continuing with Plan 16-15
-last_updated: "2026-11-26T15:28:25Z"
+current_plan: 18
+status: ready_to_ship
+stopped_at: Phase 16 verified locally at the pre-ship boundary
+last_updated: "2026-11-26T16:18:55Z"
 last_activity: 2026-11-26
-last_activity_desc: Plan 16-14 integrated under the approved 4,694-line ceiling
-state_head: f7c9aa995bd171f76cab3c7a925e98f83f19964f
+last_activity_desc: Phase 16 source review and final local verification passed
+state_head: 1abec93f56f439983b196f6e44826e06c09eba57
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 121
+  completed_plans: 125
   percent: 90
 ---
 
@@ -30,12 +30,12 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 9
+Phase: 16 (Patches, cheats and compatibility evidence) — VERIFIED LOCALLY
+Current Plan: 18
 Total Plans in Phase: 18
-Status: Plan 16-14 integrated; Plan 16-15 ready
-Last activity: 2026-11-26 — Plan 16-14 capability matrix and libretro metadata checks integrated
-Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 14/18 plans complete and wave 9 is ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Status: All plans complete and locally verified. Ready for the ship step.
+Last activity: 2026-11-26 — Reviewed-source CI, packaging and release checks passed
+Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has all 18 plans complete and awaits ship. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -90,6 +90,12 @@ Runtime/model: Codex/OpenGSD coordinator (primary model ID unavailable); GSD exe
 ### Phase 16 wave 8 completion (2026-11-26)
 
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); resumed the GPT-6 Luna xhigh executor's existing draft. The owner approved the 4,694-line ceiling with all checks counted. Focused capability, metadata, cheat, package staging and budget checks passed. A new truncated-JUnit control failed before the importer fix and passed afterward. The measured total is 4,693 lines. Direct file and commit checks confirmed the summary despite the helper's documented false positives on command strings and test history. GSD manifest-scoped cleanup exited 0 and integrated the completed worktree. The staged libretro metadata remains experimental while provider and profile play evidence is missing. See the [plan summary](phases/16-patches-cheats-and-compatibility-evidence/16-14-SUMMARY.md).
+
+### Phase 16 execution, review and verification (2026-11-26)
+
+Runtime/model: Codex and OpenGSD 1.23.0, primary model ID unavailable. The coordinator completed Plans 16-15 through 16-18. The GPT-6 Luna xhigh source review identified WASI staging, Nightly target and JUnit result attribution defects. Focused native, pinned WASI, and sanitizer replay checks passed after the fixes. The first complete workflow attempt surfaced a CUE probe control that still expected raw Mode 1 to be refused. The corrected control verifies synthetic identity for that mode and retains the unsupported-mode assertion.
+
+`cmake --workflow --preset ci` exited 0 on the reviewed source and test correction, including package staging and release checks. The repository-check inventory measured 4,692 of the approved 4,694 lines. The linked WASI runner measured 1,014,609 bytes, and stable serialized state measured 3,757,754 bytes. The package's current capability report records 16 passing rows and 35 provider/profile rows as unknown. Libretro remains experimental. Hosted gates and the release remain for ship. See the [verification report](phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md).
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2671,9 +2677,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-26T15:28:25Z
-Stopped at: Plan 16-14 integrated after approval; proceeding to Plan 16-15
-Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-15-PLAN.md
+Last session: 2026-11-26T16:18:55Z
+Stopped at: Local verification passed at the Phase 16 pre-ship boundary
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md
 
 Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
 

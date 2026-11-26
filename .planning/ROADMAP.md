@@ -389,7 +389,7 @@ Plans:
   3. The generated compatibility report accounts for all 13,407 entries at the pinned, licensed DAT revision and links supported pass and fail results to evidence. Untested entries and combinations remain explicitly unknown.
   4. `is_experimental` is false only when the committed required-capability matrix passes every row, with zero unknown or failing required rows. It stays true when that evidence is missing or fails. The matrix covers the specified boot-to-play disc families, region and board tuples, peripheral classes, card persistence, patches and cheats. DAT-wide playability is outside that claim.
 
-**Plans**: 14/18 plans executed
+**Plans**: 18/18 plans executed
 
 Plans:
 - [x] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
@@ -406,10 +406,10 @@ Plans:
 - [x] 16-12-PLAN.md — Account for DAT occurrences through a bounded runner inventory path
 - [x] 16-13-PLAN.md — Reconcile the pinned Redump source and retain aggregate provenance
 - [x] 16-14-PLAN.md — Define required capabilities and evaluate fresh results fail-closed
-- [ ] 16-15-PLAN.md — Protect current feature evidence against the actual base
-- [ ] 16-16-PLAN.md — Publish truthful inventory and required-capability reports
-- [ ] 16-17-PLAN.md — Evaluate the full BE32 shard candidate with exact coverage
-- [ ] 16-18-PLAN.md — Close local integration evidence before source review
+- [x] 16-15-PLAN.md — Protect current feature evidence against the actual base
+- [x] 16-16-PLAN.md — Publish truthful inventory and required-capability reports
+- [x] 16-17-PLAN.md — Evaluate the full BE32 shard candidate with exact coverage
+- [x] 16-18-PLAN.md — Close local integration evidence before source review
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`, `PROVENANCE.md`, `ASSET_POLICY.md`
 
@@ -428,4 +428,4 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
-| 16. Patches, cheats and compatibility evidence | 14/18 | Executing | - |
+| 16. Patches, cheats and compatibility evidence | 18/18 | Verified locally | - |

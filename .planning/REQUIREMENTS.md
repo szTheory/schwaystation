@@ -63,11 +63,11 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### ROM-hacker support and compatibility claims
 
-- [ ] **PATCH-01**: `schwaystation-run --patch` applies the documented PPF 1/2/3 and BPS subset as a host-side sector overlay, validates patch identity/bounds before use, preserves the source image, and produces deterministic patched sectors; malformed patches fail without partial application.
-- [ ] **CHEAT-01**: The runner and libretro host parse a documented bounded GameShark text subset and apply only supported deterministic memory writes through a narrow explicit core operation; invalid codes are rejected, source memory is not mutated, and cheat state is included in relevant hashes/serialization.
-- [ ] **COMPAT-01**: A pinned, licensed Redump DAT inventory accounts for all 13,407 source entries with explicit pass/fail/unknown evidence and provenance; untested title/profile/media combinations remain unknown and the generated compatibility document says the inventory does not imply playability.
+- [x] **PATCH-01**: `schwaystation-run --patch` applies the documented PPF 1/2/3 and BPS subset as a host-side sector overlay, validates patch identity/bounds before use, preserves the source image, and produces deterministic patched sectors; malformed patches fail without partial application.
+- [x] **CHEAT-01**: The runner and libretro host parse a documented bounded GameShark text subset and apply only supported deterministic memory writes through a narrow explicit core operation; invalid codes are rejected, source memory is not mutated, and cheat state is included in relevant hashes/serialization.
+- [x] **COMPAT-01**: A pinned, licensed Redump DAT inventory accounts for all 13,407 source entries with explicit pass/fail/unknown evidence and provenance; untested title/profile/media combinations remain unknown and the generated compatibility document says the inventory does not imply playability.
 - [x] **COMPAT-02**: Feature-specific compatibility rows accrue with each provider, profile, protection mechanism and peripheral; the protected ledger ratchet preserves prior passes and requires a dated allowance for any permitted regression or removal. A cheap count/key preflight runs before any broad ledger or guest suite.
-- [ ] **COMPAT-03**: The libretro metadata sets `is_experimental "false"` only when 100% of a committed required-capability matrix passes with zero required unknown/fail rows; that matrix contains at least one boot-to-play fixture per shipped disc-provider family, each declared region/board tuple, each implemented peripheral class, card persistence and each supported patch/cheat family. If the matrix is incomplete or fails, the metadata remains `true`. DAT entries outside the required matrix remain explicitly unknown and are not represented as passing. The guard prevents stale, incomplete, duplicated, or mismatched evidence from clearing the experimental marker.
+- [x] **COMPAT-03**: The libretro metadata sets `is_experimental "false"` only when 100% of a committed required-capability matrix passes with zero required unknown/fail rows; that matrix contains at least one boot-to-play fixture per shipped disc-provider family, each declared region/board tuple, each implemented peripheral class, card persistence and each supported patch/cheat family. If the matrix is incomplete or fails, the metadata remains `true`. DAT entries outside the required matrix remain explicitly unknown and are not represented as passing. The guard prevents stale, incomplete, duplicated, or mismatched evidence from clearing the experimental marker.
 
 ## Out of Scope
 
@@ -116,10 +116,10 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | GUN-01 | Phase 15 | Complete |
 | GUN-02 | Phase 15 | Complete |
 | SIO-05 | Phase 15 | Complete |
-| PATCH-01 | Phase 16 | Pending |
-| CHEAT-01 | Phase 16 | Pending |
-| COMPAT-01 | Phase 16 | Pending |
-| COMPAT-03 | Phase 16 | Pending |
+| PATCH-01 | Phase 16 | Verified locally |
+| CHEAT-01 | Phase 16 | Verified locally |
+| COMPAT-01 | Phase 16 | Verified locally |
+| COMPAT-03 | Phase 16 | Verified locally |
 
 **Coverage:**
 - v2 requirements: 34
@@ -128,4 +128,4 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 
 ---
 *Requirements defined: 2026-11-18*
-*Last updated: 2026-11-22 after Phase 11 verification*
+*Last updated: 2026-11-26 after Phase 16 local verification*
