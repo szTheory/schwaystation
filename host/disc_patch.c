@@ -14,6 +14,17 @@
 #define SCHWAY__DISC_PATCH_BLOCK_BYTES 1024u
 #define SCHWAY__DISC_PATCH_FILE_ID_MAX 3072u
 #define SCHWAY__DISC_PATCH_HASH_CHUNK 4096u
+#define SCHWAY__DISC_PATCH_BPS_MAX_BYTES (64u * 1024u * 1024u)
+
+struct schway__disc_bps_target;
+schway_disc_patch_status schway__disc_bps_transform(
+    const schway_disc_patch_source *source, const uint8_t *patch,
+    size_t patch_size, struct schway__disc_bps_target **out,
+    uint32_t *action_count, uint32_t *checks, schway_disc_patch_error *error);
+void schway__disc_bps_target_destroy(struct schway__disc_bps_target *target);
+uint32_t schway__disc_bps_target_read_bytes(
+    struct schway__disc_bps_target *target, uint64_t offset,
+    uint8_t *bytes, size_t count);
 
 typedef struct schway__disc_patch_record {
     uint64_t offset;
@@ -35,6 +46,7 @@ typedef struct schway__disc_patch_segment {
 
 struct schway_disc_patch_candidate {
     schway_disc_patch_source source;
+    struct schway__disc_bps_target *bps_target;
     uint8_t source_sha256[SCHWAY_DISC_PATCH_SHA256_BYTES];
     uint8_t *patch_bytes;
     size_t patch_size;
@@ -533,9 +545,68 @@ schway_disc_patch_status schway_disc_patch_load(
     }
     if (format != SCHWAY_DISC_PATCH_FORMAT_PPF1 &&
         format != SCHWAY_DISC_PATCH_FORMAT_PPF2 &&
-        format != SCHWAY_DISC_PATCH_FORMAT_PPF3) {
+        format != SCHWAY_DISC_PATCH_FORMAT_PPF3 &&
+        format != SCHWAY_DISC_PATCH_FORMAT_BPS) {
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_UNSUPPORTED,
                                              0u, "selected patch format is not implemented");
+    }
+    if (format == SCHWAY_DISC_PATCH_FORMAT_BPS) {
+        uint32_t action_count = 0u;
+        uint32_t bps_checks = 0u;
+        if (patch_size > SCHWAY__DISC_PATCH_BPS_MAX_BYTES) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_LIMIT,
+                0u, "BPS patch exceeds 64 MiB");
+        }
+        if (source->byte_count > (UINT64_C(1) << 30)) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_LIMIT,
+                source->byte_count, "BPS source exceeds 1 GiB");
+        }
+        if (expected_source_sha256 != NULL) {
+            status = schway__disc_patch_source_digest(source, source_digest, error);
+            if (status != SCHWAY_DISC_PATCH_OK) return status;
+            if (!schway__disc_patch_digest_equal(source_digest,
+                                                  expected_source_sha256)) {
+                return schway__disc_patch_error_set(error,
+                    SCHWAY_DISC_PATCH_BAD_IDENTITY, 0u,
+                    "raw source SHA-256 does not match");
+            }
+            bps_checks |= SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256;
+        } else {
+            memset(source_digest, 0, sizeof source_digest);
+        }
+        candidate = (schway_disc_patch_candidate *)calloc(1u, sizeof *candidate);
+        if (candidate == NULL) {
+            return schway__disc_patch_error_set(error,
+                SCHWAY_DISC_PATCH_OUT_OF_MEMORY, 0u,
+                "out of memory allocating BPS candidate");
+        }
+        candidate->source = *source;
+        memcpy(candidate->source_sha256, source_digest, sizeof source_digest);
+        candidate->format = (uint32_t)format;
+        status = schway__disc_bps_transform(source, patch_bytes, patch_size,
+            &candidate->bps_target, &action_count, &bps_checks, error);
+        if (status != SCHWAY_DISC_PATCH_OK) {
+            schway_disc_patch_candidate_destroy(candidate);
+            return status;
+        }
+        bps_checks |= expected_source_sha256 != NULL ?
+            SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256 : 0u;
+        candidate->record_count = action_count;
+        if (report != NULL) {
+            report->size = (uint32_t)sizeof *report;
+            report->format = (uint32_t)format;
+            report->checks = bps_checks;
+            report->records = action_count;
+            report->source_bytes = source->byte_count;
+            report->patch_bytes = (uint64_t)patch_size;
+            if (expected_source_sha256 != NULL) {
+                memcpy(report->source_sha256, source_digest, sizeof source_digest);
+            }
+        }
+        *out = candidate;
+        (void)schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_OK,
+                                            0u, "ok");
+        return SCHWAY_DISC_PATCH_OK;
     }
     if (expected_source_sha256 == NULL) {
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_ARGUMENT,
@@ -663,6 +734,7 @@ schway_disc_patch_status schway_disc_patch_load(
 void schway_disc_patch_candidate_destroy(schway_disc_patch_candidate *candidate)
 {
     if (candidate == NULL) return;
+    schway__disc_bps_target_destroy(candidate->bps_target);
     free(candidate->patch_bytes);
     free(candidate->segments);
     free(candidate);
@@ -694,6 +766,11 @@ schway_disc_patch_status schway_disc_patch_candidate_apply(
         return SCHWAY_DISC_PATCH_BOUNDS;
     }
     if (count == 0u) return SCHWAY_DISC_PATCH_OK;
+    if (candidate->bps_target != NULL) {
+        return schway__disc_bps_target_read_bytes(candidate->bps_target,
+                                                  offset, bytes, count) != 0u ?
+            SCHWAY_DISC_PATCH_OK : SCHWAY_DISC_PATCH_IO;
+    }
     end = offset + (uint64_t)count;
     high = candidate->segment_count;
     while (low < high) {
