@@ -1355,6 +1355,36 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_inventory_controls")
   set(root "${WORK_ROOT}/compat-inventory-controls")
   file(REMOVE_RECURSE "${root}")
   file(MAKE_DIRECTORY "${root}")
+  set(dat "${root}/utf8-serial.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: encoded serials"
+)
+game (
+ name "Repeated encoded serial one"
+ serial "SLUS-00001–A"
+)
+game (
+ name "Repeated encoded serial two"
+ serial "SLUS-00001–A"
+)
+game (
+ name "Distinct serial"
+ serial "SLES-00001"
+)
+]=])
+  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+    RESULT_VARIABLE utf8_rc OUTPUT_VARIABLE utf8_output ERROR_VARIABLE utf8_error)
+  if(NOT utf8_rc STREQUAL "0")
+    message(FATAL_ERROR "inventory rejected a valid encoded serial value: ${utf8_error}")
+  endif()
+  foreach(field "entries=3" "pass=0" "fail=0" "unknown=3"
+      "missing_serial=0" "duplicate_serial_entries=2")
+    string(FIND "${utf8_output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "encoded serial accounting omitted ${field}: ${utf8_output}")
+    endif()
+  endforeach()
+
   set(dat "${root}/duplicate-serial-field.dat")
   file(WRITE "${dat}" [=[clrmamepro (
  name "Synthetic: invalid serial field"
