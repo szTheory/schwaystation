@@ -12,7 +12,7 @@ provides:
   - fixed-size canonical cheat state encoding and validation
 affects: [runner-cheats, libretro-cheats, phase-16-cheat-state]
 actuals:
-  tokens: 12286
+  tokens: 12331
   tasks: 3
   commits: 6
 tech-stack:
@@ -59,7 +59,7 @@ coverage:
         ref: "docs.budgets (final consolidated CTest selector run)"
         status: pass
     human_judgment: false
-duration: 27m
+duration: 31m
 completed: 2026-11-26
 status: complete
 plan_head_before: 542580e5ca0770820647aab45b75722b484713f0
@@ -72,9 +72,9 @@ plan_head_after: 1602992574984ac980cee67ae11c9beb2afb2cfc
 
 ## Performance
 
-- **Duration:** 27 minutes
+- **Duration:** 31 minutes
 - **Started:** 2026-11-26T01:34:47Z
-- **Completed:** 2026-11-26T02:02:04Z
+- **Completed:** 2026-11-26T02:05:41Z
 - **Runtime/model:** Codex GSD executor; configured executor model `gpt-6-luna`
 - **Tasks:** 3
 - **Files modified:** 5
@@ -149,6 +149,7 @@ All commands ran from the worktree root. The final consolidated check also reran
 
 - The sandbox made the worktree's shared `.git/worktrees` metadata read-only, preventing the plan ledger and worktree sentinel from being created there. The exact starting HEAD was recorded in `/private/tmp/schwaystation-plan-head-before-16-03`; each commit independently checked the fixed worktree root and protected-branch status. Normal commits ran with configured hooks after scoped Git-metadata escalation.
 - One task verification initially failed on the overlapping boundary assertion documented above; the corrected test and full focused selection passed.
+- End-to-end plan time was 31 minutes, just over the 30-minute split threshold; implementation and focused checks finished before summary and hook closeout extended elapsed time.
 
 ## User Setup Required
 
