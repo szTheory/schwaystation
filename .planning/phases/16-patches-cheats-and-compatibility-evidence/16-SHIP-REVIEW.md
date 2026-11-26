@@ -58,3 +58,7 @@ Reviewed the changes prompted by CI run [45892261219](https://github.com/szTheor
 - `quality.json` lowers the WASM floor to the measured local result of 1,014,617 bytes and retains 1,014,665 as the latest exact hosted ceiling until the revised hosted module is measured.
 
 The pinned Wasmtime 48.0.7 local run passed `runner.disc.legacy`, all 14 selected patch/PPF/cheat tests, and the local WASM size check against the revised floor. The exact changed-head hosted WASM producer and Windows matrix remain required ship checks.
+
+## Repository-check preflight budget sync
+
+The first corrected push measured 4,694 lines, while CI and Nightly still used a 4,693 preflight limit. The cap had already been approved at 4,694; no budget increase was needed. Both workflow commands, the hygiene budget test, and the workflow-registration assertions now use that approved value. The local line-budget producer and all three workflow checks passed. `act --dryrun` confirmed the CI changes and Nightly fuzz job routes; hosted platform and integration coverage remains pending.
