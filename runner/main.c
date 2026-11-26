@@ -1,14 +1,14 @@
 /* schwaystation-run: the headless runner.
  *
- *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
- *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
- *                     [--hash] [--hash-audio] [--hash-state]
+ *                     [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N]
- *                     [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
+ *                     [--stop-on mailbox] [--inputs FILE] [--cheat CODE ...] [--hash] [--hash-audio]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
- *                     [--hash-audio] [--hash-state]
+ *                     [--cheat CODE ...] [--hash-audio] [--hash-state]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
@@ -93,6 +93,7 @@
 
 #include "bench.h"
 #include "cards.h"
+#include "cheats.h"
 #include "clock.h"
 #include "disc_image.h"
 #include "disc_probe.h"
@@ -143,19 +144,19 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
-    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
     "                         [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
-    "                         [--hash] [--hash-audio] [--hash-state]\n"
+    "                         [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]\n"
-    "                         [--stop-on mailbox] [--inputs FILE] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
+    "                         [--stop-on mailbox] [--inputs FILE] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--cheat CODE ...]\n"
     "                         [--hash] [--hash-audio]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
     "                         [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
-    "                         [--serial SERIAL] [--hash] [--hash-audio] [--hash-state]\n"
+    "                         [--serial SERIAL] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
     "  --machine NAME     pu7, pu8-early, pu8-late, pu18, pu20, pu22, pu23, pm41 or pm41-2\n"
@@ -172,6 +173,7 @@ static const char synopsis[] =
     "  --save-dir DIR    import and save memory cards in this existing directory\n"
     "  --memcard-names MODE  basename (default) or serial; serial derives from an EXE or first disc member\n"
     "  --serial SERIAL   preserve this literal card basename as a compatibility override\n"
+    "  --cheat CODE      apply one bounded GameShark write at each frame start; may be repeated\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
     "  --disc FILE        attach a cue sheet, ISO image or m3u playlist (needs --bios)\n"
@@ -367,6 +369,8 @@ typedef struct options {
     int hash_audio; /* --hash-audio: accumulated canonical LE stereo PCM */
     int hash_vram; /* --hash-vram: canonical whole-VRAM RGB555 bytes */
     int hash_state; /* --hash-state: the SHA-256 of the saved state */
+    uint32_t cheat_count;
+    schway__host_cheats cheats;
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
     const char *inputs; /* --inputs FILE, else NULL */
@@ -423,6 +427,7 @@ static int parse_options(int argc, char **argv, options *o)
         o->printed = 1;
         return SCHWAY__EXIT_OK;
     }
+    schway__host_cheats_reset(&o->cheats);
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         const char *value = i + 1 < argc ? argv[i + 1] : NULL;
@@ -449,6 +454,19 @@ static int parse_options(int argc, char **argv, options *o)
             o->hash_vram = 1;
         } else if (strcmp(arg, "--hash-state") == 0) {
             o->hash_state = 1;
+        } else if (strcmp(arg, "--cheat") == 0) {
+            if (value == NULL || value[0] == '-') {
+                return usage("--cheat needs CODE");
+            }
+            if (o->cheat_count >= SCHWAY_HOST_CHEAT_ENTRY_COUNT) {
+                return usage("too many --cheat entries");
+            }
+            if (!schway__host_cheats_replace(&o->cheats, o->cheat_count, true,
+                                             value, strlen(value))) {
+                return usage("--cheat contains malformed, unsupported, or out-of-range code");
+            }
+            o->cheat_count++;
+            i++;
         } else if (strcmp(arg, "--inputs") == 0) {
             if (o->inputs != NULL) {
                 return usage("give --inputs once");
@@ -751,7 +769,7 @@ static int parse_options(int argc, char **argv, options *o)
         if ((any_test_input && !all_test_inputs) || (any_metadata && !all_metadata) ||
             (any_test_input && any_metadata) || o->frames != 0u || o->bios != NULL ||
             o->exe != NULL || o->disc != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
-            o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
+            o->hash_state || o->hash_vram || o->cheat_count != 0u || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
             o->region_set || o->machine_set || o->boot_set || o->test_audio_failure ||
             o->multitap_set[0] || o->multitap_set[1]) {
@@ -769,7 +787,7 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->probe != NULL) {
         if ((o->metadata_ledger == NULL) != (o->metadata_dat == NULL) ||
             o->frames != 0u || o->bios != NULL || o->exe != NULL || o->disc != NULL || o->inputs != NULL ||
-            o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->bench || o->tty ||
+            o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->cheat_count != 0u || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
             o->memcard_names_set || o->serial != NULL || o->region_set || o->machine_set ||
             o->boot_set || o->multitap_set[0] || o->multitap_set[1]) {
@@ -1318,12 +1336,20 @@ static int print_audio_hash(schway__sha256 *state)
 
 /* Prints the state hash line: the SHA-256 of the saved state after its header. The runner may
    allocate; the core does not. Returns the exit status. */
-static int print_state_hash(const schway *inst)
+static int print_state_hash(const schway *inst, const schway__host_cheats *cheats,
+                            int include_cheats)
 {
     size_t size = schway_state_size(inst);
     uint8_t *buf = size > STATE_HEADER_SIZE ? (uint8_t *)malloc(size) : NULL;
+    uint8_t cheat_state[SCHWAY_HOST_CHEAT_SERIALIZED_SIZE];
     if (buf == NULL) {
         fprintf(stderr, "schwaystation-run: cannot size the state\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    if (include_cheats &&
+        !schway__host_cheats_encode(cheats, cheat_state, sizeof cheat_state)) {
+        fprintf(stderr, "schwaystation-run: cannot encode cheat state for hashing\n");
+        free(buf);
         return SCHWAY__EXIT_FAILURE;
     }
     schway_status st = schway_save_state(inst, buf, size);
@@ -1338,6 +1364,13 @@ static int print_state_hash(const schway *inst)
     char hex[65];
     schway__sha256_init(&s);
     schway__sha256_update(&s, buf + STATE_HEADER_SIZE, size - STATE_HEADER_SIZE);
+    if (include_cheats) {
+        static const char domain[] = "schwaystation-run/cheat-state";
+        const uint8_t version = 1u;
+        schway__sha256_update(&s, domain, sizeof domain - 1u);
+        schway__sha256_update(&s, &version, sizeof version);
+        schway__sha256_update(&s, cheat_state, sizeof cheat_state);
+    }
     schway__sha256_final(&s, digest);
     schway__sha256_hex(digest, hex);
     printf("state sha256 %s\n", hex);
@@ -1888,6 +1921,11 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
             break;
         }
+        if (!schway__host_cheats_apply(&opt->cheats, inst)) {
+            fprintf(stderr, "schwaystation-run: applying cheat options failed\n");
+            status = SCHWAY__EXIT_FAILURE;
+            break;
+        }
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         schway_run_result res;
         memset(&res, 0, sizeof res);
@@ -1998,7 +2036,7 @@ static int run(const options *opt)
         status = print_audio_hash(&audio_digest);
     }
     if (status == SCHWAY__EXIT_OK && opt->hash_state) {
-        status = print_state_hash(inst);
+        status = print_state_hash(inst, &opt->cheats, opt->cheat_count != 0u);
     }
     if (status == SCHWAY__EXIT_OK && opt->hash_vram) {
         status = print_vram_hash(inst);

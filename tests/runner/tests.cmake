@@ -34,9 +34,162 @@ if(CMAKE_SCRIPT_MODE_FILE)
   endfunction()
 
   if(CASE STREQUAL "cheats_cli")
-    message(FATAL_ERROR "runner cheat CLI behavior is not implemented")
+    foreach(var PYTHON3 OUT)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner cheat CLI case requires ${var}")
+      endif()
+    endforeach()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(cheat_exe "${OUT}/runner-cheat-boundary.exe")
+    set(program [=[
+import struct, sys
+
+def lui(rt, immediate): return (0x0f << 26) | (rt << 16) | immediate
+def ori(rt, rs, immediate): return (0x0d << 26) | (rs << 21) | (rt << 16) | immediate
+def lbu(rt, offset, rs): return (0x24 << 26) | (rs << 21) | (rt << 16) | offset
+def lhu(rt, offset, rs): return (0x25 << 26) | (rs << 21) | (rt << 16) | offset
+def addiu(rt, rs, immediate): return (0x09 << 26) | (rs << 21) | (rt << 16) | (immediate & 0xffff)
+def bne(rs, rt, offset): return (0x05 << 26) | (rs << 21) | (rt << 16) | (offset & 0xffff)
+def sb(rt, offset, rs): return (0x28 << 26) | (rs << 21) | (rt << 16) | offset
+def jump(address): return (0x02 << 26) | ((address >> 2) & 0x03ffffff)
+
+instructions = [
+    lui(11, 0xbf80),
+    ori(11, 11, 0x2080),            # debug port in t3
+    lui(8, 0x8000),                 # RAM base in t0
+    lbu(9, 0x100, 8),               # expected byte cheat in t1
+    addiu(10, 0, 0x5a),
+    bne(9, 10, 9), 0,               # branch to fail
+    lhu(9, 0x102, 8),               # expected halfword cheat in t1
+    addiu(10, 0, 0x1234),
+    bne(9, 10, 5), 0,               # branch to fail
+    addiu(9, 0, ord('Y')),
+    sb(9, 0, 11),
+    jump(0x80010134), 0,            # stay after success output
+    addiu(9, 0, ord('N')),
+    sb(9, 0, 11),
+    jump(0x80010144), 0,            # stay after failure output
+]
+header = bytearray(0x800)
+header[:8] = b"PS-X EXE"
+struct.pack_into("<I", header, 0x10, 0x80010100)
+struct.pack_into("<I", header, 0x14, 0)
+struct.pack_into("<I", header, 0x18, 0x80010000)
+struct.pack_into("<I", header, 0x1c, 0x800)
+struct.pack_into("<I", header, 0x30, 0x801ff000)
+struct.pack_into("<I", header, 0x34, 0x1000)
+header[0x4c:0x4c + 55] = b"Sony Computer Entertainment Inc. for North America area"
+image = bytearray(0x800)
+struct.pack_into("<%dI" % len(instructions), image, 0x100, *instructions)
+with open(sys.argv[1], "wb") as output:
+    output.write(header)
+    output.write(image)
+]=])
+    execute_process(COMMAND "${PYTHON3}" -c "${program}" "${cheat_exe}"
+      RESULT_VARIABLE fixture_rc OUTPUT_VARIABLE fixture_out ERROR_VARIABLE fixture_err)
+    if(NOT fixture_rc STREQUAL "0")
+      message(FATAL_ERROR "could not generate the self-authored runner cheat executable: ${fixture_rc}\n"
+        "${fixture_out}${fixture_err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+      RESULT_VARIABLE baseline_rc OUTPUT_VARIABLE baseline_out ERROR_VARIABLE baseline_err)
+    set(baseline_output "${baseline_out}${baseline_err}")
+    if(NOT baseline_rc STREQUAL "0" OR NOT baseline_output MATCHES "tty N")
+      message(FATAL_ERROR "self-authored runner cheat executable did not report its expected no-cheat value:\\n"
+        "exit ${baseline_rc}\\n${baseline_output}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --cheat "30000100 00A5" --cheat "80000102 1234" --cheat "30000100 005A"
+      RESULT_VARIABLE valid_rc OUTPUT_VARIABLE valid_out ERROR_VARIABLE valid_err)
+    set(valid_output "${valid_out}${valid_err}")
+    if(NOT valid_rc STREQUAL "0" OR NOT valid_output MATCHES "tty Y" OR
+       valid_output MATCHES "tty N")
+      message(FATAL_ERROR "runner did not apply repeatable byte/halfword cheats in option order before the first frame:\n"
+        "exit ${valid_rc}\n${valid_output}")
+    endif()
+
+    set(rejected_png "${OUT}/runner-cheat-invalid.png")
+    file(REMOVE "${rejected_png}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --png "1:${rejected_png}" --cheat "D0000100 00A5"
+      RESULT_VARIABLE invalid_rc OUTPUT_VARIABLE invalid_out ERROR_VARIABLE invalid_err)
+    string(TOLOWER "${invalid_out}${invalid_err}" invalid_output_lower)
+    if(NOT invalid_rc STREQUAL "2" OR
+       NOT invalid_output_lower MATCHES "(cheat|unsupported|unknown option)" OR
+       "${invalid_out}${invalid_err}" MATCHES "(tty [YN]|frame [0-9])" OR EXISTS "${rejected_png}")
+      message(FATAL_ERROR "runner did not reject invalid cheat text before execution or output mutation:\n"
+        "exit ${invalid_rc}\n${invalid_out}${invalid_err}")
+    endif()
+
+    set(excess_args "")
+    foreach(index RANGE 1 33)
+      list(APPEND excess_args --cheat "30000100 00A5")
+    endforeach()
+    set(excess_png "${OUT}/runner-cheat-too-many.png")
+    file(REMOVE "${excess_png}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --png "1:${excess_png}" ${excess_args}
+      RESULT_VARIABLE excess_rc OUTPUT_VARIABLE excess_out ERROR_VARIABLE excess_err)
+    string(TOLOWER "${excess_out}${excess_err}" excess_output_lower)
+    if(NOT excess_rc STREQUAL "2" OR NOT excess_output_lower MATCHES "too many --cheat entries" OR
+       "${excess_out}${excess_err}" MATCHES "(tty [YN]|frame [0-9])" OR EXISTS "${excess_png}")
+      message(FATAL_ERROR "runner did not reject an over-cap cheat list before execution or output mutation:\n"
+        "exit ${excess_rc}\n${excess_out}${excess_err}")
+    endif()
   elseif(CASE STREQUAL "cheats_hash")
-    message(FATAL_ERROR "runner cheat state hashing is not implemented")
+    if(NOT DEFINED OUT OR "${OUT}" STREQUAL "")
+      message(FATAL_ERROR "runner cheat hash case requires OUT")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(cheat_state result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state ${ARGN}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ${digits}\n$")
+        message(FATAL_ERROR "runner cheat hash ${ARGN}: expected exit 0 and one state hash, got ${rc}\n${out}${err}")
+      endif()
+      string(REGEX MATCH "state sha256 ([0-9a-f]+)" state_line "${out}")
+      set(${result_name} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    endfunction()
+
+    cheat_state(no_cheat)
+    cheat_state(no_cheat_repeat)
+    cheat_state(normalized_upper --cheat "30000100 00A5")
+    cheat_state(normalized_lower --cheat "30000100+00a5")
+    cheat_state(single_entry --cheat "30000100 00A5")
+    cheat_state(duplicate_entry --cheat "30000100 00A5" --cheat "30000100 00A5")
+    cheat_state(order_ab --cheat "30000100 00A5" --cheat "30000101 00B6")
+    cheat_state(order_ba --cheat "30000101 00B6" --cheat "30000100 00A5")
+    if(no_cheat STREQUAL normalized_upper OR
+       NOT no_cheat STREQUAL no_cheat_repeat OR
+       NOT normalized_upper STREQUAL normalized_lower OR
+       NOT single_entry STREQUAL normalized_upper OR
+       single_entry STREQUAL duplicate_entry OR
+       order_ab STREQUAL order_ba)
+      message(FATAL_ERROR "runner state hashes did not preserve no-cheat and normalized configuration identity:\n"
+        "no-cheat=${no_cheat} repeat=${no_cheat_repeat}\n"
+        "upper=${normalized_upper} lower=${normalized_lower} single=${single_entry} duplicate=${duplicate_entry}\n"
+        "A+B=${order_ab} B+A=${order_ba}")
+    endif()
+
+    set(rejected_png "${OUT}/runner-cheat-invalid-hash.png")
+    file(REMOVE "${rejected_png}")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --png "1:${rejected_png}"
+        --cheat "D0000100 00A5"
+      RESULT_VARIABLE invalid_rc OUTPUT_VARIABLE invalid_out ERROR_VARIABLE invalid_err)
+    string(TOLOWER "${invalid_out}${invalid_err}" invalid_output_lower)
+    if(NOT invalid_rc STREQUAL "2" OR invalid_out MATCHES "state sha256" OR
+       NOT invalid_output_lower MATCHES "(cheat|unsupported|unknown option)" OR EXISTS "${rejected_png}")
+      message(FATAL_ERROR "invalid cheat input produced state output or a file: exit ${invalid_rc}\n${invalid_out}${invalid_err}")
+    endif()
+
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${OUT}/unused.bin"
+        --disc "${OUT}/unused.cue" --hash-state
+      RESULT_VARIABLE disc_rc OUTPUT_VARIABLE disc_out ERROR_VARIABLE disc_err)
+    if(NOT disc_rc STREQUAL "2" OR
+       NOT "${disc_out}${disc_err}" MATCHES "--hash-state is unavailable with --disc")
+      message(FATAL_ERROR "runner accepted --hash-state with --disc: exit ${disc_rc}\n${disc_out}${disc_err}")
+    endif()
   elseif(CASE STREQUAL "patch_cli")
     message(FATAL_ERROR "runner patch CLI behavior is not implemented")
   elseif(CASE STREQUAL "boot_full")
@@ -1991,10 +2144,12 @@ endforeach()
 # Fault prevented: runner options or state hashes silently claim unsupported
 # patch and cheat behavior.
 schway_add_test(NAME runner.cheats.cli
-  COMMAND ${runner_check} -DCASE=cheats_cli -P ${CMAKE_CURRENT_LIST_FILE}
+  COMMAND ${runner_check} -DCASE=cheats_cli -DPYTHON3=${Python3_EXECUTABLE}
+    -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cheats -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 schway_add_test(NAME runner.cheats.hash
-  COMMAND ${runner_check} -DCASE=cheats_hash -P ${CMAKE_CURRENT_LIST_FILE}
+  COMMAND ${runner_check} -DCASE=cheats_hash -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cheats
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 schway_add_test(NAME runner.patch.cli
   COMMAND ${runner_check} -DCASE=patch_cli -P ${CMAKE_CURRENT_LIST_FILE}

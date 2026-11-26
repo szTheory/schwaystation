@@ -14,14 +14,14 @@ test card, described in
 ## Synopsis
 
 ```text
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-state]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]
-                  [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
+                  [--stop-on mailbox] [--inputs FILE] [--cheat CODE ...] [--hash] [--hash-audio]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
-                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
+                  [--memcard-names basename|serial] [--serial SERIAL] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
 schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
 schwaystation-run --help | --version
 ```
@@ -48,6 +48,7 @@ schwaystation-run --help | --version
 | `--save-dir DIR` | Load and save all eight card sockets under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
 | `--memcard-names MODE` | Use `basename` (default) or opt into `serial` naming to select the basename used for all eight card socket paths. Serial naming resolves the title serial from an executable or the first disc member. Give it once. |
 | `--serial SERIAL` | Keep this literal, validated card basename with `--memcard-names serial`. It overrides serial extraction and content hashing. |
+| `--cheat CODE` | Add one enabled GameShark entry. Repeat up to 32 times; entries run in command-line order at the start of each frame. Invalid or unsupported text rejects the invocation before the run starts. See [GameShark cheats](cheats.md). |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
 | `--metadata-ledger CSV` and `--metadata-dat DAT` | Supply both bounded lookup files to `--probe`; identity is shown only after an exact DAT and passing-ledger match. |
@@ -70,6 +71,10 @@ PS-EXE marker. If those hints disagree, it prints their values and the selected 
 wins among automatic hints. When no hint is available, auto keeps the NTSC-U default. An explicit `--region` value
 overrides the hints while disagreement diagnostics remain visible. The console board, video region and title serial
 are separate values: changing `--machine` does not change region selection or content identity.
+
+Each `--cheat` option is parsed before the instance runs. At every requested frame boundary, its normalized writes
+are applied in option order before emulation begins. Overlapping writes therefore use last-write-wins behavior. The
+bounded syntax, widths, address range and write limits are described in [GameShark cheats](cheats.md).
 
 ## BIOS images
 
