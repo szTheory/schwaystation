@@ -19,7 +19,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior. (completed 2026-11-23)
 - [x] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode. (completed 2026-11-24)
 - [x] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs. (completed 2026-11-25)
-- [ ] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support.
+- [x] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support. (completed 2026-11-26)
 
 ## Phase Details
 
@@ -389,7 +389,7 @@ Plans:
   3. The generated compatibility report accounts for all 13,407 entries at the pinned, licensed DAT revision and links supported pass and fail results to evidence. Untested entries and combinations remain explicitly unknown.
   4. `is_experimental` is false only when the committed required-capability matrix passes every row, with zero unknown or failing required rows. It stays true when that evidence is missing or fails. The matrix covers the specified boot-to-play disc families, region and board tuples, peripheral classes, card persistence, patches and cheats. DAT-wide playability is outside that claim.
 
-**Plans**: 18/18 plans executed
+**Plans**: 18/18 plans complete
 
 Plans:
 - [x] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
@@ -428,4 +428,4 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
-| 16. Patches, cheats and compatibility evidence | 18/18 | Verified locally | - |
+| 16. Patches, cheats and compatibility evidence | 18/18 | Complete    | 2026-11-26 |

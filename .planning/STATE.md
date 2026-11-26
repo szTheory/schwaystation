@@ -3,20 +3,19 @@ gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
-current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 18
-status: ready_to_ship
-stopped_at: Phase 16 verified locally at the pre-ship boundary
-last_updated: "2026-11-26T16:18:55Z"
+current_plan: Not started
+status: completed
+stopped_at: Phase 16 complete — all phases complete
+last_updated: "2026-11-26T18:48:57.404Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 source review and final local verification passed
-state_head: 1abec93f56f439983b196f6e44826e06c09eba57
+last_activity_desc: Phase 16 complete
+state_head: a81d14c0d5457c85f2c33efbe5de21e2a9ab0fe3
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 125
   completed_plans: 125
-  percent: 90
+  percent: 100
 ---
 
 # Project State
@@ -30,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 16 (Patches, cheats and compatibility evidence) — VERIFIED LOCALLY
-Current Plan: 18
+Phase: 16
+Current Plan: Not started
 Total Plans in Phase: 18
-Status: All plans complete and locally verified. Ready for the ship step.
-Last activity: 2026-11-26 — Reviewed-source CI, packaging and release checks passed
-Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has all 18 plans complete and awaits ship. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Status: All phases complete
+Last activity: 2026-11-26 — Phase 16 complete
+Progress: [██████████] 100% (9/10 v2.0 phases released; Phase 16 has all 18 plans complete and awaits ship. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -1630,7 +1629,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 302
+- Total plans completed: 320
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1653,6 +1652,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 13 | 9 | - | - |
 | 14 | 16 | - | - |
 | 15 | 12 | - | - |
+| 16 | 18 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -2678,7 +2678,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-26T16:18:55Z
-Stopped at: Local verification passed at the Phase 16 pre-ship boundary
+Stopped at: Phase 16 complete — all phases complete
 Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md
 
 Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
