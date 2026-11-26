@@ -864,6 +864,7 @@ static int run_bounds(const char *root)
 {
     static const uint8_t prior_byte[] = {0xa7u};
     static const uint8_t patch_byte[] = {0xb8u};
+    static const uint8_t patch_pair[] = {0xb8u, 0xb9u};
     schway_disc_image *image = NULL;
     schway_disc_patch_source source;
     schway_disc_patch_candidate *candidate = NULL;
@@ -934,7 +935,8 @@ static int run_bounds(const char *root)
     patch[57u] = 1u;
     REJECT_PPF(patch, 1083u, source_sha, SCHWAY_DISC_PATCH_BAD_PATCH, "reject truncated enabled PPF3 block");
     REJECT_PPF3_RECORD(UINT64_MAX, patch_byte, 1u, source_sha, SCHWAY_DISC_PATCH_BOUNDS, "reject PPF3 offset overflow");
-    REJECT_PPF3_RECORD(PATCH_SOURCE_BYTES - 1u, patch_byte, 2u, source_sha, SCHWAY_DISC_PATCH_BOUNDS, "source overrun");
+    REJECT_PPF3_RECORD(PATCH_SOURCE_BYTES - 1u, patch_pair, 2u, source_sha,
+                       SCHWAY_DISC_PATCH_BOUNDS, "source overrun");
 
     patch_size = begin_ppf3(patch, sizeof patch, raw, 0u, 1u);
     write_u64_le(patch + patch_size, 200u);

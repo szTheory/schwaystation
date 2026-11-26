@@ -126,7 +126,12 @@ static FILE *schway__disc_bps_open_stage(void)
     if (file == NULL) (void)close(fd);
     return file;
 #else
+#if defined(_MSC_VER)
+    FILE *file = NULL;
+    return tmpfile_s(&file) == 0 ? file : NULL;
+#else
     return tmpfile();
+#endif
 #endif
 }
 

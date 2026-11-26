@@ -21,3 +21,15 @@ Reviewed the follow-up diff based on `f3d544967e6efcc2936e3dea5837ad4ef084cf7f`:
 - `tests/hygiene/tests.cmake` — `hygiene.tree` has a 180-second timeout, above the measured 101.02-second standalone scan and 75.99-second hygiene-workflow scan.
 
 No findings remain. Focused patch/cheat regressions passed locally; the GCC 15 patch build and final hosted performance, WASI-size, hygiene, and platform results are recorded in `16-LOCAL-EVIDENCE.md` after they complete.
+
+## Hosted-CI correction review
+
+Reviewed the follow-up corrections based on `25ba6bb749c968018e23618df35951a12c092645`:
+
+- `.github/workflows/nightly.yml` — the fuzz timeout increases from 15 to 18 minutes based on run 45885388337, where 12 of 13 bounded 61-second campaigns completed before the job limit.
+- `examples/sdl2/CMakeLists.txt` — the installed-library example now compiles the patch/BPS providers and their CRC/SHA helpers, and adds the runner's private include directory. The local installed-consumer build passed.
+- `host/disc_bps.c` — only MSVC uses `tmpfile_s()` to avoid its deprecation warning under `/WX`; WASI's exclusive unlinked staging and other platforms' `tmpfile()` path are unchanged.
+- `quality.json` — exact ceilings follow the successful hosted perf and WASI producers from run 45885388357; their relative regression and size checks passed.
+- `tests/disc/patch.c` — the malformed two-byte record now has two readable fixture bytes, so the test reaches the intended source-bound rejection without an out-of-bounds test read. The seven focused cases passed in normal and ASan builds.
+
+No correctness, security, or maintainability findings remain in this correction. Windows compilation and the complete CI/Nightly results remain pending a fresh hosted run. Commands and current hosted outcomes are recorded in `16-LOCAL-EVIDENCE.md`.
