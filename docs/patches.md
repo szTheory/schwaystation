@@ -59,3 +59,5 @@ PPF offsets address the raw file directly: `LBA = offset / 2352`, and `byte with
 Candidate loading reads and hashes the complete source, validates the PPF1 header and every record, enforces source bounds with subtraction-based checks, then builds a bounded sorted overlay. Loading does not change the current image reader. Attaching a candidate requires the same source length, raw-sector geometry, read callback, and image instance used to validate it.
 
 The image takes ownership only after that source binding succeeds. A malformed patch, wrong digest, unsupported geometry, or candidate for another image leaves the prior reader and overlay in place. Applying an overlay changes only the sector buffer returned by the provider; opening, hashing, and reading a patch never writes the source file.
+
+See the [compatibility report](compatibility.md) for the recorded tests and required build evidence.

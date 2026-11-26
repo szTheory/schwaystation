@@ -646,10 +646,10 @@ report. The report is written only to ignored `build/library/results.csv`.
 
 The local lookup uses `tests/compat/ledger.csv` and the DAT at `build/library/Sony - PlayStation.dat`. If the DAT
 is absent, it is fetched from libretro-database commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a` and checked by
-SHA-256; an existing local DAT is reused. Boot and play remain unknown until a disc
+SHA-256. Cached copies get the same digest check before use. Boot and play remain unknown until a disc
 backend measures them. CI exercises the same host lookup code with isolated temporary DAT and ledger fixtures,
-never `.env.local` or owner content. Public compatibility documentation is regenerated from the committed ledger
-only.
+never `.env.local` or owner content. The [public compatibility report](compatibility.md) combines the committed
+ledger, required capability matrix and pinned aggregate inventory.
 
 ## Stopping
 

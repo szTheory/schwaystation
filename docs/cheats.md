@@ -57,3 +57,5 @@ produce different hashes even when the current RAM contents match.
 
 This hash covers the runner's saved machine state and configured cheat continuation. It does not identify patched
 disc media or replace a disc-patch identity. The runner continues to reject `--hash-state` with `--disc`.
+
+See the [compatibility report](compatibility.md) for the recorded tests and required build evidence.

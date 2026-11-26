@@ -28,6 +28,7 @@ core,ntsc-u.pu8-late.v2,none,mouse,relative_motion.frame_latch+active_low_button
 core,ntsc-u.pu8-late.v2,none,multitap,eight_socket.card_protocol+independent.persistence,pass,card.tap.protocol.exit0;card.tap.state.exit0;runner.cards.multitap.exit0;runner.cards.persistence.exit0;libretro.cards.multitap.exit0;libretro.cards.persistence.exit0,2026-11-24
 core,ntsc-u.pu8-late.v2,none,multitap,poll_methods+request_history+host.topology,pass,sio.tap.history_edges.exit0;sio.tap.poll_methods.exit0;libretro.input.multitap.exit0;libretro.input.descriptors.exit0,2026-11-24
 core,ntsc-u.pu8-late.v2,none,negcon,native_poll_payload+host.mapping,pass,sio.special.negcon.exit0;libretro.input.special.exit0,2026-11-24
+core,ntsc-u.pu8-late.v2,none,none,gameshark.byte+halfword+frame_write+state_continuation,pass,libretro.cheats.apply;libretro.cheats.state;runner.cheats.cli;runner.cheats.hash,2026-11-26
 core,ntsc-u.pu8-late.v2,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,ntsc-u.pu8-late.v2,none,sensor,beam.bright_dark+threshold48+edge+offscreen_reload,pass,gpu.gun.sample.exit0;gpu.gun.geometry.exit0;gpu.gun.irq_order.exit0,2026-11-25
 core,ntsc-u.pu8-late.v2,none,state,malformed_reject+host_pending_excluded+stable_bytes,pass,sio.gun.state.exit0;gpu.gun.state.exit0;core.state.stable_bytes.exit0,2026-11-25
@@ -40,5 +41,9 @@ core,pal.pu23.v2,none,none,profile.select,pass,core.profile.machine.exit0;libret
 core,pal.pu7.v0,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,pal.pu8-early.v0,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,pal.pu8-late.v2,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
+cue-bin,ntsc-u,none,cdrom,bps.crc+staging+transaction,pass,disc.patch.bps;disc.patch.atomic;runner.patch.cli,2026-11-26
+cue-bin,ntsc-u,none,cdrom,ppf1.identity+sector_overlay,pass,disc.patch.ppf1,2026-11-26
+cue-bin,ntsc-u,none,cdrom,ppf2.size+validation_block+sector_overlay,pass,disc.patch.ppf2,2026-11-26
+cue-bin,ntsc-u,none,cdrom,ppf3.bin+offset64+undo+sector_overlay,pass,disc.patch.ppf3,2026-11-26
 ecm,ntsc-u,none,cdrom,disc_boot.one_data_track.64x1+toc+sectors+guest.boot+read+fmv,pass,disc.image.ecm.literal+modeled.exit0;disc.image.legacy_parity.ecm.64x1.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ecm.boot+read+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22
 pbp,ntsc-u,none,cdrom,disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame,pass,provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run,2026-11-21

@@ -62,8 +62,8 @@ invalid replacement keeps the previous entry and does not touch RAM. Enabled ent
 options and input are prepared, immediately before core frame execution. Entries run by ascending index and then
 text order, so the last overlapping write wins. Disabling an entry stops its future writes without undoing bytes
 already written. `retro_cheat_reset` clears all entries; `retro_reset` preserves them. Unload, deinit, and a new
-content load clear the configuration. The `.info` `cheats` claim remains false until the state tests and claim
-guard cover this behavior.
+content load clear the configuration. The `.info` advertises this tested cheat subset. The
+[compatibility report](compatibility.md) shows which evidence is required to clear the experimental marker.
 
 ## Serialized state
 

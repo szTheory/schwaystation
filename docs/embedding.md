@@ -293,7 +293,7 @@ nothing and changes no byte of the instance, so peeking everything leaves the st
 accept CPU addresses, mirrors or MMIO. Width is 1 or 2 bytes, halfwords must be aligned, and the entire write must
 fit in RAM. Values must fit the selected width. A null instance, unsupported width, unaligned halfword, out-of-range
 offset or oversized value returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing state. Accepted writes store
-little-endian bytes directly and consume no emulated ticks.
+little-endian bytes directly and consume no emulated ticks. See [GameShark cheats](cheats.md) for its host caller.
 
 ## The first fault
 
@@ -678,10 +678,10 @@ state. The cursor preserves a contiguous block stream when an EOB occupies the l
 the frame-latched inputs and serial protocol state for eight controller endpoints, including multitap selection and
 special-controller controls; pending host input remains outside the state. Loading restores card protocol progress,
 not the card image or its generation: those remain with the receiving instance, and only a newly completed valid
-write changes them. Format-16 through format-19 states return `SCHWAY_STATUS_ERR_STATE_VERSION`.
+write changes them. Older state formats return `SCHWAY_STATUS_ERR_STATE_VERSION`.
 
 The API version, state format and behavior revision are separate compatibility values. The current values are API
-v9, state format 20 and behavior revision 20: API versions track public header changes, state formats track the
+v11, state format 21 and behavior revision 21: API versions track public header changes, state formats track the
 serialized layout, and behavior revisions track deterministic behavior and hash changes. API v6 introduced the
 host-supplied disc identity in the size-tagged descriptor.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
