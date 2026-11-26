@@ -1285,6 +1285,66 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_live")
   return()
 endif()
 
+# Fault prevented: a DAT game occurrence being dropped when its serial is missing or repeated.
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_inventory_accounting")
+  foreach(required SOURCE_ROOT WORK_ROOT RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "inventory accounting requires ${required}")
+    endif()
+  endforeach()
+  set(root "${WORK_ROOT}/compat-inventory-accounting")
+  file(REMOVE_RECURSE "${root}")
+  file(MAKE_DIRECTORY "${root}")
+  set(dat "${root}/synthetic.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: inventory"
+)
+game (
+ name "Alpha (revision \"A\")"
+ serial "SLUS-00001"
+ rom (
+  name "alpha disk 1.bin"
+  size 1
+  crc 00000001
+ )
+ rom (
+  name "alpha disk 2.bin"
+  size 2
+  crc 00000002
+ )
+)
+game (
+ name "Alpha (revision \"A\")"
+ serial "SLUS-00001"
+ rom (
+  name "alpha duplicate.bin"
+  size 3
+  crc 00000003
+ )
+)
+game (
+ name "No serial"
+)
+]=])
+  file(SHA256 "${dat}" expected_sha256)
+  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "inventory accounting command failed (${rc}): ${error}")
+  endif()
+  foreach(field "source_sha256=${expected_sha256}" "entries=3" "pass=0" "fail=0"
+      "unknown=3" "missing_serial=1" "duplicate_serial_entries=2")
+    string(FIND "${output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "inventory accounting omitted ${field}: ${output}")
+    endif()
+  endforeach()
+  if(output MATCHES "Alpha|SLUS-00001|No serial")
+    message(FATAL_ERROR "public inventory output disclosed per-occurrence data: ${output}")
+  endif()
+  return()
+endif()
+
 # These script selectors are part of the compatibility contract before their
 # accounting and fresh-result implementations land in later plans.
 if(CMAKE_SCRIPT_MODE_FILE AND CASE MATCHES
@@ -1423,6 +1483,7 @@ set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_
 foreach(case accounting controls)
   schway_add_test(NAME compat.inventory.${case}
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+      -DRUN=$<TARGET_FILE:schwaystation-run>
       -DCASE=compat_inventory_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
     LABELS compat portable TIMEOUT 30)
 endforeach()
