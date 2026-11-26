@@ -6477,6 +6477,217 @@ static int test_rumble_controls(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_cheats_apply(void)
+{
+    unsigned char *ram = NULL;
+
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        p_cheat_reset();
+        p_cheat_set(0u, true, "30000010 00A5\n80000012 1234");
+        run_one();
+        CHECK_EQ_U64(ram[0x10u], 0xA5u);
+        CHECK_EQ_U64(ram[0x12u], 0x34u);
+        CHECK_EQ_U64(ram[0x13u], 0x12u);
+    }
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static void cheat_expect_rejection_preserves_state(unsigned index, const char *code)
+{
+    const size_t ram_size = 2u * 1024u * 1024u;
+    unsigned char *ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    size_t state_size = p_serialize_size();
+    unsigned char *saved_ram = ram != NULL ? (unsigned char *)malloc(ram_size) : NULL;
+    unsigned char *before = state_size != 0u ? (unsigned char *)malloc(state_size) : NULL;
+    unsigned char *after = state_size != 0u ? (unsigned char *)malloc(state_size) : NULL;
+    int before_ok = 0;
+    int after_ok = 0;
+
+    CHECK(ram != NULL);
+    CHECK(saved_ram != NULL);
+    CHECK(state_size != 0u);
+    CHECK(before != NULL);
+    CHECK(after != NULL);
+    if (ram == NULL || saved_ram == NULL || state_size == 0u || before == NULL || after == NULL) {
+        free(after);
+        free(before);
+        free(saved_ram);
+        return;
+    }
+
+    memcpy(saved_ram, ram, ram_size);
+    before_ok = p_serialize(before, state_size) ? 1 : 0;
+    CHECK(before_ok);
+    p_cheat_set(index, true, code);
+    CHECK(memcmp(saved_ram, ram, ram_size) == 0);
+    after_ok = p_serialize(after, state_size) ? 1 : 0;
+    CHECK(after_ok);
+    if (before_ok && after_ok) {
+        CHECK(memcmp(before, after, state_size) == 0);
+    }
+
+    free(after);
+    free(before);
+    free(saved_ram);
+}
+
+static size_t make_cheat_text(char *text, size_t capacity, unsigned first, unsigned count)
+{
+    size_t used = 0u;
+    for (unsigned line = 0u; line < count; line++) {
+        const char *separator = used == 0u ? "" : "\n";
+        size_t available = capacity - used;
+        int written = snprintf(text + used, available, "%s30%06X 0001", separator,
+                               first + line);
+        if (written < 0 || (size_t)written >= available) {
+            return 0u;
+        }
+        used += (size_t)written;
+    }
+    return used;
+}
+
+static int test_cheats_controls(void)
+{
+    unsigned char *ram = NULL;
+    char bulk[4][1025];
+    char fifth_entry[] = "30081200 00AA";
+    int loaded = p_load_game(NULL) ? 1 : 0;
+
+    CHECK(loaded);
+    if (!loaded) goto cleanup;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+
+    /* Keep the test addresses out of the test-card guest's code and stack. */
+    p_cheat_reset();
+    ram[0x80000u] = 0x5Au;
+    ram[0x80020u] = 0x5Bu;
+    ram[0x80021u] = 0x5Cu;
+    run_one();
+    CHECK_EQ_U64(ram[0x80000u], 0x5Au);
+    CHECK_EQ_U64(ram[0x80020u], 0x5Bu);
+    CHECK_EQ_U64(ram[0x80021u], 0x5Cu);
+    p_cheat_set(0u, true, "30080020 0011\n30080020 0022");
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x22u);
+    p_cheat_reset();
+    p_cheat_set(0u, true, "30080020 0011\n30080020 0022");
+    p_cheat_set(1u, true, "30080020 0033\n30080021 0044");
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x33u);
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+
+    p_cheat_set(1u, false, "30080020 0033\n30080021 0044");
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+    ram[0x80021u] = 0x55u;
+    unsigned video_before_disable = video_calls;
+    run_one();
+    CHECK_EQ_U64(video_calls, video_before_disable + 1u);
+    CHECK_EQ_U64(ram[0x80020u], 0x22u);
+    CHECK_EQ_U64(ram[0x80021u], 0x55u);
+    p_cheat_set(1u, true, "30080020 0033\n30080021 0044");
+    run_one();
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+
+    p_reset();
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x33u);
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+
+    p_cheat_reset();
+    ram[0x80020u] = 0x5Au;
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x5Au);
+
+    p_cheat_set(0u, true, "30080030 007E");
+    ram[0x80030u] = 0xA5u;
+    cheat_expect_rejection_preserves_state(0u, "30080030 00BE\n80080032");
+    CHECK_EQ_U64(ram[0x80030u], 0xA5u);
+    cheat_expect_rejection_preserves_state(32u, "30080031 0099");
+    cheat_expect_rejection_preserves_state(0u, "30080030 00BE\n80080033 0001");
+    run_one();
+    CHECK_EQ_U64(ram[0x80030u], 0x7Eu);
+
+    p_cheat_reset();
+    for (unsigned entry = 0u; entry < 4u; entry++) {
+        size_t text_size = make_cheat_text(bulk[entry], sizeof bulk[entry],
+                                           0x81000u + entry * 64u, 64u);
+        CHECK(text_size != 0u);
+        if (text_size != 0u) {
+            p_cheat_set(entry, true, bulk[entry]);
+        }
+    }
+    ram[0x81200u] = 0x6Bu;
+    cheat_expect_rejection_preserves_state(4u, fifth_entry);
+    run_one();
+    CHECK_EQ_U64(ram[0x81000u], 0x01u);
+    CHECK_EQ_U64(ram[0x810FFu], 0x01u);
+    CHECK_EQ_U64(ram[0x81200u], 0x6Bu);
+
+    p_cheat_reset();
+    ram[0x81200u] = 0x6Bu;
+    run_one();
+    CHECK_EQ_U64(ram[0x81200u], 0x6Bu);
+
+    p_cheat_set(0u, true, "30080120 00A7");
+    CHECK(p_load_game(NULL));
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+    ram[0x80120u] = 0x5Cu;
+    run_one();
+    CHECK_EQ_U64(ram[0x80120u], 0x5Cu);
+
+    p_cheat_set(0u, true, "30080120 00A7");
+    p_unload_game();
+    loaded = 0;
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    CHECK(p_load_game(NULL));
+    loaded = 1;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        ram[0x80120u] = 0x5Cu;
+        run_one();
+        CHECK_EQ_U64(ram[0x80120u], 0x5Cu);
+    }
+
+    p_cheat_set(0u, true, "30080120 00A7");
+    p_deinit();
+    p_set_environment(env);
+    p_init();
+    set_callbacks();
+    CHECK(p_load_game(NULL));
+    loaded = 1;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        ram[0x80120u] = 0x5Cu;
+        run_one();
+        CHECK_EQ_U64(ram[0x80120u], 0x5Cu);
+    }
+
+cleanup:
+    if (loaded) {
+        p_unload_game();
+    }
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -6519,6 +6730,8 @@ int main(int argc, char **argv)
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
+    int cheats_apply_mode = argc == 3 && strcmp(argv[2], "cheats-apply") == 0;
+    int cheats_controls_mode = argc == 3 && strcmp(argv[2], "cheats-controls") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
@@ -6536,6 +6749,7 @@ int main(int argc, char **argv)
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
+         !cheats_apply_mode && !cheats_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                         argv[5][0] == '\0')) ||
@@ -6579,7 +6793,8 @@ int main(int argc, char **argv)
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
                 "card-controls <exe> <save-dir> | cards-multitap <save-dir> | memory-aliases | memory-boundaries | "
                 "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
-                "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
+                "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe> | "
+                "cheats-apply | cheats-controls\n");
         return 2;
     }
     content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || content_boot_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
@@ -6609,7 +6824,7 @@ int main(int argc, char **argv)
     int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode ||
                         card_persistence_mode || input_multitap_mode || input_special_mode ||
                         input_lightgun_mode || input_pointer_mode || input_gun_unavailable_mode ||
-                        cards_multitap_mode;
+                        cards_multitap_mode || cheats_apply_mode || cheats_controls_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -6657,6 +6872,14 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
+
+    if (cheats_apply_mode) {
+        return test_cheats_apply();
+    }
+
+    if (cheats_controls_mode) {
+        return test_cheats_controls();
+    }
 
     if (audio_mode) {
         return test_audio_equality(argv[4], argv[5], region);
