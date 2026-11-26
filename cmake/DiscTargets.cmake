@@ -13,8 +13,9 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
   target_include_directories(schwaystation_disc_image PUBLIC
     ${PROJECT_SOURCE_DIR}/host
     ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/runner
     ${PROJECT_BINARY_DIR}/generated)
+  target_include_directories(schwaystation_disc_image PRIVATE
+    ${PROJECT_SOURCE_DIR}/runner)
   set_target_properties(schwaystation_disc_image PROPERTIES
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)

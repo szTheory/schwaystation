@@ -516,6 +516,9 @@ static schway_disc_image_status schway__disc_image_parse_cue(
             } else if (schway__disc_image_word_is(mode, "MODE1/2048")) {
                 active_track->type = SCHWAY_DISC_TRACK_MODE1;
                 active_track->sector_bytes = SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES;
+            } else if (schway__disc_image_word_is(mode, "MODE1/2352")) {
+                active_track->type = SCHWAY_DISC_TRACK_MODE1;
+                active_track->sector_bytes = SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES;
             } else if (schway__disc_image_word_is(mode, "MODE2/2352")) {
                 active_track->type = SCHWAY_DISC_TRACK_MODE2;
                 active_track->sector_bytes = SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES;
@@ -1457,7 +1460,13 @@ static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
                    fread(raw, 1u, track->sector_bytes, source->file) != track->sector_bytes) {
             return 0u;
         }
-        if (track->type == SCHWAY_DISC_TRACK_MODE1) {
+        if (image->patch != NULL &&
+            schway_disc_patch_candidate_apply(image->patch, file_offset, raw,
+                                              track->sector_bytes) != SCHWAY_DISC_PATCH_OK) {
+            return 0u;
+        }
+        if (track->type == SCHWAY_DISC_TRACK_MODE1 &&
+            track->sector_bytes == SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES) {
             uint8_t cooked[SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES];
             memcpy(cooked, raw, sizeof cooked);
             memset(raw, 0, sizeof raw);

@@ -172,6 +172,7 @@ static int run_mapping(const char *root)
           memcmp(sectors, raw, PATCH_SOURCE_BYTES) == 0,
           "MODE1/2352 reads preserve all raw source bytes");
     schway_disc_image_close(mode1_image);
+    mode1_image = NULL;
     CHECK(open_raw_cue(root, "pregap.cue", "mapping.bin", "MODE2/2352",
                        "PREGAP 00:00:01\n", &pregap_image), "open CUE with virtual pregap");
     CHECK(schway_disc_image_patch_source(pregap_image, &source, &error) ==
