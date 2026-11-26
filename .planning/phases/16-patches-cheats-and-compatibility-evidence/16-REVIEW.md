@@ -1,6 +1,6 @@
 ---
 phase: 16-patches-cheats-and-compatibility-evidence
-reviewed: 2026-11-26T20:54:42Z
+reviewed: 2026-11-26T22:08:14Z
 depth: standard
 files_reviewed: 40
 files_reviewed_list:
@@ -45,26 +45,28 @@ files_reviewed_list:
   - tests/libretro/host.c
   - tests/runner/tests.cmake
 findings:
-  critical: 2
-  warning: 3
+  critical: 0
+  warning: 0
   info: 0
-  total: 5
+  total: 0
   necessity: 0
-status: issues_found
+status: clean
 ---
 
 # Phase 16: Code Review Report
 
-**Reviewed:** 2026-11-26T20:54:42Z
+**Reviewed:** 2026-11-26T22:08:14Z
 **Depth:** standard
 **Files Reviewed:** 40
-**Status:** issues_found
+**Status:** clean
 
 ## Summary
 
-Reviewed current HEAD `2b86f1d0c43e5fd225b3c4ae5994f245485b732f`. Coverage from the earlier 25-file review was reused for unchanged files. I reread the later implementation, build, test-reliability, workflow, and documentation changes, and added a targeted review of the WASI toolchain and CCD path because the latest hosted run exposed a runtime failure there. The three earlier findings remain below with their recorded fixed dispositions. Two current issues remain: the WASI runner traps while resolving CCD paths, and Windows compatibility tests cannot hash the DAT because `shasum` is assumed to exist.
+Reviewed current HEAD `06bb5da9c5213b81c53d5de606a10af87f9b2a37`. Coverage from the earlier 25-file review was reused for unchanged files; I rechecked the implementation, build, test-reliability, workflow, budget, and inventory-emulator changes. The five original findings, the runner emulator finding, and the private-report helper emulator finding are all fixed. The focused inventory suite passed 3/3, and the controls script passed with a multi-part emulator argument. No findings remain on this head; prior findings are retained below as fixed review history. Changed-head hosted BE32 validation remains pending.
 
 ## Narrative Findings (AI reviewer)
+
+No open findings remain on current HEAD. The entries below are retained from earlier review snapshots and are fixed in the current tree.
 
 ## Critical Issues
 
@@ -79,8 +81,8 @@ Reviewed current HEAD `2b86f1d0c43e5fd225b3c4ae5994f245485b732f`. Coverage from 
 
 **Severity:** BLOCKER
 **File:** `cmake/toolchains/wasm32-wasi.cmake:5-8,17`; `host/disc_ccd.c:580`; `tests/runner/tests.cmake:1101,2362-2369`
-**Issue:** The WASI toolchain links executables with a fixed 128 KiB stack, and the latest hosted WASI run traps with an out-of-bounds memory failure at `realpath(relative, NULL)` while `runner.disc.legacy` opens its supported CCD fixture. Earlier CCD probe cases passed, so this is a runtime failure in the deeper legacy runner path. Stack exhaustion is the leading hypothesis; the current test-only 256 KiB overrides do not apply to `schwaystation-run`. The crash prevents supported CCD loading and fails the required WASI lane.
-**Fix:** Reproduce with a 256 KiB stack on the runner to confirm the cause. If that resolves the trap, raise the measured stack size in the toolchain baseline and remove the now-redundant 256 KiB target overrides in `tests/disc/tests.cmake`, `tests/fuzz/tests.cmake`, and `tests/runner/tests.cmake`. Re-measure the WASI runner and update the size bound from that producer. If the larger stack does not resolve it, replace or correct the WASI CCD path-resolution operation while retaining companion-path containment, then add a hosted regression for the CCD runner path.
+**Issue:** The WASI toolchain's 128 KiB stack caused an out-of-bounds runtime trap at `realpath(relative, NULL)` in the `runner.disc.legacy` CCD path. Stack exhaustion was the leading hypothesis. This is fixed: the toolchain baseline is now 256 KiB, the narrower test overrides are removed, and local pinned Wasmtime evidence shows the legacy runner case passes at the new baseline.
+**Fix:** Fixed by raising the WASI baseline stack to 256 KiB and removing redundant target-specific overrides. The WASI size measurement was also updated from the local producer; see `16-REVIEW-DISPOSITION.md` and `16-LOCAL-EVIDENCE.md`.
 
 ## Warnings
 
@@ -102,11 +104,25 @@ Reviewed current HEAD `2b86f1d0c43e5fd225b3c4ae5994f245485b732f`. Coverage from 
 
 **Severity:** WARNING
 **File:** `scripts/library.sh:25-27`; `tests/compat/tests.cmake:1666-1687`
-**Issue:** The library inventory helper invokes only `shasum -a 256`. The Windows hosted compatibility tests run this helper in an environment without `shasum`, so the DAT digest is empty and inventory accounting fails in both Windows legs. This blocks the required test job even though the test runner and inventory code built successfully.
-**Fix:** Use a cross-platform hash command available to this workflow, such as `cmake -E sha256sum`, or feature-detect `sha256sum` and `shasum` and fail explicitly if neither exists.
+**Issue:** The library inventory helper previously invoked only `shasum -a 256`, which is unavailable in the Windows hosted environment. This is fixed: the helper now prefers `sha256sum` and falls back to `shasum`; the recorded native compatibility checks pass.
+**Fix:** Fixed by selecting an available SHA-256 utility and preserving explicit failure handling if hashing fails. See `16-REVIEW-DISPOSITION.md`.
+
+### WR-04: BE32 inventory tests invoke the target runner without its emulator
+
+**Severity:** WARNING
+**File:** `tests/compat/tests.cmake:1353-1354,1398-1399,1762-1768`
+**Issue:** The hosted BE32 `compat.inventory.accounting` job failed because the test passed the big-endian runner through `RUN` and executed it directly from a CMake script. This is fixed in the current tree: the registrations pass the serialized emulator list, script mode decodes it, and every runner invocation in both inventory cases is prefixed with `${EMULATOR}`. The local focused selectors and multi-part emulator script-mode cases passed.
+**Fix:** Fixed by transporting `CMAKE_CROSSCOMPILING_EMULATOR` to both script cases and using it for all runner invocations. A changed-head hosted BE32 run is still needed to verify the full cross-compiled test path; see the remaining warning below.
+
+### WR-05: BE32 inventory controls invoke the test helper without its emulator
+
+**Severity:** WARNING
+**File:** `tests/compat/tests.cmake:1495-1496,1553-1554,1646-1651,1762-1768`
+**Issue:** Before the latest correction, `schwaystation-test-library` was built as a target executable and therefore used the configured BE32 architecture, but `compat_inventory_controls` invoked it directly twice from CMake script mode. CMake did not automatically apply `CMAKE_CROSSCOMPILING_EMULATOR`, so the host could not run the BE32 ELF. This is fixed: both report-validation invocations now use the decoded `${EMULATOR}` list.
+**Fix:** Fixed by prefixing both `${TEST_BINARY}` invocations with `${EMULATOR}` while preserving direct execution when the emulator list is empty. The controls script passed with a multi-part emulator argument, and the focused inventory suite passed 3/3.
 
 ---
 
-_Reviewed: 2026-11-26T20:54:42Z_
+_Reviewed: 2026-11-26T22:08:14Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
