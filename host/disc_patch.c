@@ -8,6 +8,11 @@
 #include <string.h>
 
 #define SCHWAY__DISC_PATCH_HEADER_BYTES 56u
+#define SCHWAY__DISC_PATCH_PPF2_HEADER_BYTES 1084u
+#define SCHWAY__DISC_PATCH_PPF3_HEADER_BYTES 60u
+#define SCHWAY__DISC_PATCH_BLOCK_OFFSET 0x9320u
+#define SCHWAY__DISC_PATCH_BLOCK_BYTES 1024u
+#define SCHWAY__DISC_PATCH_FILE_ID_MAX 3072u
 #define SCHWAY__DISC_PATCH_HASH_CHUNK 4096u
 
 typedef struct schway__disc_patch_record {
@@ -57,6 +62,18 @@ static uint32_t schway__disc_patch_read_u32_le(const uint8_t *bytes)
 {
     return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
            ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+}
+
+static uint64_t schway__disc_patch_read_u64_le(const uint8_t *bytes)
+{
+    uint64_t value = 0u;
+    for (size_t i = 0u; i < 8u; i++) value |= (uint64_t)bytes[i] << (8u * i);
+    return value;
+}
+
+static uint16_t schway__disc_patch_read_u16_le(const uint8_t *bytes)
+{
+    return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8));
 }
 
 static int schway__disc_patch_event_compare(const void *left, const void *right)
@@ -220,6 +237,178 @@ static void schway__disc_patch_fill_records(const uint8_t *patch_bytes,
     }
 }
 
+static int schway__disc_patch_is_file_id(const uint8_t *patch_bytes,
+                                         size_t patch_size, size_t position)
+{
+    static const uint8_t begin[] = "@BEGIN_FILE_ID.DIZ";
+    size_t remaining = patch_size - position;
+    return remaining >= sizeof begin - 1u &&
+           memcmp(patch_bytes + position, begin, sizeof begin - 1u) == 0;
+}
+
+static schway_disc_patch_status schway__disc_patch_validate_file_id(
+    const uint8_t *patch_bytes, size_t patch_size, size_t position,
+    schway_disc_patch_error *error)
+{
+    static const uint8_t begin[] = "@BEGIN_FILE_ID.DIZ";
+    static const uint8_t end[] = "@END_FILE_ID.DIZ";
+    const size_t begin_bytes = sizeof begin - 1u;
+    const size_t end_bytes = sizeof end - 1u;
+    size_t end_offset;
+    size_t description_offset;
+    size_t description_bytes;
+    uint16_t declared_bytes;
+    if (patch_size - position < begin_bytes + end_bytes + 2u ||
+        memcmp(patch_bytes + position, begin, begin_bytes) != 0) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                             (uint64_t)position,
+                                             "truncated PPF3 FileID trailer");
+    }
+    declared_bytes = schway__disc_patch_read_u16_le(patch_bytes + patch_size - 2u);
+    if ((size_t)declared_bytes > SCHWAY__DISC_PATCH_FILE_ID_MAX) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                             (uint64_t)(patch_size - 2u),
+                                             "PPF3 FileID exceeds 3,072 bytes");
+    }
+    end_offset = patch_size - 2u - end_bytes;
+    description_offset = position + begin_bytes;
+    if (end_offset < description_offset) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                             (uint64_t)position,
+                                             "PPF3 FileID trailer bounds are invalid");
+    }
+    description_bytes = end_offset - description_offset;
+    if (description_bytes != (size_t)declared_bytes ||
+        memcmp(patch_bytes + end_offset, end, end_bytes) != 0) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                             (uint64_t)end_offset,
+                                             "PPF3 FileID length or end marker is invalid");
+    }
+    return SCHWAY_DISC_PATCH_OK;
+}
+
+static schway_disc_patch_status schway__disc_patch_check_block(
+    const schway_disc_patch_source *source, const uint8_t *patch_bytes,
+    schway_disc_patch_error *error)
+{
+    uint8_t source_block[SCHWAY__DISC_PATCH_BLOCK_BYTES];
+    uint64_t source_end = SCHWAY__DISC_PATCH_BLOCK_OFFSET +
+                          SCHWAY__DISC_PATCH_BLOCK_BYTES;
+    if (source->byte_count < source_end) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_IDENTITY,
+                                             source->byte_count,
+                                             "source is too short for the PPF validation block");
+    }
+    if (source->read(source->user, SCHWAY__DISC_PATCH_BLOCK_OFFSET,
+                     source_block, sizeof source_block) == 0u) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_IO,
+                                             SCHWAY__DISC_PATCH_BLOCK_OFFSET,
+                                             "cannot read the PPF validation block");
+    }
+    if (memcmp(source_block, patch_bytes + 60u, sizeof source_block) != 0) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_IDENTITY,
+                                             SCHWAY__DISC_PATCH_BLOCK_OFFSET,
+                                             "source PPF validation block does not match");
+    }
+    return SCHWAY_DISC_PATCH_OK;
+}
+
+static schway_disc_patch_status schway__disc_patch_scan_ppf23(
+    const schway_disc_patch_source *source, const uint8_t *patch_bytes,
+    size_t patch_size, schway_disc_patch_format format, size_t header_bytes,
+    uint8_t has_undo, uint32_t *record_count, schway_disc_patch_error *error)
+{
+    size_t position = header_bytes;
+    uint32_t records = 0u;
+    uint64_t payload_bytes = 0u;
+    while (position < patch_size) {
+        uint64_t offset;
+        uint8_t count;
+        size_t record_header_bytes = format == SCHWAY_DISC_PATCH_FORMAT_PPF2 ? 5u : 9u;
+        if (format == SCHWAY_DISC_PATCH_FORMAT_PPF3 &&
+            schway__disc_patch_is_file_id(patch_bytes, patch_size, position)) {
+            schway_disc_patch_status status = schway__disc_patch_validate_file_id(
+                patch_bytes, patch_size, position, error);
+            if (status != SCHWAY_DISC_PATCH_OK) return status;
+            position = patch_size;
+            break;
+        }
+        if (patch_size - position < record_header_bytes) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 (uint64_t)position,
+                                                 "truncated PPF2/PPF3 record header");
+        }
+        offset = format == SCHWAY_DISC_PATCH_FORMAT_PPF2 ?
+            (uint64_t)schway__disc_patch_read_u32_le(patch_bytes + position) :
+            schway__disc_patch_read_u64_le(patch_bytes + position);
+        count = patch_bytes[position + record_header_bytes - 1u];
+        if (count == 0u) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 (uint64_t)position,
+                                                 "PPF2/PPF3 records must contain at least one byte");
+        }
+        if (records >= SCHWAY_DISC_PATCH_MAX_RECORDS) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_LIMIT,
+                                                 (uint64_t)position,
+                                                 "PPF2/PPF3 exceeds the record limit");
+        }
+        if (offset > source->byte_count ||
+            (uint64_t)count > source->byte_count - offset) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BOUNDS,
+                                                 (uint64_t)position,
+                                                 "PPF2/PPF3 record exceeds the raw source");
+        }
+        position += record_header_bytes;
+        if ((size_t)count > patch_size - position) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 (uint64_t)position,
+                                                 "truncated PPF2/PPF3 record data");
+        }
+        position += (size_t)count;
+        payload_bytes += count;
+        if (has_undo != 0u) {
+            if ((size_t)count > patch_size - position) {
+                return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                     (uint64_t)position,
+                                                     "truncated PPF3 undo data");
+            }
+            position += (size_t)count;
+            payload_bytes += count;
+        }
+        if (payload_bytes > SCHWAY_DISC_PATCH_MAX_BYTES) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_LIMIT,
+                                                 (uint64_t)position,
+                                                 "PPF2/PPF3 exceeds the patch data limit");
+        }
+        records++;
+    }
+    if (records == 0u) {
+        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                             (uint64_t)header_bytes,
+                                             "PPF2/PPF3 contains no records");
+    }
+    *record_count = records;
+    return SCHWAY_DISC_PATCH_OK;
+}
+
+static void schway__disc_patch_fill_records_ppf23(
+    const uint8_t *patch_bytes, schway_disc_patch_format format,
+    size_t header_bytes, uint32_t record_count, uint8_t has_undo,
+    schway__disc_patch_record *records)
+{
+    size_t position = header_bytes;
+    size_t offset_bytes = format == SCHWAY_DISC_PATCH_FORMAT_PPF2 ? 4u : 8u;
+    for (uint32_t index = 0u; index < record_count; index++) {
+        uint8_t count = patch_bytes[position + offset_bytes];
+        records[index].offset = offset_bytes == 4u ?
+            (uint64_t)schway__disc_patch_read_u32_le(patch_bytes + position) :
+            schway__disc_patch_read_u64_le(patch_bytes + position);
+        records[index].length = (uint32_t)count;
+        records[index].data_offset = (uint32_t)(position + offset_bytes + 1u);
+        position += offset_bytes + 1u + (size_t)count * (has_undo != 0u ? 2u : 1u);
+    }
+}
+
 static schway_disc_patch_status schway__disc_patch_build_overlay(
     schway_disc_patch_candidate *candidate,
     const schway__disc_patch_record *records,
@@ -324,6 +513,10 @@ schway_disc_patch_status schway_disc_patch_load(
     schway__disc_patch_record *records = NULL;
     uint8_t source_digest[SCHWAY_DISC_PATCH_SHA256_BYTES];
     uint32_t record_count = 0u;
+    uint32_t checks = SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256;
+    uint32_t ppf2_source_size = 0u;
+    size_t header_bytes = SCHWAY__DISC_PATCH_HEADER_BYTES;
+    uint8_t has_undo = 0u;
     schway_disc_patch_status status;
     if (out != NULL) *out = NULL;
     if (report != NULL) memset(report, 0, sizeof *report);
@@ -338,7 +531,9 @@ schway_disc_patch_status schway_disc_patch_load(
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_ARGUMENT,
                                              0u, "invalid patch source, input or output");
     }
-    if (format != SCHWAY_DISC_PATCH_FORMAT_PPF1) {
+    if (format != SCHWAY_DISC_PATCH_FORMAT_PPF1 &&
+        format != SCHWAY_DISC_PATCH_FORMAT_PPF2 &&
+        format != SCHWAY_DISC_PATCH_FORMAT_PPF3) {
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_UNSUPPORTED,
                                              0u, "selected patch format is not implemented");
     }
@@ -346,16 +541,46 @@ schway_disc_patch_status schway_disc_patch_load(
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_ARGUMENT,
                                              0u, "PPF requires the full-source SHA-256");
     }
-    if (patch_size < SCHWAY__DISC_PATCH_HEADER_BYTES ||
-        patch_size > SCHWAY_DISC_PATCH_MAX_BYTES) {
+    if (patch_size > SCHWAY_DISC_PATCH_MAX_BYTES) {
         return schway__disc_patch_error_set(error,
-            patch_size > SCHWAY_DISC_PATCH_MAX_BYTES ? SCHWAY_DISC_PATCH_LIMIT :
-                                                       SCHWAY_DISC_PATCH_BAD_PATCH,
-            0u, "PPF1 header is truncated or patch exceeds the byte limit");
+            SCHWAY_DISC_PATCH_LIMIT, 0u, "PPF patch exceeds the byte limit");
     }
-    if (memcmp(patch_bytes, "PPF10", 5u) != 0 || patch_bytes[5] != 0u) {
-        return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
-                                             0u, "PPF1 magic or method is invalid");
+    if (format == SCHWAY_DISC_PATCH_FORMAT_PPF1) {
+        if (patch_size < SCHWAY__DISC_PATCH_HEADER_BYTES ||
+            memcmp(patch_bytes, "PPF10", 5u) != 0 || patch_bytes[5] != 0u) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 0u, "PPF1 header or method is invalid");
+        }
+    } else if (format == SCHWAY_DISC_PATCH_FORMAT_PPF2) {
+        if (patch_size < SCHWAY__DISC_PATCH_PPF2_HEADER_BYTES ||
+            memcmp(patch_bytes, "PPF20", 5u) != 0 || patch_bytes[5] != 1u) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 0u, "PPF2 header or method is invalid");
+        }
+        ppf2_source_size = schway__disc_patch_read_u32_le(patch_bytes + 56u);
+        header_bytes = SCHWAY__DISC_PATCH_PPF2_HEADER_BYTES;
+    } else {
+        if (patch_size < SCHWAY__DISC_PATCH_PPF3_HEADER_BYTES ||
+            memcmp(patch_bytes, "PPF30", 5u) != 0 || patch_bytes[5] != 2u) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 0u, "PPF3 header or method is invalid");
+        }
+        if (patch_bytes[56] != 0u) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_UNSUPPORTED,
+                                                 56u, "PPF3 supports BIN image type only");
+        }
+        if (patch_bytes[57] > 1u || patch_bytes[58] > 1u || patch_bytes[59] != 0u) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 57u, "PPF3 flags or reserved byte are invalid");
+        }
+        has_undo = patch_bytes[58];
+        header_bytes = patch_bytes[57] != 0u ?
+            SCHWAY__DISC_PATCH_PPF2_HEADER_BYTES :
+            SCHWAY__DISC_PATCH_PPF3_HEADER_BYTES;
+        if (patch_size < header_bytes) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_PATCH,
+                                                 60u, "PPF3 validation block is truncated");
+        }
     }
     status = schway__disc_patch_source_digest(source, source_digest, error);
     if (status != SCHWAY_DISC_PATCH_OK) return status;
@@ -363,15 +588,39 @@ schway_disc_patch_status schway_disc_patch_load(
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_IDENTITY,
                                              0u, "raw source SHA-256 does not match");
     }
-    status = schway__disc_patch_scan_ppf1(source, patch_bytes, patch_size,
-                                          &record_count, error);
+    if (format == SCHWAY_DISC_PATCH_FORMAT_PPF2) {
+        if (source->byte_count > UINT32_MAX ||
+            (uint64_t)ppf2_source_size != source->byte_count) {
+            return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_BAD_IDENTITY,
+                                                 56u, "PPF2 source size does not match");
+        }
+        checks |= SCHWAY_DISC_PATCH_CHECK_PPF2_SOURCE_SIZE;
+        status = schway__disc_patch_check_block(source, patch_bytes, error);
+        if (status != SCHWAY_DISC_PATCH_OK) return status;
+        checks |= SCHWAY_DISC_PATCH_CHECK_PPF2_BLOCK;
+    } else if (format == SCHWAY_DISC_PATCH_FORMAT_PPF3 && patch_bytes[57] != 0u) {
+        status = schway__disc_patch_check_block(source, patch_bytes, error);
+        if (status != SCHWAY_DISC_PATCH_OK) return status;
+        checks |= SCHWAY_DISC_PATCH_CHECK_PPF3_BLOCK;
+    }
+    status = format == SCHWAY_DISC_PATCH_FORMAT_PPF1 ?
+        schway__disc_patch_scan_ppf1(source, patch_bytes, patch_size,
+                                     &record_count, error) :
+        schway__disc_patch_scan_ppf23(source, patch_bytes, patch_size,
+                                      format, header_bytes, has_undo,
+                                      &record_count, error);
     if (status != SCHWAY_DISC_PATCH_OK) return status;
     records = (schway__disc_patch_record *)calloc(record_count, sizeof *records);
     if (records == NULL) {
         return schway__disc_patch_error_set(error, SCHWAY_DISC_PATCH_OUT_OF_MEMORY,
-                                             0u, "out of memory validating PPF1 records");
+                                             0u, "out of memory validating PPF records");
     }
-    schway__disc_patch_fill_records(patch_bytes, patch_size, records);
+    if (format == SCHWAY_DISC_PATCH_FORMAT_PPF1) {
+        schway__disc_patch_fill_records(patch_bytes, patch_size, records);
+    } else {
+        schway__disc_patch_fill_records_ppf23(patch_bytes, format, header_bytes,
+                                              record_count, has_undo, records);
+    }
     candidate = (schway_disc_patch_candidate *)calloc(1u, sizeof *candidate);
     if (candidate == NULL) {
         free(records);
@@ -400,7 +649,7 @@ schway_disc_patch_status schway_disc_patch_load(
     if (report != NULL) {
         report->size = (uint32_t)sizeof *report;
         report->format = (uint32_t)format;
-        report->checks = SCHWAY_DISC_PATCH_CHECK_SOURCE_SHA256;
+        report->checks = checks;
         report->records = record_count;
         report->source_bytes = source->byte_count;
         report->patch_bytes = (uint64_t)patch_size;
