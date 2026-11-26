@@ -437,3 +437,12 @@ schway_add_test(NAME libretro.video.geometry_edges
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> video-geometry-edges ${PROJECT_BINARY_DIR}/tests/native_video_edges.exe
   LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: cheat callbacks, controls or save-state envelopes silently
+# report success without exercising the in-process test-card module.
+foreach(case apply controls state)
+  schway_add_test(NAME libretro.cheats.${case}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+      $<TARGET_FILE:schwaystation-libretro-card-test> cheats-${case}
+    LABELS libretro portable TIMEOUT 30)
+endforeach()

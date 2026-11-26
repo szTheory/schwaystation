@@ -2,6 +2,9 @@
 libretro.cards.controls	libretro,portable
 libretro.cards.multitap	libretro,portable
 libretro.cards.persistence	libretro,portable
+libretro.cheats.apply	libretro,portable
+libretro.cheats.controls	libretro,portable
+libretro.cheats.state	libretro,portable
 libretro.content.boot	libretro,portable
 libretro.content.chd	libretro,portable
 libretro.content.legacy	libretro,portable
