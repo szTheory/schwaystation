@@ -191,7 +191,66 @@ with open(sys.argv[1], "wb") as output:
       message(FATAL_ERROR "runner accepted --hash-state with --disc: exit ${disc_rc}\n${disc_out}${disc_err}")
     endif()
   elseif(CASE STREQUAL "patch_cli")
-    message(FATAL_ERROR "runner patch CLI behavior is not implemented")
+    foreach(var IN ITEMS RUN BIOS OUT PYTHON3)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner patch CLI case requires ${var}")
+      endif()
+    endforeach()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(source "${OUT}/patch-cli-source.bin")
+    set(cue "${OUT}/patch-cli-source.cue")
+    set(patch "${OUT}/patch-cli.ppf")
+    set(program [=[
+import hashlib, struct, sys
+source_path, cue_path, patch_path = sys.argv[1:]
+raw = bytearray()
+for lba in range(32):
+    sector = bytearray(2352)
+    sector[0] = 0
+    sector[1:11] = b"\xff" * 10
+    sector[11] = 0
+    minute, second = divmod((lba + 150) // 75, 60)
+    frame = (lba + 150) % 75
+    bcd = lambda value: ((value // 10) << 4) | (value % 10)
+    sector[12:16] = bytes((bcd(minute), bcd(second), bcd(frame), 2))
+    sector[16:24] = b"\x00\x00\x08\x00\x00\x00\x08\x00"
+    sector[24] = 0x11
+    raw.extend(sector)
+with open(source_path, "wb") as stream:
+    stream.write(raw)
+with open(cue_path, "w", encoding="ascii") as stream:
+    stream.write('FILE "patch-cli-source.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n')
+patch = bytearray(b"PPF10\x00" + bytes(50))
+patch.extend(struct.pack("<IB", 24, 1))
+patch.append(0xA5)
+with open(patch_path, "wb") as stream:
+    stream.write(patch)
+print(hashlib.sha256(raw).hexdigest())
+]=])
+    execute_process(COMMAND "${PYTHON3}" -c "${program}" "${source}" "${cue}" "${patch}"
+      RESULT_VARIABLE fixture_rc OUTPUT_VARIABLE source_sha ERROR_VARIABLE fixture_err
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(LENGTH "${source_sha}" source_sha_length)
+    if(NOT fixture_rc STREQUAL "0" OR NOT source_sha_length EQUAL 64 OR
+       NOT source_sha MATCHES "^[0-9a-f]+$")
+      message(FATAL_ERROR "could not generate the raw patch CLI fixture: ${fixture_rc}\n${fixture_err}")
+    endif()
+    file(SHA256 "${source}" source_sha_before)
+    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --disc "${cue}"
+        --patch "${patch}" --patch-source-sha256 "${source_sha}"
+        --frames 1 --test-patch-sector-zero
+      RESULT_VARIABLE valid_rc OUTPUT_VARIABLE valid_out ERROR_VARIABLE valid_err)
+    set(valid_output "${valid_out}${valid_err}")
+    if(NOT valid_rc STREQUAL "0" OR
+       NOT valid_output MATCHES "patch format=PPF1 .*source-sha256" OR
+       NOT valid_output MATCHES "patch test sector0 byte24=A5")
+      message(FATAL_ERROR "runner did not report the source checks and patched provider byte:\n"
+        "exit ${valid_rc}\n${valid_output}")
+    endif()
+    file(SHA256 "${source}" source_sha_after)
+    if(NOT source_sha_before STREQUAL source_sha_after)
+      message(FATAL_ERROR "runner patching modified its source image: ${source_sha_before} != ${source_sha_after}")
+    endif()
   elseif(CASE STREQUAL "boot_full")
     foreach(var RUN BIOS FIXTURES)
       if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
@@ -2152,7 +2211,10 @@ schway_add_test(NAME runner.cheats.hash
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 schway_add_test(NAME runner.patch.cli
-  COMMAND ${runner_check} -DCASE=patch_cli -P ${CMAKE_CURRENT_LIST_FILE}
+  COMMAND ${runner_check} -DCASE=patch_cli -DRUN=$<TARGET_FILE:schwaystation-run-test>
+    -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DOUT=${PROJECT_BINARY_DIR}/tests/runner-patch-cli -DPYTHON3=${Python3_EXECUTABLE}
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: a movie applied after the frame latch, rejected after execution starts, or
