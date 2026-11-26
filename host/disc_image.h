@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "schwaystation.h"
+#include "disc_patch.h"
 
 typedef enum schway_disc_image_status {
     SCHWAY_DISC_IMAGE_OK = 0,
@@ -260,6 +261,15 @@ static inline schway_disc_image_status schway_disc_image_parse_system_cnf(
 schway_disc_image_status schway_disc_image_open(const char *path,
                                                 schway_disc_image **out,
                                                 schway_disc_image_error *error);
+/* Describes the one supported raw CUE track for a patch candidate. */
+schway_disc_patch_status schway_disc_image_patch_source(
+    schway_disc_image *image, schway_disc_patch_source *out,
+    schway_disc_patch_error *error);
+/* Atomically transfers a validated candidate and preserves the old overlay
+   when the candidate does not belong to this exact raw source. */
+schway_disc_patch_status schway_disc_image_patch_replace(
+    schway_disc_image *image, schway_disc_patch_candidate **candidate,
+    schway_disc_patch_error *error);
 /* Shared by CUE and CHD providers for absent virtual-pregap sectors. */
 void schway__disc_image_make_virtual_sector(uint32_t track_type, uint32_t lba,
                                             uint8_t sector[2352]);

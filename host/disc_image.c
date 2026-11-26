@@ -79,12 +79,37 @@ struct schway_disc_image {
     schway__disc_ecm *ecm;
     schway__disc_pbp *pbp;
     schway_disc_sbi sbi;
+    schway_disc_patch_candidate *patch;
     schway_disc_image *playlist[SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX];
     schway__disc_image_source sources[SCHWAY_DISC_MAX_TRACKS];
     schway__disc_image_track tracks[SCHWAY_DISC_MAX_TRACKS];
     schway_disc descriptor;
     schway_toc toc;
 };
+
+static uint32_t schway__disc_image_patch_read(void *user, uint64_t offset,
+                                             uint8_t *bytes, size_t count)
+{
+    schway_disc_image *image = (schway_disc_image *)user;
+    schway__disc_image_source *source;
+    if (image == NULL || bytes == NULL || image->source_count != 1u) return 0u;
+    source = &image->sources[0];
+    if (source->file == NULL || offset > source->size ||
+        (uint64_t)count > source->size - offset || offset > (uint64_t)LONG_MAX ||
+        fseek(source->file, (long)offset, SEEK_SET) != 0) return 0u;
+    return fread(bytes, 1u, count, source->file) == count ? 1u : 0u;
+}
+
+static void schway__disc_image_patch_error(schway_disc_patch_error *error,
+                                           schway_disc_patch_status status,
+                                           const char *message)
+{
+    if (error == NULL) return;
+    memset(error, 0, sizeof *error);
+    error->size = (uint32_t)sizeof *error;
+    error->status = (uint32_t)status;
+    (void)snprintf(error->message, sizeof error->message, "%s", message);
+}
 
 static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
                                                uint8_t sector[2352], uint8_t subcode[96]);
@@ -491,6 +516,9 @@ static schway_disc_image_status schway__disc_image_parse_cue(
             } else if (schway__disc_image_word_is(mode, "MODE1/2048")) {
                 active_track->type = SCHWAY_DISC_TRACK_MODE1;
                 active_track->sector_bytes = SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES;
+            } else if (schway__disc_image_word_is(mode, "MODE1/2352")) {
+                active_track->type = SCHWAY_DISC_TRACK_MODE1;
+                active_track->sector_bytes = SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES;
             } else if (schway__disc_image_word_is(mode, "MODE2/2352")) {
                 active_track->type = SCHWAY_DISC_TRACK_MODE2;
                 active_track->sector_bytes = SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES;
@@ -1432,7 +1460,13 @@ static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
                    fread(raw, 1u, track->sector_bytes, source->file) != track->sector_bytes) {
             return 0u;
         }
-        if (track->type == SCHWAY_DISC_TRACK_MODE1) {
+        if (image->patch != NULL &&
+            schway_disc_patch_candidate_apply(image->patch, file_offset, raw,
+                                              track->sector_bytes) != SCHWAY_DISC_PATCH_OK) {
+            return 0u;
+        }
+        if (track->type == SCHWAY_DISC_TRACK_MODE1 &&
+            track->sector_bytes == SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES) {
             uint8_t cooked[SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES];
             memcpy(cooked, raw, sizeof cooked);
             memset(raw, 0, sizeof raw);
@@ -1549,9 +1583,81 @@ schway_disc_image_status schway_disc_image_open(const char *path,
     return SCHWAY_DISC_IMAGE_OK;
 }
 
+schway_disc_patch_status schway_disc_image_patch_source(
+    schway_disc_image *image, schway_disc_patch_source *out,
+    schway_disc_patch_error *error)
+{
+    const schway__disc_image_track *track;
+    const schway__disc_image_source *source;
+    if (out == NULL || image == NULL) {
+        schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_BAD_ARGUMENT,
+                                       "invalid image or source output");
+        return SCHWAY_DISC_PATCH_BAD_ARGUMENT;
+    }
+    memset(out, 0, sizeof *out);
+    if (image->playlist_count != 0u || image->source_count != 1u ||
+        image->track_count != 1u || image->chd != NULL || image->ccd != NULL ||
+        image->ecm != NULL || image->pbp != NULL) {
+        schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_UNSUPPORTED,
+                                       "patching requires one raw CUE FILE and track");
+        return SCHWAY_DISC_PATCH_UNSUPPORTED;
+    }
+    track = &image->tracks[0];
+    source = &image->sources[0];
+    if ((track->type != SCHWAY_DISC_TRACK_MODE1 &&
+         track->type != SCHWAY_DISC_TRACK_MODE2) ||
+        track->sector_bytes != SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES ||
+        track->have_index00 != 0u || track->have_pregap != 0u ||
+        track->physical_pregap != 0u || track->virtual_pregap != 0u ||
+        track->have_index01 == 0u || track->index_count != 1u ||
+        track->index01_frame != 0u || track->index0_file_offset != 0u ||
+        track->index1_file_offset != 0u || source->file == NULL ||
+        source->ecm != NULL || source->size == 0u ||
+        source->size % SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES != 0u) {
+        schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_UNSUPPORTED,
+                                       "unsupported raw track geometry for patching");
+        return SCHWAY_DISC_PATCH_UNSUPPORTED;
+    }
+    out->size = (uint32_t)sizeof *out;
+    out->sector_bytes = SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES;
+    out->byte_count = source->size;
+    out->read = schway__disc_image_patch_read;
+    out->user = image;
+    schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_OK, "ok");
+    return SCHWAY_DISC_PATCH_OK;
+}
+
+schway_disc_patch_status schway_disc_image_patch_replace(
+    schway_disc_image *image, schway_disc_patch_candidate **candidate,
+    schway_disc_patch_error *error)
+{
+    schway_disc_patch_source source;
+    schway_disc_patch_status status;
+    schway_disc_patch_candidate *previous;
+    if (image == NULL || candidate == NULL || *candidate == NULL) {
+        schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_BAD_ARGUMENT,
+                                       "invalid image or patch candidate");
+        return SCHWAY_DISC_PATCH_BAD_ARGUMENT;
+    }
+    status = schway_disc_image_patch_source(image, &source, error);
+    if (status != SCHWAY_DISC_PATCH_OK) return status;
+    if (!schway_disc_patch_candidate_matches_source(*candidate, &source)) {
+        schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_BAD_SOURCE,
+                                       "patch candidate belongs to another source");
+        return SCHWAY_DISC_PATCH_BAD_SOURCE;
+    }
+    previous = image->patch;
+    image->patch = *candidate;
+    *candidate = NULL;
+    schway_disc_patch_candidate_destroy(previous);
+    schway__disc_image_patch_error(error, SCHWAY_DISC_PATCH_OK, "ok");
+    return SCHWAY_DISC_PATCH_OK;
+}
+
 void schway_disc_image_close(schway_disc_image *image)
 {
     if (image == NULL) return;
+    schway_disc_patch_candidate_destroy(image->patch);
     for (size_t i = 0u; i < image->playlist_count; i++) {
         schway_disc_image_close(image->playlist[i]);
     }
