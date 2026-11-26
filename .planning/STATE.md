@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 8
+current_plan: 9
 status: executing
-stopped_at: Phase 16 wave 7 complete; wave 8 plan 16-14 is ready
-last_updated: "2026-11-26T06:03:51Z"
+stopped_at: Plan 16-14 integrated; continuing with Plan 16-15
+last_updated: "2026-11-26T15:28:25Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 plans 16-05, 16-10, 16-11, 16-12 and 16-13 complete; wave 8 ready
-state_head: 018dc9220926d8a678d2f44ba4d25cda67020ef0
+last_activity_desc: Plan 16-14 integrated under the approved 4,694-line ceiling
+state_head: f7c9aa995bd171f76cab3c7a925e98f83f19964f
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 120
+  completed_plans: 121
   percent: 90
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 8
+Current Plan: 9
 Total Plans in Phase: 18
-Status: Ready to execute
-Last activity: 2026-11-26 — Phase 16 wave 7 complete; wave 8 ready
-Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 13/18 plans complete and wave 8 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Status: Plan 16-14 integrated; Plan 16-15 ready
+Last activity: 2026-11-26 — Plan 16-14 capability matrix and libretro metadata checks integrated
+Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 14/18 plans complete and wave 9 is ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -82,6 +82,14 @@ After merge, `git diff --check be22dcb..HEAD`, compatibility inventory sort, exa
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` gpt-6-luna xhigh. Plan 16-13 took 34 minutes, six minutes over its 20–28 minute target. `gh api` verified the exact public Redump commit, DAT blob/header and CC BY-SA 4.0 license. The pinned DAT digest matched D-06, and the runner reconciled all 13,407 occurrences as unknown without measured evidence, including 177 missing-serial and 988 duplicate-group entries. The library route now verifies cached and newly fetched DATs before parsing and writes aggregate-only reports; the raw source was removed. The cached-wrong-digest control produced accepted RED evidence. Focused runs exposed test-only probe-log contamination and a snapshot-baseline mismatch; those controls were corrected within the declared tests. The final repository-check measure was 3,900/3,901 lines.
 
 After merge, `git diff --check cdac692..HEAD`, the compatibility inventory sort, shell syntax, source/temp-file checks and exact selector preflight passed. `cmake --preset ci`, the runner/library targets and the four plan selectors plus setup fixture and `docs.budgets` passed; `policy.gate_budget` passed 1/1. The DAT, manifest and worktree were removed. Every bounded command session returned; the sandbox denied a separate OS process-table query, so no OS-wide listing is claimed. No owner BIOS/disc paths, Docker, Act, hosted CI, or broad workflow were used. Current plan is 8; wave 8 Plan 16-14 is ready.
+
+### Phase 16 Plan 16-14 budget proposal (2026-11-26)
+
+Runtime/model: Codex/OpenGSD coordinator (primary model ID unavailable); GSD executor gpt-6-luna xhigh. The complete uncommitted candidate measures **4,694 counted gate lines**, including the 347-line synthetic-control file under the existing `tests/cmake/*.cmake` inventory; the baseline was 3,900/3,901, so the candidate is 793 lines over the unchanged ceiling. The independent reuse audit found no safe duplicate logic to remove. The committed matrix draft has 51 required data rows; integrated provider/profile boot-to-play selectors remain absent, so the generated metadata stays experimental. The exact focused capability/info/cheat selector set passed 7/7 after relocating controls; targeted libretro builds passed; direct `cmake --install build/ci --component libretro` staging and the staged metadata claims check exited 0. The candidate budget check passed at 4,694; `git diff --check` passed. The proposal remains uncommitted and the 3,901 ceiling unchanged pending owner review. No broad workflow, hosted CI, Act job, Docker resource or fuzz campaign ran. The temporary install prefix was removed by its exit trap; all launched command sessions exited, while a separate process-table query was sandbox-denied, so no OS-wide process listing is claimed. CI/CD efficiency, local Act use, full local evidence, and task-named Docker cleanup guidance are already discoverable in `AGENTS.md`, `.planning/AUTONOMOUS.md`, and `docs/maintaining.md`. Next command after context clear: `$gsd-resume-work`.
+
+### Phase 16 wave 8 completion (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); resumed the GPT-6 Luna xhigh executor's existing draft. The owner approved the 4,694-line ceiling with all checks counted. Focused capability, metadata, cheat, package staging and budget checks passed. A new truncated-JUnit control failed before the importer fix and passed afterward. The measured total is 4,693 lines. Direct file and commit checks confirmed the summary despite the helper's documented false positives on command strings and test history. GSD manifest-scoped cleanup exited 0 and integrated the completed worktree. The staged libretro metadata remains experimental while provider and profile play evidence is missing. See the [plan summary](phases/16-patches-cheats-and-compatibility-evidence/16-14-SUMMARY.md).
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2663,9 +2671,11 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-26T06:03:51Z
-Stopped at: Phase 16 wave 7 integration passed; proceeding with Plan 16-14
-Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-14-PLAN.md
+Last session: 2026-11-26T15:28:25Z
+Stopped at: Plan 16-14 integrated after approval; proceeding to Plan 16-15
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-15-PLAN.md
+
+Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
 
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
 

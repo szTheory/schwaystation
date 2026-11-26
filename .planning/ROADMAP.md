@@ -389,7 +389,7 @@ Plans:
   3. The generated compatibility report accounts for all 13,407 entries at the pinned, licensed DAT revision and links supported pass and fail results to evidence. Untested entries and combinations remain explicitly unknown.
   4. `is_experimental` is false only when the committed required-capability matrix passes every row, with zero unknown or failing required rows. It stays true when that evidence is missing or fails. The matrix covers the specified boot-to-play disc families, region and board tuples, peripheral classes, card persistence, patches and cheats. DAT-wide playability is outside that claim.
 
-**Plans**: 13/18 plans executed
+**Plans**: 14/18 plans executed
 
 Plans:
 - [x] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
@@ -405,7 +405,7 @@ Plans:
 - [x] 16-11-PLAN.md — Replay and fuzz patch and cheat hostile input
 - [x] 16-12-PLAN.md — Account for DAT occurrences through a bounded runner inventory path
 - [x] 16-13-PLAN.md — Reconcile the pinned Redump source and retain aggregate provenance
-- [ ] 16-14-PLAN.md — Define required capabilities and evaluate fresh results fail-closed
+- [x] 16-14-PLAN.md — Define required capabilities and evaluate fresh results fail-closed
 - [ ] 16-15-PLAN.md — Protect current feature evidence against the actual base
 - [ ] 16-16-PLAN.md — Publish truthful inventory and required-capability reports
 - [ ] 16-17-PLAN.md — Evaluate the full BE32 shard candidate with exact coverage
@@ -415,7 +415,7 @@ Plans:
 
 ## Progress
 
-Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,901-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
+Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the per-phase repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
@@ -428,4 +428,4 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
-| 16. Patches, cheats and compatibility evidence | 13/18 | Planning | - |
+| 16. Patches, cheats and compatibility evidence | 14/18 | Executing | - |
