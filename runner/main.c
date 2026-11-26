@@ -99,6 +99,7 @@
 #include "cards.h"
 #include "cheats.h"
 #include "clock.h"
+#include "dat_inventory.h"
 #include "disc_image.h"
 #include "disc_probe.h"
 #include "exit_status.h"
@@ -165,6 +166,7 @@ static const char synopsis_rest[] =
     "                         [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
     "                         [--serial SERIAL] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
+    "       schwaystation-run --library-inventory DAT [--library-inventory-output FILE] [--library-evidence FILE]\n"
     "       schwaystation-run --help | --version\n"
     "  --machine NAME     pu7, pu8-early, pu8-late, pu18, pu20, pu22, pu23, pm41 or pm41-2\n"
     "  --region NAME      auto (default), ntsc-u, ntsc-j or pal\n"
@@ -194,6 +196,9 @@ static const char synopsis_rest[] =
     "  --no-stop-on-fault   keep running after the program's first fault; needs --exe\n"
     "  --probe FILE       print PS-EXE or disc metadata; runs nothing\n"
     "  --metadata-ledger CSV and --metadata-dat DAT  reveal identity only on exact match\n"
+    "  --library-inventory DAT  count DAT game occurrences; inventory is not playability evidence\n"
+    "  --library-inventory-output FILE  write a private per-occurrence report\n"
+    "  --library-evidence FILE  attach exact-occurrence evidence to the report\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
 
@@ -400,6 +405,9 @@ typedef struct options {
     const char *probe; /* --probe FILE, else NULL */
     const char *metadata_ledger;
     const char *metadata_dat;
+    const char *library_inventory; /* --library-inventory DAT, else NULL */
+    const char *library_inventory_output;
+    const char *library_evidence;
     int machine_set; /* --machine was supplied */
     uint32_t board;
 #ifdef SCHWAY_RUN_TEST_HOOKS
@@ -961,6 +969,27 @@ static int parse_options(int argc, char **argv, options *o)
             i++;
         } else if (strcmp(arg, "--no-stop-on-fault") == 0) {
             o->keep_going = 1;
+        } else if (strcmp(arg, "--library-inventory") == 0) {
+            if (o->library_inventory != NULL || value == NULL ||
+                value[0] == '\0' || value[0] == '-') {
+                return usage("--library-inventory needs one DAT file");
+            }
+            o->library_inventory = value;
+            i++;
+        } else if (strcmp(arg, "--library-inventory-output") == 0) {
+            if (o->library_inventory_output != NULL || value == NULL ||
+                value[0] == '\0' || value[0] == '-') {
+                return usage("--library-inventory-output needs one file");
+            }
+            o->library_inventory_output = value;
+            i++;
+        } else if (strcmp(arg, "--library-evidence") == 0) {
+            if (o->library_evidence != NULL || value == NULL ||
+                value[0] == '\0' || value[0] == '-') {
+                return usage("--library-evidence needs one file");
+            }
+            o->library_evidence = value;
+            i++;
         } else if (strcmp(arg, "--probe") == 0) {
             if (o->probe != NULL || value == NULL || value[0] == '-') {
                 return usage("--probe needs one file");
@@ -997,6 +1026,26 @@ static int parse_options(int argc, char **argv, options *o)
         } else {
             return usage(arg[0] == '-' ? "unknown option" : "unexpected argument");
         }
+    }
+    if (o->library_inventory != NULL || o->library_inventory_output != NULL ||
+        o->library_evidence != NULL) {
+        int other_options = o->library_inventory == NULL || o->frames != 0u ||
+            o->bench || o->hash || o->hash_audio || o->hash_vram || o->hash_state ||
+            o->cheat_count != 0u || o->png_path != NULL || o->inputs != NULL ||
+            o->save_dir != NULL || o->multitap_set[0] || o->multitap_set[1] ||
+            o->serial != NULL || o->memcard_names_set || o->region_set ||
+            o->machine_set || o->probe != NULL || o->metadata_ledger != NULL ||
+            o->metadata_dat != NULL || o->bios != NULL || o->disc != NULL ||
+            o->patch != NULL || o->exe != NULL || o->boot_set || o->tty ||
+            o->stop_mailbox || o->trace || o->keep_going;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        other_options = other_options || o->test_ledger != NULL || o->test_dat != NULL ||
+            o->test_root != NULL || o->test_config != NULL || o->test_audio_file != NULL ||
+            o->test_audio_failure || o->test_disc_identity_read_failure ||
+            o->test_patch_sector_zero || o->test_card_write || o->test_save_failure;
+#endif
+        if (other_options) return usage("--library-inventory cannot be combined with other modes");
+        return SCHWAY__EXIT_OK;
     }
     if (o->bios != NULL && o->exe != NULL) {
         return usage("--bios and --exe cannot be used together");
@@ -2374,7 +2423,30 @@ int main(int argc, char **argv)
     options opt;
     memset(&opt, 0, sizeof opt);
     int status = parse_options(argc, argv, &opt);
-    if (status == SCHWAY__EXIT_OK && opt.probe != NULL) {
+    if (status == SCHWAY__EXIT_OK && opt.library_inventory != NULL) {
+        schway__dat_inventory_result result;
+        schway__dat_inventory_status inventory_status = schway__dat_inventory_run(
+            opt.library_inventory, opt.library_evidence, opt.library_inventory_output, &result);
+        if (inventory_status != SCHWAY__DAT_INVENTORY_OK) {
+            fprintf(stderr, "schwaystation-run: library inventory: %s\n",
+                    schway__dat_inventory_status_string(inventory_status));
+            status = SCHWAY__EXIT_FAILURE;
+        } else {
+            const char *source_pin =
+                strcmp(result.source_sha256,
+                       "52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8") == 0 ?
+                "12c21cf79f1e20eff6ac68b80875816c717d0a7a" : "unverified";
+            printf("source_pin=%s\n", source_pin);
+            printf("source_sha256=%s\n", result.source_sha256);
+            printf("entries=%llu\n", (unsigned long long)result.entries);
+            printf("pass=%llu\n", (unsigned long long)result.pass);
+            printf("fail=%llu\n", (unsigned long long)result.fail);
+            printf("unknown=%llu\n", (unsigned long long)result.unknown);
+            printf("missing_serial=%llu\n", (unsigned long long)result.missing_serial);
+            printf("duplicate_serial_entries=%llu\n",
+                   (unsigned long long)result.duplicate_serial_entries);
+        }
+    } else if (status == SCHWAY__EXIT_OK && opt.probe != NULL) {
         schway__probe_metadata_inputs metadata = {
             opt.metadata_ledger, opt.metadata_dat, NULL, NULL
         };
