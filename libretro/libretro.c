@@ -21,6 +21,7 @@
 #include "schwaystation.h"
 #include "cards.h"
 #include "disc_image.h"
+#include "../host/cheats.h"
 #include "../host/disc_probe.h"
 #include "../runner/region.h"
 #include "xrgb8888.h"
@@ -75,6 +76,7 @@ static retro_audio_sample_batch_t audio_batch_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 static schway *inst;
+static schway__host_cheats lr_cheats;
 static schway_info info;
 static uint32_t *pixels;
 static int16_t *samples;
@@ -1082,6 +1084,7 @@ static void lr_card_sockets_load(const char *const paths[LR_CARD_ENDPOINT_COUNT]
 /* Destroys the instance and frees the frame buffer. */
 static void lr_unload(void)
 {
+    schway__host_cheats_reset(&lr_cheats);
     lr_cards_flush();
     lr_memory_map_clear();
     if (inst != NULL) {
@@ -1944,6 +1947,9 @@ void retro_run(void)
     lr_check_options();
     gun_source = lr_gun_host_source();
     lr_queue_input(gun_source);
+    if (!schway__host_cheats_apply(&lr_cheats, inst)) {
+        return;
+    }
     memset(&result, 0, sizeof result);
     result.size = (uint32_t)sizeof result;
     if (schway_run_frame(inst, &result) != SCHWAY_STATUS_OK) {
@@ -2001,13 +2007,40 @@ bool retro_unserialize(const void *data, size_t len)
 
 void retro_cheat_reset(void)
 {
+    schway__host_cheats_reset(&lr_cheats);
+}
+
+static size_t lr_cheat_text_size(const char *code)
+{
+    size_t length = 0u;
+    if (code == NULL) {
+        return 0u;
+    }
+    while (length <= SCHWAY_HOST_CHEAT_ENTRY_TEXT_MAX && code[length] != '\0') {
+        length++;
+    }
+    return length;
+}
+
+static void lr_log_cheat_rejection(unsigned index)
+{
+    struct retro_log_callback callback;
+    if (env_cb == NULL) {
+        return;
+    }
+    memset(&callback, 0, sizeof callback);
+    if (env_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &callback) && callback.log != NULL) {
+        callback.log(RETRO_LOG_WARN,
+                     "schwaystation: rejected unsupported or invalid cheat entry %u\n", index);
+    }
 }
 
 void retro_cheat_set(unsigned index, bool enabled, const char *code)
 {
-    (void)index;
-    (void)enabled;
-    (void)code;
+    size_t text_size = lr_cheat_text_size(code);
+    if (!schway__host_cheats_replace(&lr_cheats, index, enabled, code, text_size)) {
+        lr_log_cheat_rejection(index);
+    }
 }
 
 /* L9020. NULL boots the test card or an explicitly selected BIOS. A fullpath
