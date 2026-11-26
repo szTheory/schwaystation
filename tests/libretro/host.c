@@ -6477,6 +6477,28 @@ static int test_rumble_controls(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_cheats_apply(void)
+{
+    unsigned char *ram = NULL;
+
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        p_cheat_reset();
+        p_cheat_set(0u, true, "30000010 00A5\n80000012 1234");
+        run_one();
+        CHECK_EQ_U64(ram[0x10u], 0xA5u);
+        CHECK_EQ_U64(ram[0x12u], 0x34u);
+        CHECK_EQ_U64(ram[0x13u], 0x12u);
+    }
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -6519,6 +6541,7 @@ int main(int argc, char **argv)
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
+    int cheats_apply_mode = argc == 3 && strcmp(argv[2], "cheats-apply") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
@@ -6536,6 +6559,7 @@ int main(int argc, char **argv)
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
+         !cheats_apply_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                         argv[5][0] == '\0')) ||
@@ -6609,7 +6633,7 @@ int main(int argc, char **argv)
     int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode ||
                         card_persistence_mode || input_multitap_mode || input_special_mode ||
                         input_lightgun_mode || input_pointer_mode || input_gun_unavailable_mode ||
-                        cards_multitap_mode;
+                        cards_multitap_mode || cheats_apply_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -6657,6 +6681,10 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
+
+    if (cheats_apply_mode) {
+        return test_cheats_apply();
+    }
 
     if (audio_mode) {
         return test_audio_equality(argv[4], argv[5], region);
