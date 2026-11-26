@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Phase 16 wave 5 complete; wave 6 plan 16-12 is ready
-last_updated: "2026-11-26T04:21:26Z"
+stopped_at: Phase 16 wave 6 complete; wave 7 plan 16-13 is ready
+last_updated: "2026-11-26T05:21:12Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 plans 16-05, 16-10 and 16-11 complete; wave 6 ready
-state_head: 0324953155adbc7614c664e0ab3803cb914811ec
+last_activity_desc: Phase 16 plans 16-05, 16-10, 16-11 and 16-12 complete; wave 7 ready
+state_head: baf6e3a53df5177755f53550224fed1b07f1341f
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 125
-  completed_plans: 118
+  completed_plans: 119
   percent: 90
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 (Patches, cheats and compatibility evidence) — EXECUTING
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 18
 Status: Ready to execute
-Last activity: 2026-11-26 — Phase 16 wave 4 complete; wave 5 ready
-Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 11/18 plans complete and wave 6 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
+Last activity: 2026-11-26 — Phase 16 wave 6 complete; wave 7 ready
+Progress: [█████████░] 90% (9/10 v2.0 phases released; Phase 16 has 12/18 plans complete and wave 7 ready. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
@@ -70,6 +70,12 @@ All three worktrees started at `445d699`, ended clean, and had resolved commit-s
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-05 took 33m19s, Plan 16-10 took 44m, and Plan 16-11 took 31m21s. Plan 16-05 added atomic libretro cheat configuration state; its five required selectors passed. Its optional content-profile probe could not run because the generated OpenBIOS fixture was absent after cleanup. Plan 16-10 added runner `--patch` transactional handling and passed eight required selectors plus `runner.hash_state` and repository/documentation budget checks. Its Task 2 tests were already green after Task 1; the test-harness argument mismatch was corrected, actual ordering recorded, and no artificial RED was introduced. Plan 16-11 added patch/cheat replay seeds and nightly fuzz routing; replay passed 2/2, exact seed and workflow checks passed, and `act --dryrun --container-architecture linux/arm64 -W .github/workflows/nightly.yml -j fuzz` exited 0. It added 14 PPF and 10 cheat seeds; local sanitizer execution was unavailable because clang-21 was not installed. Temporary seed/cache data was removed and no task-owned Docker resources remained.
 
 The isolated worktrees completed clean with resolved scope checks and merged. `verify-summary` flagged heuristic false positives for Plans 16-05 and 16-11; both summaries explicitly report `Self-Check: PASSED`, and their created files, commits and checks were verified. After merge, `git diff --check 3d19212..HEAD`, sorted test inventories, `cmake --preset ci`, the combined affected target builds and all 19 focused API/cheat/libretro/patch/fuzz/runner/disc/documentation selectors passed. The hygiene selectors `hygiene.timeout_comments`, `policy.action_pins` and `policy.gate_budget` passed 3/3. No hosted CI ran in this wave. Current plan is 6; wave 6 Plan 16-12 is ready.
+
+### Phase 16 wave 6 execution (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` gpt-6-luna xhigh. Plan 16-12 took 46m36s, exceeding its 20–28 minute target. It added a bounded host parser and non-emulating runner mode that preserves every DAT occurrence and publishes aggregate counts only; optional per-occurrence identity/evidence stays private. Parser tests first exposed ambiguous duplicate serial fields and synthetic pin mislabeling. A real parse of the pinned D-06 Redump source then exposed valid UTF-8 serial bytes; the encoded-serial regression and digest-based duplicate accounting fixed that without storing or printing serials. The verified source digest was `52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8`; the runner counted 13,407 entries, all unknown, with 177 missing serials and 988 entries in duplicate-serial groups. The raw DAT was held in a task-specific temporary path and removed after the run. An output-check wrapper's first assertion returned 1 despite correct runner output; a corrected field check returned 0. No owner BIOS/disc paths, Docker, hosted CI, or broad workflow were used.
+
+After merge, `git diff --check be22dcb..HEAD`, compatibility inventory sort, exact selector preflight, `cmake --preset ci`, and builds for `schwaystation-run`, `schwaystation-run-test` and `schwaystation-test-library` passed. The four plan selectors plus `compat.features.preflight` passed 5/5. The first cleanup-wave attempt rejected the abbreviated manifest base; ancestry inspection confirmed the worktree was exactly based on the current phase head, so the manifest was corrected to its full SHA and GSD merged/removed the worktree cleanly. Current plan is 7; wave 7 Plan 16-13 is ready.
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2651,9 +2657,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-26T04:21:26Z
-Stopped at: Phase 16 wave 5 integration passed; proceeding with Plan 16-12
-Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-12-PLAN.md
+Last session: 2026-11-26T05:21:12Z
+Stopped at: Phase 16 wave 6 integration passed; proceeding with Plan 16-13
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-13-PLAN.md
 
 Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
 
