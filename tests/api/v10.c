@@ -88,7 +88,7 @@ _Static_assert(sizeof(((schway_input *)0)->controllers[0]) == 96u,
 _Static_assert(sizeof(((schway_input *)0)->controllers) == 192u,
                "API v9 eight-endpoint stride");
 _Static_assert(sizeof(schway_input) == 228u, "API v9 input size");
-_Static_assert(SCHWAY_API_VERSION == 10, "API v10 version");
+_Static_assert(SCHWAY_API_VERSION >= 10, "API v10 remains available");
 _Static_assert(SCHWAY_INPUT_DEVICE_GUNCON == 7u, "API v10 GunCon identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_JUSTIFIER == 8u, "API v10 Justifier identifier");
 _Static_assert(SCHWAY_GUN_INPUT_VALID == 1u, "API v10 valid flag");
@@ -183,7 +183,7 @@ int main(void)
     CHECK_EQ_U64(schway_create(&config, &inst), SCHWAY_STATUS_OK);
     if (inst == NULL) CHECK_DONE();
 
-    CHECK_EQ_U64(SCHWAY_API_VERSION, 10u);
+    CHECK(SCHWAY_API_VERSION >= 10u);
     expected_v10_input extended;
     memset(&extended, 0, sizeof extended);
     extended.v9.size = (uint32_t)sizeof extended;

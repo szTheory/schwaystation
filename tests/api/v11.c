@@ -88,7 +88,7 @@ _Static_assert(sizeof(((schway_input *)0)->controllers[0]) == 96u,
 _Static_assert(sizeof(((schway_input *)0)->controllers) == 192u,
                "API v9 eight-endpoint stride");
 _Static_assert(sizeof(schway_input) == 228u, "API v9 input size");
-_Static_assert(SCHWAY_API_VERSION == 10, "API v10 version");
+_Static_assert(SCHWAY_API_VERSION >= 10, "API v10 remains available");
 _Static_assert(SCHWAY_INPUT_DEVICE_GUNCON == 7u, "API v10 GunCon identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_JUSTIFIER == 8u, "API v10 Justifier identifier");
 _Static_assert(SCHWAY_GUN_INPUT_VALID == 1u, "API v10 valid flag");
@@ -171,6 +171,95 @@ static void expect_rejected_v10_input(schway *inst,
     CHECK_EQ_U64(observed.buttons[1], (uint16_t)~baseline->buttons[1]);
 }
 
+#if SCHWAY_API_VERSION >= 11
+typedef struct observed_ticks {
+    uint64_t value;
+    uint32_t found;
+} observed_ticks;
+
+static void observe_instance_ticks(void *user, const char *name, const void *data,
+                                   uint32_t count, uint32_t width)
+{
+    observed_ticks *observed = (observed_ticks *)user;
+    if (strcmp(name, "instance.ticks") == 0 && count == 1u && width == 8u) {
+        memcpy(&observed->value, data, sizeof observed->value);
+        observed->found = 1u;
+    }
+}
+
+static uint64_t instance_ticks(schway *inst)
+{
+    observed_ticks observed;
+    memset(&observed, 0, sizeof observed);
+    CHECK_EQ_U64(schway_state_visit(inst, observe_instance_ticks, &observed),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(observed.found, 1u);
+    return observed.value;
+}
+
+static void expect_rejected_ram_write(schway *inst, uint32_t offset,
+                                      uint32_t width, uint32_t value)
+{
+    size_t size = schway_state_size(inst);
+    uint8_t *before = (uint8_t *)malloc(size);
+    uint8_t *after = (uint8_t *)malloc(size);
+    CHECK(before != NULL && after != NULL);
+    if (before == NULL || after == NULL) {
+        free(before);
+        free(after);
+        return;
+    }
+    CHECK_EQ_U64(schway_save_state(inst, before, size), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_write_ram(inst, offset, width, value),
+                 SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_save_state(inst, after, size), SCHWAY_STATUS_OK);
+    CHECK(memcmp(before, after, size) == 0);
+    free(before);
+    free(after);
+}
+
+static void check_ram_write_api(schway *inst)
+{
+    CHECK_EQ_U64(schway_write_ram(NULL, 0u, 1u, 1u), SCHWAY_STATUS_ERR_ARGUMENT);
+
+    uint64_t ticks = instance_ticks(inst);
+    CHECK_EQ_U64(schway_write_ram(inst, 0u, 1u, 0xA5u), SCHWAY_STATUS_OK);
+    uint32_t value = 0u;
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0u, 1u, &value), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(value, 0xA5u);
+    CHECK_EQ_U64(instance_ticks(inst), ticks);
+
+    CHECK_EQ_U64(schway_write_ram(inst, 2u, 2u, 0xBEEFu), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 2u, 2u, &value), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(value, 0xBEEFu);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 2u, 1u, &value), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(value, 0xEFu);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 3u, 1u, &value), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(value, 0xBEu);
+    CHECK_EQ_U64(instance_ticks(inst), ticks);
+
+    CHECK_EQ_U64(schway_write_ram(inst, 0x1FFFFEu, 2u, 0x1234u), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0x1FFFFEu, 2u, &value),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(value, 0x1234u);
+    CHECK_EQ_U64(schway_write_ram(inst, 0x1FFFFFu, 1u, 0x56u), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0x1FFFFFu, 1u, &value),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(value, 0x56u);
+    CHECK_EQ_U64(instance_ticks(inst), ticks);
+
+    expect_rejected_ram_write(inst, 0u, 0u, 0u);
+    expect_rejected_ram_write(inst, 0u, 3u, 0u);
+    expect_rejected_ram_write(inst, 0u, 1u, 0x100u);
+    expect_rejected_ram_write(inst, 0u, 2u, 0x10000u);
+    expect_rejected_ram_write(inst, 1u, 2u, 0x1234u);
+    expect_rejected_ram_write(inst, 0x200000u, 1u, 0x12u);
+    expect_rejected_ram_write(inst, 0x1FFFFFu, 2u, 0x1234u);
+    expect_rejected_ram_write(inst, UINT32_MAX, 2u, 0x1234u);
+    CHECK_EQ_U64(instance_ticks(inst), ticks);
+}
+#endif
+
 int main(void)
 {
     schway_config config;
@@ -183,7 +272,7 @@ int main(void)
     CHECK_EQ_U64(schway_create(&config, &inst), SCHWAY_STATUS_OK);
     if (inst == NULL) CHECK_DONE();
 
-    CHECK_EQ_U64(SCHWAY_API_VERSION, 10u);
+    CHECK_EQ_U64(SCHWAY_API_VERSION, 11u);
     uint32_t ram_value = UINT32_MAX;
     CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0u, 4u, &ram_value),
                  SCHWAY_STATUS_OK);
@@ -342,6 +431,10 @@ int main(void)
             CHECK(memcmp(&observed.axes[endpoint * 4u], controller->axes, 4u) == 0);
         }
     }
+
+#if SCHWAY_API_VERSION >= 11
+    check_ram_write_api(inst);
+#endif
 
     free(input);
     schway_destroy(inst);
