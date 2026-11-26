@@ -2,6 +2,34 @@
 
 Patch parsing stays in the host disc provider. A patch is prepared as a candidate and becomes visible to sector reads only after its source identity, complete record stream, and geometry have passed validation. The original track file is read-only and is never rewritten.
 
+## Runner CLI
+
+Attach one patch to a disc run with `--patch FILE`. PPF1, PPF2 and PPF3 also require the
+SHA-256 of the complete raw source file through `--patch-source-sha256 HEX`; BPS may omit
+this extra identity check because its source, target and patch CRCs are always validated.
+A supplied BPS source SHA is checked in addition to those CRCs. The runner reports the
+format, source identity when supplied, and the checks it performed without printing the
+input paths.
+
+Patches require `--disc` and cannot be combined with `--bench` or `--probe`. Repeated
+patch options, malformed SHA text, a SHA option without a patch, and a missing PPF SHA
+are usage errors (exit 2). A bad patch, failed identity check or patch-file I/O error
+exits 1; an unsupported patch type or disc mapping exits 77. The runner refuses a patch
+before creating the emulator instance, running frames or writing a requested PNG.
+`--hash-state` remains unavailable with any `--disc` run.
+
+For example, a PPF run binds the patch to the entire raw source image before applying its overlay:
+
+```sh
+schwaystation-run --bios ./openbios.bin --disc ./game.cue --patch ./game.ppf \
+  --patch-source-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+  --frames 900
+```
+
+BPS can rely on its native CRC checks, or add the same source SHA option when the patch
+must be bound to a specific source image. The patching path changes only the bytes returned
+by the host sector provider; it does not add a patch operation to the emulated core.
+
 ## PPF1 subset
 
 This implementation accepts PPF1 (`PPF10`, method 0), PPF2 (`PPF20`, method 1), and the BIN subset of PPF3 (`PPF30`, method 2). Format facts follow the [PPF developer format reference](https://raw.githubusercontent.com/meunierd/ppf/4f24f8c784faf27b54081caee3835fa59a8a009e/ppfdev/PPF3.txt); the test fixtures in this repository are self-authored from that layout.
