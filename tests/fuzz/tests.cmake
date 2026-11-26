@@ -60,6 +60,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
   set(chd_guest_work_dir "/tests/fuzz-work/chd")
   set(chd_guest_fixture "/fixtures/disc_boot.chd")
 endif()
+
 add_executable(schwaystation-fuzz-chd-replay ${fuzz_dir}/chd.c)
 target_compile_definitions(schwaystation-fuzz-chd-replay PRIVATE
   SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_CHD_SEEDS
@@ -332,3 +333,12 @@ if(SCHWAYSTATION_FUZZ)
   endforeach()
 
 endif()
+
+# These replay paths are intentionally concrete build-tree locations until
+# Plan 11 adds and owns the production replay targets.
+foreach(subsystem IN ITEMS ppf cheat)
+  set(replay "${PROJECT_BINARY_DIR}/tests/schwaystation-fuzz-${subsystem}-replay${CMAKE_EXECUTABLE_SUFFIX}")
+  schway_add_test(NAME fuzz.regress.${subsystem}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "${replay}"
+    LABELS fuzz portable TIMEOUT 60)
+endforeach()

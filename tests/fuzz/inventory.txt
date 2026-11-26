@@ -2,6 +2,7 @@ fuzz.regress.ccd	fuzz,portable
 fuzz.regress.cdrom	fuzz,portable
 fuzz.regress.chd	fuzz,portable
 fuzz.regress.chd.seed_corpus	fuzz,portable
+fuzz.regress.cheat	fuzz,portable
 fuzz.regress.cnf	fuzz,portable
 fuzz.regress.cue	fuzz,portable
 fuzz.regress.ecm	fuzz,portable
@@ -11,6 +12,7 @@ fuzz.regress.m3u	fuzz,portable
 fuzz.regress.mdec	fuzz,portable
 fuzz.regress.memcard	fuzz,portable
 fuzz.regress.pbp	fuzz,portable
+fuzz.regress.ppf	fuzz,portable
 fuzz.regress.sbi	fuzz,portable
 fuzz.regress.sio	fuzz,portable
 fuzz.regress.spu	fuzz,portable
