@@ -25,10 +25,12 @@ remain unproven under the accepted v1.0 scope. The detailed discrepancy and evid
 
 Milestone v2.0, “The whole library,” is active. It expands disc-format and LibCrypt support, peripherals and save
 compatibility, region and revision coverage, ROM-hacker patches and cheats, and the compatibility ledger.
-Phase 7 is released as v0.7.0. Phase 8 per-game card saves passed goal verification, including the exact-head
-hosted RetroArch continuation proof, and shipped in v0.8.0 after its release and main CI passed. Phase 9 CHD
-work is now unblocked. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md)
-remain explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance.
+Phase 7 is released as v0.7.0. Phase 8 per-game card saves shipped in v0.8.0 after their goal verification,
+hosted RetroArch continuation proof, release checks and main CI passed. Phases 9–15 are complete and released.
+Phase 16's patches, cheats and compatibility evidence passed goal verification and exact-head CI/Nightly; its
+ship PR is in progress. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md)
+remain explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance. The v2.0
+milestone audit and closeout follow Phase 16's release.
 
 ## Current Milestone: v2.0 The whole library
 
@@ -62,6 +64,11 @@ conformance are not claims of this milestone.
 - ✓ Phase 9: MEDIA-01–02, CHD-01, COMPAT-02 — bounded CHD reading, shared media checks and evidence ledger — v2.0.
 - ✓ Phase 10: PBP-01 — the documented unencrypted PSISO subset and unsupported-layout handling — v2.0.
 - ✓ Phase 11: ECM-01 and CCD-01 — bounded ECM and CloneCD/IMG/SUB readers, consumer integration and automated checks; hosted gates remain in the ship record — v2.0.
+- ✓ Phase 12: CRYPT-01 — SBI loading and LibCrypt subchannel protection behavior — v2.0.
+- ✓ Phase 13: PROFILE-01–02, BOOT-01 and MDEC-01 — region/board profiles, BIOS-shell fast boot and bounded MDEC behavior — v2.0.
+- ✓ Phase 14: SIO-01–04 — multitap, mouse, neGcon, Jogcon and flight-mode controls — v2.0.
+- ✓ Phase 15: GUN-01–02 and SIO-05 — GunCon/Justifier input and supported special-controller behavior — v2.0.
+- ✓ Phase 16: PATCH-01, CHEAT-01, COMPAT-01 and COMPAT-03 — host-side PPF/BPS overlays, bounded GameShark support and evidence-gated compatibility claims — v2.0; goal verified, release pending.
 
 ### Active
 
@@ -128,11 +135,14 @@ conformance are not claims of this milestone.
 | Video is the native display frame in GPU encoding with a metadata tuple plus a read-only VRAM view; conversion, borders and deinterlacing are host helpers outside the hash | Lossless and host-independent; ps1-tests compare whole VRAM | ✓ v1.0: native frames and host conversion are deterministic; GPU references pass. |
 | Audio is int16 stereo at 44,100 Hz with exactly `frame_cycles / 768` samples per frame; the hash is over that stream before any host resampling | Mixer-independent determinism | ✓ v1.0: hardware transfer logs, cross-platform hashes and runner/libretro PCM parity pass. |
 | The core never opens files: the host supplies `schway_disc` sector callbacks; host-side readers parse cue/bin, iso, m3u, CHD, PBP, bounded ECM and CloneCD/IMG/SUB through the shared contract | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | ✓ Phases 9–11: CHD/PBP/ECM/CCD readers and automated checks pass; Phase 11 hosted evidence is recorded at ship. |
+| PPF and BPS patches are validated host-side sector overlays; the source image stays unchanged | Patch inputs are untrusted, and patched reads must reuse the common disc boundary | ✓ Phase 16: PPF/BPS identity, bounds, source immutability and deterministic overlay tests passed. |
+| GameShark strings use one bounded host parser and an explicit checked RAM write; canonical cheat state participates in hashes and libretro serialization | Keep cheat parsing and mutation outside the deterministic core while preserving reproducible state | ✓ Phase 16: runner and libretro paths, invalid-input behavior, hashing and serialization passed. |
+| DAT occurrence accounting is not playability evidence; libretro stays experimental until every required capability row passes | Compatibility claims must follow measured boot-to-play evidence, not inventory counts | ✓ Phase 16: all 13,407 DAT occurrences remain accounted, the 51-row matrix retains unknowns, and experimental metadata remains true. |
 | Card bytes stay instance-owned and file access stays in hosts. Runner save names use normalized serials when valid and content-derived fallbacks otherwise; libretro card 1 belongs to frontend SAVE_RAM and card 2 persists separately. PocketStation support is storage-only over the card port. | Preserve deterministic host boundaries, portable card files and frontend ownership without claiming a PocketStation handheld emulator | ✓ Phase 8 verification: SAVE-01–05 passed local and hosted behavior checks; phase release pending. |
 | Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | ✓ v1.0: no speed-changing option or enhancement enters the hashed path. |
 | Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | ✓ Six phase PRs merged; the automatic release workflow published v0.6.0. |
 | Cachegrind Ir/frame on three fixtures as the only per-PR speed gate; proportional gates; real-host e2e at most 300 lines; pins public and fetched with `gh api`; pre-seeded GSD bootstrap, interactive, one step per session | Wall-clock tails are noise on shared runners; two siblings stalled on their own machinery; a sibling lost six plans to an unpushed pin | ✓ v1.0: performance/policy checks passed, real-host e2e stayed within cap and source pins remained public. |
-| v2.0 expands playable library breadth while keeping the deterministic core, permissive reuse policy and host-owned I/O boundaries | The owner approved the whole-library direction; the browser and save-state directions remain later milestones | — v2.0: requirements and verification are pending. |
+| v2.0 expands playable library breadth while keeping the deterministic core, permissive reuse policy and host-owned I/O boundaries | The owner approved the whole-library direction; the browser and save-state directions remain later milestones | ✓ Phase 16 goal verified and all 10 phase plans are complete; its release and the milestone audit remain. |
 
 The full list with sources is `.planning/preparation/DECISIONS.md`.
 
@@ -149,4 +159,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-22 after Phase 11 verification*
+*Last updated: 2026-11-26 after Phase 16 goal verification*

@@ -45,7 +45,7 @@ recorded: 2026-11-26T22:12:30.350Z
 | WR-01 | warning | fixed | 16-REVIEW-FIX.md |
 | WR-02 | warning | fixed | 16-REVIEW-FIX.md |
 | WR-03 | warning | fixed | `sha256sum` / `shasum` fallback; all three native library compatibility tests passed |
-| WR-04 | warning | fixed | `16-REVIEW.md` and `16-LOCAL-EVIDENCE.md`; changed-head hosted BE32 validation is pending |
+| WR-04 | warning | fixed | `16-REVIEW.md` and `16-LOCAL-EVIDENCE.md`; final CI passed both BE32 inventory cases and hash comparison |
 | WR-05 | warning | fixed | `16-REVIEW.md` and `16-LOCAL-EVIDENCE.md`; the controls helper now uses the decoded emulator |
 
 Dispositions: `open` (recorded, not yet triaged), `fixed`, `skipped`, `deferred`.

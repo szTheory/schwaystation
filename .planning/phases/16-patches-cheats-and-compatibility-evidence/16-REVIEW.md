@@ -62,7 +62,7 @@ status: clean
 
 ## Summary
 
-Reviewed current HEAD `06bb5da9c5213b81c53d5de606a10af87f9b2a37`. Coverage from the earlier 25-file review was reused for unchanged files; I rechecked the implementation, build, test-reliability, workflow, budget, and inventory-emulator changes. The five original findings, the runner emulator finding, and the private-report helper emulator finding are all fixed. The focused inventory suite passed 3/3, and the controls script passed with a multi-part emulator argument. No findings remain on this head; prior findings are retained below as fixed review history. Changed-head hosted BE32 validation remains pending.
+Reviewed current HEAD `06bb5da9c5213b81c53d5de606a10af87f9b2a37`. Coverage from the earlier 25-file review was reused for unchanged files; I rechecked the implementation, build, test-reliability, workflow, budget, and inventory-emulator changes. The five original findings, the runner emulator finding, and the private-report helper emulator finding are all fixed. The focused inventory suite passed 3/3, and the controls script passed with a multi-part emulator argument. No findings remain on this head; prior findings are retained below as fixed review history. The corrected-head hosted BE32 run later passed both inventory tests and all 694 portable tests; downstream hash equality passed.
 
 ## Narrative Findings (AI reviewer)
 
@@ -111,7 +111,7 @@ No open findings remain on current HEAD. The entries below are retained from ear
 
 **Severity:** WARNING
 **File:** `tests/compat/tests.cmake:1353-1354,1398-1399,1762-1768`
-**Issue:** The hosted BE32 `compat.inventory.accounting` job failed because the test passed the big-endian runner through `RUN` and executed it directly from a CMake script. This is fixed in the current tree: the registrations pass the serialized emulator list, script mode decodes it, and every runner invocation in both inventory cases is prefixed with `${EMULATOR}`. The local focused selectors and multi-part emulator script-mode cases passed.
+**Issue:** The hosted BE32 `compat.inventory.accounting` job failed because the test passed the big-endian runner through `RUN` and executed it directly from a CMake script. This is fixed in the current tree: the registrations pass the serialized emulator list, script mode decodes it, and every runner invocation in both inventory cases is prefixed with `${EMULATOR}`. The local focused selectors and multi-part emulator script-mode cases passed. Final CI confirmed both inventory cases pass under BE32 and the downstream hash comparison passes.
 **Fix:** Fixed by transporting `CMAKE_CROSSCOMPILING_EMULATOR` to both script cases and using it for all runner invocations. A changed-head hosted BE32 run is still needed to verify the full cross-compiled test path; see the remaining warning below.
 
 ### WR-05: BE32 inventory controls invoke the test helper without its emulator
