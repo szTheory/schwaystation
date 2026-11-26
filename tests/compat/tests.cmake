@@ -1345,10 +1345,41 @@ game (
   return()
 endif()
 
+# Fault prevented: ambiguous duplicate serial fields being treated as one identity.
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_inventory_controls")
+  foreach(required SOURCE_ROOT WORK_ROOT RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "inventory controls require ${required}")
+    endif()
+  endforeach()
+  set(root "${WORK_ROOT}/compat-inventory-controls")
+  file(REMOVE_RECURSE "${root}")
+  file(MAKE_DIRECTORY "${root}")
+  set(dat "${root}/duplicate-serial-field.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: invalid serial field"
+)
+game (
+ name "Ambiguous serial fields"
+ serial ""
+ serial "SLUS-00001"
+)
+]=])
+  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(rc STREQUAL "0")
+    message(FATAL_ERROR "inventory accepted duplicate serial fields with an empty first value")
+  endif()
+  if(NOT output STREQUAL "")
+    message(FATAL_ERROR "invalid inventory input published a partial public report: ${output}")
+  endif()
+  return()
+endif()
+
 # These script selectors are part of the compatibility contract before their
-# accounting and fresh-result implementations land in later plans.
+# fresh-result implementations land in later plans.
 if(CMAKE_SCRIPT_MODE_FILE AND CASE MATCHES
-    "^(compat_inventory_accounting|compat_inventory_controls|compat_capabilities_coverage|compat_capabilities_results|compat_capabilities_claims)$")
+    "^(compat_capabilities_coverage|compat_capabilities_results|compat_capabilities_claims)$")
   message(FATAL_ERROR "compatibility evidence behavior is not implemented: ${CASE}")
 endif()
 
