@@ -1332,7 +1332,7 @@ game (
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "inventory accounting command failed (${rc}): ${error}")
   endif()
-  foreach(field "source_sha256=${expected_sha256}" "entries=3" "pass=0" "fail=0"
+  foreach(field "source_pin=unverified" "source_sha256=${expected_sha256}" "entries=3" "pass=0" "fail=0"
       "unknown=3" "missing_serial=1" "duplicate_serial_entries=2")
     string(FIND "${output}" "${field}" position)
     if(position EQUAL -1)
@@ -1347,7 +1347,7 @@ endif()
 
 # Fault prevented: ambiguous duplicate serial fields being treated as one identity.
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_inventory_controls")
-  foreach(required SOURCE_ROOT WORK_ROOT RUN)
+  foreach(required SOURCE_ROOT WORK_ROOT RUN TEST_BINARY)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
       message(FATAL_ERROR "inventory controls require ${required}")
     endif()
@@ -1372,6 +1372,203 @@ game (
   endif()
   if(NOT output STREQUAL "")
     message(FATAL_ERROR "invalid inventory input published a partial public report: ${output}")
+  endif()
+
+  set(dat "${root}/synthetic.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: inventory controls"
+)
+game (
+ name "Shared (disc 1)"
+ serial "SLUS-00001"
+ rom (
+  name "track (one).bin"
+  size 1
+  crc 00000001
+  md5 11111111111111111111111111111111
+  sha1 1111111111111111111111111111111111111111
+ )
+ rom (
+  name "track two.bin"
+  size 2
+  crc 00000002
+  md5 22222222222222222222222222222222
+  sha1 2222222222222222222222222222222222222222
+ )
+)
+game (
+ name "Shared (disc 1)"
+ serial "SLUS-00001"
+ rom (
+  name "another track.bin"
+  size 3
+  crc 00000003
+  md5 33333333333333333333333333333333
+  sha1 3333333333333333333333333333333333333333
+ )
+)
+game (
+ name "Missing serial"
+)
+game (
+ name "No matching evidence"
+ serial "SLES-00001"
+ rom (
+  name "unmatched.bin"
+  size 4
+  crc 00000004
+  md5 44444444444444444444444444444444
+  sha1 4444444444444444444444444444444444444444
+ )
+)
+]=])
+  set(report "${root}/occurrences.csv")
+  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+      --library-inventory-output "${report}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "inventory occurrence report failed: ${error}")
+  endif()
+  foreach(field "entries=4" "pass=0" "fail=0" "unknown=4"
+      "missing_serial=1" "duplicate_serial_entries=2")
+    string(FIND "${output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "inventory report omitted ${field}: ${output}")
+    endif()
+  endforeach()
+  if(output MATCHES "Shared|SLUS-00001|Missing serial|No matching evidence")
+    message(FATAL_ERROR "public inventory output disclosed per-occurrence data: ${output}")
+  endif()
+  execute_process(COMMAND "${TEST_BINARY}" inventory "${report}" 4 0 0 4
+    RESULT_VARIABLE report_rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT report_rc STREQUAL "0")
+    message(FATAL_ERROR "private inventory report lost an ordinal or failed total reconciliation")
+  endif()
+
+  file(SHA256 "${dat}" source_sha256)
+  file(STRINGS "${report}" occurrence_lines)
+  list(LENGTH occurrence_lines occurrence_line_count)
+  if(NOT occurrence_line_count EQUAL 5)
+    message(FATAL_ERROR "private inventory report did not contain four occurrences")
+  endif()
+  set(evidence "${root}/evidence.csv")
+  file(WRITE "${evidence}" "source_sha256,ordinal,entry_sha256,content_sha256,predicate,profile,status,evidence\n")
+  foreach(index RANGE 1 3)
+    list(GET occurrence_lines ${index} row)
+    string(REPLACE "," ";" fields "${row}")
+    list(GET fields 0 ordinal)
+    list(GET fields 1 entry_sha256)
+    list(GET fields 2 content_sha256)
+    if(ordinal EQUAL 1)
+      set(status pass)
+      set(exit_code 0)
+    elseif(ordinal EQUAL 2)
+      set(status fail)
+      set(exit_code 1)
+    else()
+      set(status unknown)
+      set(exit_code "")
+    endif()
+    if(ordinal EQUAL 3)
+      set(evidence_text "unavailable:hardware")
+    else()
+      set(evidence_text "synthetic:inventory;exit=${exit_code};sha256=${content_sha256}")
+    endif()
+    set(evidence_row "${source_sha256},${ordinal},${entry_sha256},${content_sha256},boots@600,pu8-late/ntsc-u,${status},${evidence_text}")
+    file(APPEND "${evidence}" "${evidence_row}\n")
+    if(ordinal EQUAL 1)
+      set(evidence_row_1 "${evidence_row}")
+      set(entry_sha_1 "${entry_sha256}")
+      set(content_sha_1 "${content_sha256}")
+    elseif(ordinal EQUAL 2)
+      set(entry_sha_2 "${entry_sha256}")
+      set(content_sha_2 "${content_sha256}")
+    endif()
+  endforeach()
+  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+      --library-inventory-output "${report}" --library-evidence "${evidence}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "exact inventory evidence was rejected: ${error}")
+  endif()
+  foreach(field "entries=4" "pass=1" "fail=1" "unknown=2")
+    string(FIND "${output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "evidence totals omitted ${field}: ${output}")
+    endif()
+  endforeach()
+  execute_process(COMMAND "${TEST_BINARY}" inventory "${report}" 4 1 1 2
+    RESULT_VARIABLE report_rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT report_rc STREQUAL "0")
+    message(FATAL_ERROR "private inventory report lost an evidence status or ordinal")
+  endif()
+
+  function(inventory_expect_rejection input private_report evidence_path)
+    file(SHA256 "${private_report}" before)
+    if("${evidence_path}" STREQUAL "")
+      execute_process(COMMAND "${RUN}" --library-inventory "${input}"
+          --library-inventory-output "${private_report}"
+        RESULT_VARIABLE rejected_rc OUTPUT_VARIABLE rejected_out ERROR_VARIABLE rejected_err)
+    else()
+      execute_process(COMMAND "${RUN}" --library-inventory "${input}"
+          --library-inventory-output "${private_report}" --library-evidence "${evidence_path}"
+        RESULT_VARIABLE rejected_rc OUTPUT_VARIABLE rejected_out ERROR_VARIABLE rejected_err)
+    endif()
+    file(SHA256 "${private_report}" after)
+    if(rejected_rc STREQUAL "0" OR NOT rejected_out STREQUAL "" OR
+       NOT before STREQUAL after)
+      message(FATAL_ERROR "invalid inventory input replaced a prior private report")
+    endif()
+    if(rejected_err MATCHES "Shared|SLUS-00001|Missing serial|No matching evidence")
+      message(FATAL_ERROR "inventory failure disclosed source data: ${rejected_err}")
+    endif()
+  endfunction()
+
+  file(READ "${evidence}" evidence_text)
+  string(REPLACE "${content_sha_1}" "0000000000000000000000000000000000000000000000000000000000000000"
+    wrong_content "${evidence_text}")
+  file(WRITE "${root}/wrong-content.csv" "${wrong_content}")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/wrong-content.csv")
+  string(REPLACE "${entry_sha_2},${content_sha_2},boots@600,pu8-late/ntsc-u"
+    "${entry_sha_2},${content_sha_2},boots@300,pu8-late/ntsc-u" wrong_predicate "${evidence_text}")
+  file(WRITE "${root}/wrong-predicate.csv" "${wrong_predicate}")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/wrong-predicate.csv")
+  string(REPLACE "${entry_sha_2},${content_sha_2},boots@600,pu8-late/ntsc-u"
+    "${entry_sha_2},${content_sha_2},boots@600,pm41/ntsc-u" wrong_profile "${evidence_text}")
+  file(WRITE "${root}/wrong-profile.csv" "${wrong_profile}")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/wrong-profile.csv")
+  file(WRITE "${root}/duplicate-evidence.csv" "${evidence_text}${evidence_row_1}\n")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/duplicate-evidence.csv")
+
+  file(WRITE "${root}/truncated.dat" "clrmamepro ()\ngame ( name \\\"Truncated\\\"\n")
+  inventory_expect_rejection("${root}/truncated.dat" "${report}" "")
+  set(deep "clrmamepro ()\ngame (")
+  foreach(index RANGE 1 64)
+    string(APPEND deep " nested (")
+  endforeach()
+  foreach(index RANGE 1 64)
+    string(APPEND deep ")")
+  endforeach()
+  string(APPEND deep ")\n")
+  file(WRITE "${root}/nested.dat" "${deep}")
+  inventory_expect_rejection("${root}/nested.dat" "${report}" "")
+
+  string(REPEAT "x" 33554433 oversized_text)
+  file(WRITE "${root}/oversized.dat" "${oversized_text}")
+  file(SIZE "${root}/oversized.dat" oversized_bytes)
+  if(NOT oversized_bytes EQUAL 33554433)
+    message(FATAL_ERROR "oversized DAT preflight produced ${oversized_bytes} bytes")
+  endif()
+  inventory_expect_rejection("${root}/oversized.dat" "${report}" "")
+  unset(oversized_text)
+
+  set(escaped_report "${root}/../compat-inventory-escape.csv")
+  file(REMOVE "${escaped_report}")
+  execute_process(COMMAND "${RUN}" --library-inventory "${dat}"
+      --library-inventory-output "${escaped_report}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(rc STREQUAL "0" OR NOT output STREQUAL "" OR EXISTS "${escaped_report}")
+    message(FATAL_ERROR "inventory output escaped its private directory")
   endif()
   return()
 endif()
@@ -1515,6 +1712,7 @@ foreach(case accounting controls)
   schway_add_test(NAME compat.inventory.${case}
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
       -DRUN=$<TARGET_FILE:schwaystation-run>
+      -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-library>
       -DCASE=compat_inventory_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
     LABELS compat portable TIMEOUT 30)
 endforeach()
