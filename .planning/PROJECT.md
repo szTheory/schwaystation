@@ -29,12 +29,23 @@ matrix. The Redump inventory is not playability evidence: untested titles and co
 libretro remains experimental while required capabilities are incomplete. The accepted MDEC hardware and full
 frame/movie conformance limits remain explicit in the [v2.0 audit](milestones/v2.0-MILESTONE-AUDIT.md).
 
-No next milestone is active. Future directions remain in `.planning/PRODUCT-ROADMAP.md` and the seed ledger; this
-closeout does not promote a new scope.
+The active v3.0 milestone, “Prove a game plays,” turns that unknown into two bounded proofs: a self-authored
+interactive homebrew disc in automated RetroArch CI, and one locally run retail title using the owner's BIOS and
+disc. Commercial bytes and paths stay on the owner's machine. A pass for one game will not imply broad library
+compatibility; the required-capability matrix still governs public compatibility claims.
 
-## Current Milestone
+## Current Milestone: v3.0 Prove a game plays
 
-None. v2.0 is complete and archived. The next milestone requires a separate scope decision.
+**Goal:** Demonstrate a title reaches input-driven gameplay in RetroArch with visible and audible output, first
+through an automated owned fixture and then with one locally owned retail game.
+
+**Target features:**
+- One bootable self-authored homebrew fixture exercises BIOS handoff, disc access, input-driven visible change,
+  motion, audio and deterministic replay parity through RetroArch.
+- One owner-selected retail game reaches playable gameplay in a local RetroArch session using the owner's BIOS
+  and disc; only privacy-safe title-specific evidence is retained.
+- Compatibility claims stay scoped to measured titles and predicates, and libretro remains experimental until
+  the complete required-capability matrix passes.
 
 ## Requirements
 
@@ -59,7 +70,12 @@ None. v2.0 is complete and archived. The next milestone requires a separate scop
 
 ### Active
 
-None. A new active requirement set will be written only after the next milestone is approved.
+- [ ] v3.0: Prove one integrated, self-authored bootable homebrew session in RetroArch CI and compare its
+  deterministic result with the runner.
+- [ ] v3.0: Prove one owner-selected retail title reaches playable gameplay locally through RetroArch using the
+  owner's BIOS and disc, without putting commercial bytes or private paths in the repository.
+- [ ] v3.0: Keep compatibility reporting title- and predicate-specific; a single title result does not clear the
+  experimental marker or imply broad compatibility.
 
 ### Out of Scope
 
@@ -125,6 +141,7 @@ None. A new active requirement set will be written only after the next milestone
 | PPF and BPS patches are validated host-side sector overlays; the source image stays unchanged | Patch inputs are untrusted, and patched reads must reuse the common disc boundary | ✓ Phase 16: PPF/BPS identity, bounds, source immutability and deterministic overlay tests passed. |
 | GameShark strings use one bounded host parser and an explicit checked RAM write; canonical cheat state participates in hashes and libretro serialization | Keep cheat parsing and mutation outside the deterministic core while preserving reproducible state | ✓ Phase 16: runner and libretro paths, invalid-input behavior, hashing and serialization passed. |
 | DAT occurrence accounting is not playability evidence; libretro stays experimental until every required capability row passes | Compatibility claims must follow measured boot-to-play evidence, not inventory counts | ✓ Phase 16: all 13,407 DAT occurrences remain accounted, the 51-row matrix retains unknowns, and experimental metadata remains true. |
+| v3.0 playability requires both an automated self-authored RetroArch game session and one local retail-game pass | The fixture makes recurring CI deterministic; a real title proves the user-visible commercial path without distributing its BIOS or disc | — v3.0 planning: one title-specific result will not imply library-wide compatibility. |
 | Card bytes stay instance-owned and file access stays in hosts. Runner save names use normalized serials when valid and content-derived fallbacks otherwise; libretro card 1 belongs to frontend SAVE_RAM and card 2 persists separately. PocketStation support is storage-only over the card port. | Preserve deterministic host boundaries, portable card files and frontend ownership without claiming a PocketStation handheld emulator | ✓ Phase 8 verification: SAVE-01–05 passed local and hosted behavior checks; v0.8.0 was published. |
 | Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | ✓ v1.0: no speed-changing option or enhancement enters the hashed path. |
 | Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | ✓ Six phase PRs merged; the automatic release workflow published v0.6.0. |
@@ -148,4 +165,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-26 after v2.0 milestone completion*
+*Last updated: 2026-11-27 after v3.0 milestone start*

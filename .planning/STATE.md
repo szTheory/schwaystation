@@ -1,19 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.0
-milestone_name: The whole library
-status: Awaiting next milestone
-stopped_at: Phase 16 complete — all phases complete
-last_updated: "2026-11-27T04:32:25.609Z"
-last_activity: 2026-11-26
-last_activity_desc: Milestone v2.0 completed and archived
-state_head: a2f37b46eab24f53e30f99c6b3faff6eedc8f2f8
+milestone: v3.0
+milestone_name: Prove a game plays
+status: planning
+last_updated: "2026-11-27T20:46:09.601Z"
+last_activity: 2026-11-27
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 125
-  completed_plans: 125
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,10 +24,11 @@ See: .planning/PROJECT.md (updated 2026-11-26)
 
 ## Current Position
 
-Phase: Milestone v2.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-11-26 — Milestone v2.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-11-27 — Milestone v3.0 started
+
 
 ### Phase 16 planning (2026-11-25)
 
