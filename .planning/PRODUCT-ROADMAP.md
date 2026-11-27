@@ -2,7 +2,7 @@
 title: "Product roadmap (rolling)"
 summary: "Immediate / Near / Mid / Long direction for schwaystation with the evidence and promotion trigger for each horizon; ROADMAP.md is the execution contract, seeds hold the source narratives."
 read_when: "At every new-milestone and complete-milestone step, and when a finding changes priorities."
-updated: 2026-11-26
+updated: 2026-11-27
 ---
 
 # Product roadmap (rolling)
@@ -64,24 +64,42 @@ The final Main CI critical path was about 69 minutes and the full Release lane a
 slowest job. TODO-051 and TODO-052 preserve the full Nightly and BE32 gates until a coverage-preserving route or
 shard proves an improvement. The measured BE32 candidate remains a follow-up, not an unvalidated workflow change.
 
-## Mid: v3.0 "States and movies" (SEED-002), v4.0 "Measured accuracy" (SEED-003)
+## Immediate: v3.0 "Prove a game plays" (new scope; SEED-007 tune-up first)
 
-v3.0: fixed-size validated save states with cards outside by default, rewind and run-ahead claims in the libretro
-`.info` behind their tests, an own movie format with BK2 and PJM import, emulated-time print and input display for
-speedrunners, Playstead continuation. **Trigger:** v2.0 shipped, or Playstead's `psx` integration needs
-continuation first. The v2.0 trigger is now met; v3.0 remains a candidate in Mid and is not promoted without a
-separate owner-approved milestone.
-v4.0: fixtures run on the owner's console settle the fitted constants (GPU clocks per line, the CD seek curve and
-INT1 period, per-primitive GPU cost, MDEC block cost, ADSR edges, XA and reverb rounding); nightly oracle lanes
-against released binaries. **Trigger:** a stable failing set in the ledger that documentation does not explain.
+One integrated, self-authored bootable homebrew session passes in RetroArch CI: BIOS handoff, disc access,
+input-driven gameplay change, moving picture, audible output, deterministic replay and runner parity. Then one
+owner-selected retail game reaches that same playable threshold locally through RetroArch using the owner's BIOS
+and disc. Retail bytes, paths and captures stay local under `ASSET_POLICY.md`; evidence names only the approved
+title identity and predicates. One title does not change the 13,407-entry inventory or clear the experimental
+marker. **Trigger:** owner selected game playability as the next milestone after v2.0; Phase 17 starts with
+SEED-007.
 
-## Long: v5.0 "Tools" (SEED-004), v6.0 "Everywhere" (SEED-005), enhancements (SEED-006), the browser (SEED-008)
+## Near: v4.0 "States and movies" (SEED-002), v5.0 "The browser" (SEED-008)
 
-Hooks, a GDB stub, debugger views and ROM-hacker aids, Python and Gymnasium bindings; the cached interpreter and a
-JIT behind `core.exec_mode_equivalence`, handheld and console compile lanes, the libretro buildbot, Playstead;
-internal resolution, PGXP-style precision, widescreen, texture filtering and true colour as a host renderer outside
-the hashed path; the WebAssembly page. **Triggers:** a user ask, a met instructions-per-frame budget or a named
-port target; each seed names its own.
+v4.0: fixed-size validated save states with cards outside by default, measured rewind and run-ahead claims,
+frame-exact movies and replay, and Playstead continuation. **Trigger:** v2.0 shipped; now promoted to Near after
+the playability proof because its state and replay surface supports repeatable play sessions.
+
+v5.0: a browser host for the existing deterministic core, with a real WebAssembly browser launch and measured
+playability/performance on a named desktop browser; the wasm32 hash lane remains only a determinism check.
+**Trigger:** the game-shaped RetroArch path is proven and browser work can be measured against it; retain the
+owner's stated high priority for browser and low-power performance.
+
+## Mid: v6.0 "Measured accuracy" (SEED-003), v7.0 "Tools" (SEED-004)
+
+v6.0: settle documented GPU, CD, MDEC, SPU/XA and reverb uncertainties with a stable reproducible mismatch and
+an available oracle; do not assume a hardware capture is available. **Trigger:** a retail or homebrew playability
+run produces a repeatable mismatch that the current evidence cannot explain.
+
+v7.0: debugger/GDB views, ROM-hacker aids, Python bindings and Gymnasium hooks. **Trigger:** a concrete user,
+speedrunner or tooling request identifies the first consumer.
+
+## Long: v8.0 "Everywhere" (SEED-005), enhancements (SEED-006)
+
+The cached interpreter and a JIT behind `core.exec_mode_equivalence`, handheld and console compile lanes, the
+libretro buildbot and additional Playstead targets; internal resolution, PGXP-style precision, widescreen,
+texture filtering and true colour as a host renderer outside the hashed path. **Triggers:** a named port target
+or measured instructions-per-frame budget for Everywhere; a concrete renderer consumer for enhancements.
 
 ## Decision log
 
@@ -90,6 +108,7 @@ port target; each seed names its own.
 | 2026-11-19 | Phase 7 tune-up records current deterministic quality and CI baselines while preserving device/browser evidence limits | `gpu_motion` exceeds provisional low-power budgets; device MIPS are unmeasured, and hosted release-PR timing plus WASI module size remain for ship. |
 | 2026-11-24 | Final Phase 7 evidence reconciled | The automatic v0.7.0 release PR route, exact WASI producer and release evidence are recorded; the missing merge-ref SHA still prevents an exact release-App speedup comparison. Current producer values are linked above. |
 | 2026-11-26 | v2.0 shipped and archived after Phase 16 | Ten phases passed verification, 34 requirements and seven integration flows are covered, and v0.16.0 was published. v3.0's trigger is met but remains in Mid pending a separate scope decision; TODO-051/052 retain their evidence requirements. |
+| 2026-11-27 | Promoted v3.0 playability proof to Immediate; states/movies and browser to Near | The 51-row required matrix still has 35 unknowns and no retail title pass. Existing RetroArch evidence covers interactive fixtures, sound and bootable-disc behavior in separate checks. |
 
 | Date | Change | Why |
 |---|---|---|
