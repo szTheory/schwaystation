@@ -2,7 +2,7 @@
 title: "Product roadmap (rolling)"
 summary: "Immediate / Near / Mid / Long direction for schwaystation with the evidence and promotion trigger for each horizon; ROADMAP.md is the execution contract, seeds hold the source narratives."
 read_when: "At every new-milestone and complete-milestone step, and when a finding changes priorities."
-updated: 2026-11-24
+updated: 2026-11-26
 ---
 
 # Product roadmap (rolling)
@@ -23,14 +23,14 @@ SEED-007 (the tune-up) opens every milestone after the first.
 
 Phase 7 shipped as v0.7.0. It records repeatable Cachegrind work for `testcard` and `gpu_motion`, serialized state
 size, a comparable full-CI push critical-path range, and the linked WASI module measurement. The original producers
-and cohort remain in the [Phase 7 baselines](phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md); later
+and cohort remain in the [Phase 7 baselines](milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md); later
 phase-owned producer updates set the current values to 1,620,101 and 138,319,540 Ir/frame, 3,757,638 state bytes,
 and 947,969 WASI bytes. The two comparable full-CI pushes measured 2,249–3,293 seconds.
 
 The release-App PR #29 retained `CI required` and skipped the measured heavy matrix; its run is about 70 seconds.
 Because the merge-ref SHA was not retained, it is route and required-check evidence rather than an exact workload
-comparison or a speedup claim. The detailed [CI efficiency report](phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md)
-and [delivery record](phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md) preserve that limitation.
+comparison or a speedup claim. The detailed [CI efficiency report](milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md)
+and [delivery record](milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md) preserve that limitation.
 `gpu_motion` exceeds provisional budgets for each listed low-power device class, whose sustained MIPS remain
 assumptions; SEED-005 retains the cached-interpreter and target-device follow-up. The wasm32 hash lane is not a
 browser-speed measurement. The quality review selected the README's false BIOS/disc status statement and verified
@@ -50,22 +50,27 @@ own dumps, the compatibility ledger; (5) sound plays in RetroArch: the SPU again
 audio equal to the runner's stream; (6) discs and FMV: the CD-ROM controller with cue/bin, iso and m3u, XA and
 CD-DA, the MDEC, disk control, the own disc fixture booting through OpenBIOS, hashes identical on every platform. Requirements: [archived v1.0 requirements](milestones/v1.0-REQUIREMENTS.md). Evidence: [milestone audit](milestones/v1.0-MILESTONE-AUDIT.md). Exact 8-bit MDEC output and complete external frame/movie conformance remain unproven under the accepted v1.0 scope.
 
-## Active: v2.0 "The whole library" (SEED-001)
+## Shipped: v2.0 "The whole library" (completed 2026-11-26)
 
-CHD through libchdr, PBP, ECM, CCD and SBI/LibCrypt; multitap, GunCon and Justifier, mouse, neGcon, Jogcon and
-Dual Analog flight mode; PocketStation storage; per-game cards by serial and the libretro save round trip; PAL and
-every revision profile over the compatibility ledger; opt-in BIOS-shell fast boot; GameShark strings and `--patch`
-for ROM hackers; bounded MDEC edge cases; and a measured gate for dropping `.info`'s `is_experimental` flag.
-**Trigger:** v1.0 shipped; the owner approved this scope on 2026-11-18. **Why next:** what collectors and players
-notice first after the core plays; CHD is the format most frontend libraries already hold. Opens with SEED-007.
-The browser page (SEED-008) was weighed at this boundary and remains outside this milestone.
+Ten phases and 125 plans added CHD, PBP, ECM, CloneCD/IMG/SUB and SBI/LibCrypt support; per-game card lifecycle,
+multitap, special controllers and guns; PAL/revision profiles and opt-in BIOS-shell fast boot; PPF/BPS overlays,
+bounded GameShark support, and a 51-row required-capability matrix. All requirements passed phase verification,
+and v0.16.0 was published after the exact-head Main and Release gates passed. See the [milestone audit](milestones/v2.0-MILESTONE-AUDIT.md)
+for the requirement and integration map. The DAT inventory is not playability evidence: 35 of the 51 required
+capability rows remain unknown, so the metadata remains experimental. Exact 8-bit MDEC hardware output and full
+external frame/movie conformance remain unproven.
+
+The final Main CI critical path was about 69 minutes and the full Release lane about 77 minutes, with BE32 the
+slowest job. TODO-051 and TODO-052 preserve the full Nightly and BE32 gates until a coverage-preserving route or
+shard proves an improvement. The measured BE32 candidate remains a follow-up, not an unvalidated workflow change.
 
 ## Mid: v3.0 "States and movies" (SEED-002), v4.0 "Measured accuracy" (SEED-003)
 
 v3.0: fixed-size validated save states with cards outside by default, rewind and run-ahead claims in the libretro
 `.info` behind their tests, an own movie format with BK2 and PJM import, emulated-time print and input display for
 speedrunners, Playstead continuation. **Trigger:** v2.0 shipped, or Playstead's `psx` integration needs
-continuation first.
+continuation first. The v2.0 trigger is now met; v3.0 remains a candidate in Mid and is not promoted without a
+separate owner-approved milestone.
 v4.0: fixtures run on the owner's console settle the fitted constants (GPU clocks per line, the CD seek curve and
 INT1 period, per-primitive GPU cost, MDEC block cost, ADSR edges, XA and reverb rounding); nightly oracle lanes
 against released binaries. **Trigger:** a stable failing set in the ledger that documentation does not explain.
@@ -84,6 +89,7 @@ port target; each seed names its own.
 | 2026-11-18 | Owner approved v2.0 “The whole library” as the next milestone; SEED-001 is promoted and mandatory SEED-007 opens the sequence | v1.0 is released and main CI is green; browser UI remains outside this milestone. |
 | 2026-11-19 | Phase 7 tune-up records current deterministic quality and CI baselines while preserving device/browser evidence limits | `gpu_motion` exceeds provisional low-power budgets; device MIPS are unmeasured, and hosted release-PR timing plus WASI module size remain for ship. |
 | 2026-11-24 | Final Phase 7 evidence reconciled | The automatic v0.7.0 release PR route, exact WASI producer and release evidence are recorded; the missing merge-ref SHA still prevents an exact release-App speedup comparison. Current producer values are linked above. |
+| 2026-11-26 | v2.0 shipped and archived after Phase 16 | Ten phases passed verification, 34 requirements and seven integration flows are covered, and v0.16.0 was published. v3.0's trigger is met but remains in Mid pending a separate scope decision; TODO-051/052 retain their evidence requirements. |
 
 | Date | Change | Why |
 |---|---|---|

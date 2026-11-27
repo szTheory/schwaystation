@@ -573,12 +573,12 @@ each `docs/*.md` and `docs/*/*.md` page under 61,440 bytes, each strictly below 
 its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` counts every line of
-`scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*`; the Phase 7 measured shipping ceiling is 3,901 lines,
-and the gate meets that cap. `policy.e2e_budget` keeps all `tests/retroarch/*` at or below 300 lines; the
-current total is 300. Run the existing count preflight from the repo root:
+`scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*`. Phase 7 ratcheted the ceiling to its measured 3,901 lines;
+Phase 16 raised the current approved ceiling to 4,694 lines. `policy.e2e_budget` keeps all `tests/retroarch/*`
+at or below 300 lines; the current total is 300. Run the existing count preflight from the repo root:
 
 ```sh
-cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake
+cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4694 -P tests/cmake/line_budget.cmake
 cmake -DROOT=. -DPATTERNS=tests/retroarch/* -DLIMIT=300 -P tests/cmake/line_budget.cmake
 ```
 
@@ -686,7 +686,7 @@ not replace the required hosted checks on the pull request and resulting `main` 
 
 | Job | What it runs | Required |
 |---|---|---|
-| `changes` | Lists PR paths, or diffs exact before/after commits for direct `main` pushes. `heavy=false` for a complete, bounded planning-only change, or only for the verified release App PR whose stable, complete file list is exactly the three modified paths `.release-please-manifest.json`, `CHANGELOG.md` and `version.txt`. The release route checks event and fresh REST identity, same-repository refs, SHAs, count and file-list stability; uncertainty takes the heavy route. | yes |
+| `changes` | Complete PR paths or an exact push diff. The light route accepts bounded `.planning/` changes plus `docs/testing.md` and `docs/maintaining.md`, and checks workflows, inventories, gate budget, disc registration and doc budgets. The release-App route verifies exact metadata and live identity, refs, SHAs, count and file-list stability. Mixed or uncertain paths take the heavy route. | yes |
 | `hygiene` | The `hygiene` preset and its JUnit check. | yes |
 | `title` | `scripts/check-title.sh` on the pull request's live title and body (pull requests only). | yes |
 | `gpu-reference` | The selected pinned GPU oracle tests on Ubuntu; JUnit checks the exact GPU inventory. | yes |
@@ -701,7 +701,7 @@ not replace the required hosted checks on the pull request and resulting `main` 
 | `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, checked against `quality.json` and compared with the merge base in gate mode on pull requests. A manual run performs the comparison only when an explicit control commit is supplied; exact-head validation runs without one skip this report-only sampler. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
-| `CI required` | The one ruleset check. It requires the full listed job roll-up to succeed, allowing only the documented skips for planning-only changes, non-PR title/perf, nested release calls, and inapplicable rehearsal/cleanup. On full heavy uncalled PRs it then reads the complete exact-attempt Actions jobs page and checks the comparable critical path against `quality.json`. | the check |
+| `CI required` | The one ruleset check. It requires the listed jobs to succeed, allowing the documented light-route, non-PR title/perf, nested-call and inapplicable-rehearsal skips. Heavy PRs also compare the exact-attempt critical path with `quality.json`. | the check |
 
 `wasm32` became required after a successful run on `main`. Each workflow job timeout is derived from twice the
 slowest matching successful or failed duration, rounded up to minutes, with its established setup floor; the

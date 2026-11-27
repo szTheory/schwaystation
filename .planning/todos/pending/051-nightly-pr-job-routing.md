@@ -6,6 +6,9 @@ resolves_phase: 10
 source: "Phase 9 CI efficiency audit, run 44825237757"
 created: 2026-11-20
 theme: ci
+audit_acknowledged:
+  milestone: v2.0
+  at: 2026-11-26
 ---
 
 ## Goal

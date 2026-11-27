@@ -49,6 +49,50 @@
 
 ---
 
+## Milestone: v2.0 — The whole library
+
+**Shipped:** 2026-11-26
+**Phases:** 10 | **Plans:** 125 | **Tasks:** 221
+
+### What Was Built
+
+- Extended the deterministic C library, headless runner and libretro core with CHD, PBP, ECM, CloneCD/IMG/SUB and SBI/LibCrypt support.
+- Added per-game card lifecycle, multitap and special controller protocols, PAL/revision profiles, opt-in fast boot, host-side PPF/BPS overlays, and bounded GameShark support.
+- Added a pinned 13,407-entry DAT inventory and a 51-row required-capability matrix that keeps untested combinations unknown and libretro experimental.
+- Published v0.16.0 after all ten phase PRs, main CI and the full release workflow completed.
+
+### What Worked
+
+- Each phase shipped through its own PR and release; the source and release PRs both merged with their required CI gates green.
+- Cheap selector, fixture, inventory and budget checks caught structural mismatches before broad suites.
+- Reusing exact-release CI evidence refreshed stale phase reports without repeating the full cross-platform suite.
+- A read-only integration pass traced all 34 requirements through their final consumers and found no broken flow.
+
+### What Was Inefficient
+
+- BE32 remained the critical path: the final main source run took 69m16s wall time, with BE32 at 68m23s; the full Release run took 76m38s, with BE32 at 68m30s. TODO-052 retains the measured sharding opportunity until complete selector/JUnit/artifact/hash coverage and a real hosted speedup are proven.
+- The milestone audit found malformed YAML in one plan summary and phase-level requirements absent from some interim summary metadata. A cheap GSD `summary-extract` pass caught these before closing; we corrected the YAML and added explicit phase-closeout metadata, then refreshed affected fingerprints without rerunning tests.
+- The Nightly metadata shortcut could not be added within the existing repository-check line cap without dropping its controls. TODO-051 keeps the safe full-workload fallback.
+
+### Patterns Established
+
+- Parse every plan summary and refresh verification fingerprints before aggregating a milestone; reconcile missing IDs against final phase verification instead of guessing from prose.
+- Use local/Act routing checks before expensive CI when workflow wiring changes; for planning-only changes, reuse exact-source hosted evidence and avoid an equivalent broad rerun.
+- Measure the job that owns the critical path and preserve all required checks until an exact split proves complete coverage and lower elapsed time.
+
+### Key Lessons
+
+1. Run the actual planning-tool parser over summary metadata; a regular expression can miss malformed YAML or misunderstand phase-level closure.
+2. A pending shard is a hypothesis until its disjoint test union, JUnit reports, fixtures and downstream artifacts are proven on the hosted runner.
+3. A changed workflow path can save iteration time only when its failure route remains conservative and every scheduled/manual gate stays complete.
+4. Reuse green exact-head CI for documentation and fingerprint refreshes; do not repeat a long suite for bookkeeping.
+
+### Cost Observations
+
+- Main source CI took 69m16s wall time; full Release CI took 76m38s. BE32 was the longest critical-path job in both. The timing evidence does not provide a reliable dollar-cost estimate.
+- Model mix and session count were not measured consistently. No local test, fuzz or Docker process was started for milestone auditing or cleanup.
+- Timeline: Phase 7's v0.7.0 release began the milestone delivery; Phase 16's v0.16.0 release and the audit completed the v2.0 scope.
+
 ## Cross-Milestone Trends
 
-This is the first milestone retrospective. There is not yet enough cross-milestone data to claim a trend.
+Both milestones used per-phase pull requests and automated releases. v2.0's CI lanes are materially different from the early v1.0 runs, so the available timings do not support a comparable trend in Actions cost or critical-path duration. Keep the BE32 evidence and TODO-052 for the next workflow design that can measure a comparable before/after result.

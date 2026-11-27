@@ -6,7 +6,9 @@ A Sony PlayStation (PS1) emulator core written in C17: a small MIT-licensed libr
 (`schwaystation-run`) for tests, automation and frontends such as Playstead, and a libretro core for RetroArch. One
 core covers every console revision from the SCPH-1000 to the SCPH-102 PS one and the NTSC-J, NTSC-U/C and PAL
 regions as machine profiles. The v1.0 milestone delivers a deterministic CPU, GPU, SPU and CD path, host-supplied
-disc sectors, the runner and libretro host, and an owned disc that boots through OpenBIOS in RetroArch.
+disc sectors, the runner and libretro host, and an owned disc that boots through OpenBIOS in RetroArch. The v2.0
+milestone extends those same deliverables with bounded CHD/PBP/ECM/CloneCD readers, SBI protection data, card and
+controller support, PAL/revision profiles, host-side patches and cheats, and evidence-gated compatibility claims.
 
 ## Core Value
 
@@ -15,39 +17,24 @@ library that any host can embed.
 
 ## Current State
 
-The v1.0 GSD milestone completed on 2026-11-18 across six phases and 195 plans. Phase releases through the disc
-and FMV work are merged; the automatic release workflow published v0.6.0. The v2.0 Phase 7 release later
-published v0.7.0. The library, runner and libretro core
-build and pass the hosted platform, deterministic hash, RetroArch and media checks recorded in the milestone
-archive. This is a completed v1.0 project milestone, not a claim of full PlayStation library compatibility or
-complete hardware conformance. In particular, exact 8-bit MDEC output and complete external frame/movie output
-remain unproven under the accepted v1.0 scope. The detailed discrepancy and evidence are in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md).
+The v1.0 GSD milestone completed on 2026-11-18 across six phases and 195 plans; the automatic release workflow
+published v0.6.0. Exact 8-bit MDEC output and complete external frame/movie output remain unproven under the
+accepted v1.0 scope; the [v1.0 audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md) preserves that boundary.
 
-Milestone v2.0, “The whole library,” is active. It expands disc-format and LibCrypt support, peripherals and save
-compatibility, region and revision coverage, ROM-hacker patches and cheats, and the compatibility ledger.
-Phase 7 is released as v0.7.0. Phase 8 per-game card saves shipped in v0.8.0 after their goal verification,
-hosted RetroArch continuation proof, release checks and main CI passed. Phases 9–15 are complete and released.
-Phase 16's patches, cheats and compatibility evidence passed goal verification and exact-head CI/Nightly; its
-ship PR is in progress. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md)
-remain explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance. The v2.0
-milestone audit and closeout follow Phase 16's release.
+The v2.0 milestone, “The whole library,” completed across phases 7–16 and 125 plans. All phase and release pull
+requests are merged, v0.16.0 was published with 19 assets, and exact-release Main CI and Release checks passed.
+The release adds bounded CHD/PBP/ECM/CloneCD support, SBI/LibCrypt behavior, save lifecycle and special
+controllers, PAL/revision profiles, host-side PPF/BPS patches and GameShark support, and a required-capability
+matrix. The Redump inventory is not playability evidence: untested titles and combinations remain unknown, and
+libretro remains experimental while required capabilities are incomplete. The accepted MDEC hardware and full
+frame/movie conformance limits remain explicit in the [v2.0 audit](milestones/v2.0-MILESTONE-AUDIT.md).
 
-## Current Milestone: v2.0 The whole library
+No next milestone is active. Future directions remain in `.planning/PRODUCT-ROADMAP.md` and the seed ledger; this
+closeout does not promote a new scope.
 
-**Goal:** Make more of the PlayStation library playable through common disc formats, protection data, peripherals,
-save workflows, machine profiles, and ROM-hacker support.
+## Current Milestone
 
-**Target features:**
-- CHD, PBP, ECM and CCD media, plus SBI/LibCrypt support behind the existing host-supplied disc boundary.
-- Multitap, light guns, mouse, neGcon, Jogcon, Dual Analog flight mode and PocketStation storage behavior.
-- Per-game memory cards, card import/export formats and the libretro save round trip.
-- PAL timing and console/GPU revision profiles across the compatibility ledger, plus opt-in BIOS-shell fast boot.
-- GameShark strings, runner patch support, bounded MDEC edge cases, broader ledger coverage and removal of the experimental metadata only when supported.
-- A first-phase pipeline and documentation tune-up, including the triage digest, CI-efficiency report and measured `quality.json` ratchets.
-
-Save states, movies, browser UI, measured-accuracy campaigns, JITs and visual enhancements remain outside v2.0.
-The MDEC edge work stays within the v1.0 evidence boundary: exact 8-bit hardware output and full-frame/movie
-conformance are not claims of this milestone.
+None. v2.0 is complete and archived. The next milestone requires a separate scope decision.
 
 ## Requirements
 
@@ -59,20 +46,20 @@ conformance are not claims of this milestone.
 - ✓ Phase 4: GPU, display modes, pads, memory cards, OpenBIOS and compatibility ledger — v1.0.
 - ✓ Phase 5: deterministic SPU audio, pinned memory-transfer logs and runner/libretro PCM parity — v1.0.
 - ✓ Phase 6: CD-ROM images, XA, CD-DA, MDEC within the approved evidence scope, owned disc boot and disk control — v1.0.
-- ✓ Phase 7: weekly triage, measured CI/quality controls and maintainer guidance — v2.0; hosted ship evidence is tracked in the phase report.
+- ✓ Phase 7: weekly triage, measured CI/quality controls and maintainer guidance — v2.0; hosted ship evidence is recorded in the phase report.
 - ✓ Phase 8: SAVE-01–05 — per-game card identity, supported card formats, persistence and storage-only PocketStation — v2.0.
 - ✓ Phase 9: MEDIA-01–02, CHD-01, COMPAT-02 — bounded CHD reading, shared media checks and evidence ledger — v2.0.
 - ✓ Phase 10: PBP-01 — the documented unencrypted PSISO subset and unsupported-layout handling — v2.0.
-- ✓ Phase 11: ECM-01 and CCD-01 — bounded ECM and CloneCD/IMG/SUB readers, consumer integration and automated checks; hosted gates remain in the ship record — v2.0.
+- ✓ Phase 11: ECM-01 and CCD-01 — bounded ECM and CloneCD/IMG/SUB readers, consumer integration and automated checks; hosted gates passed — v2.0.
 - ✓ Phase 12: CRYPT-01 — SBI loading and LibCrypt subchannel protection behavior — v2.0.
 - ✓ Phase 13: PROFILE-01–02, BOOT-01 and MDEC-01 — region/board profiles, BIOS-shell fast boot and bounded MDEC behavior — v2.0.
 - ✓ Phase 14: SIO-01–04 — multitap, mouse, neGcon, Jogcon and flight-mode controls — v2.0.
 - ✓ Phase 15: GUN-01–02 and SIO-05 — GunCon/Justifier input and supported special-controller behavior — v2.0.
-- ✓ Phase 16: PATCH-01, CHEAT-01, COMPAT-01 and COMPAT-03 — host-side PPF/BPS overlays, bounded GameShark support and evidence-gated compatibility claims — v2.0; goal verified, release pending.
+- ✓ Phase 16: PATCH-01, CHEAT-01, COMPAT-01 and COMPAT-03 — host-side PPF/BPS overlays, bounded GameShark support and evidence-gated compatibility claims — v2.0; released as v0.16.0.
 
 ### Active
 
-- v2.0: The whole library — scoped in `.planning/REQUIREMENTS.md` and mapped in `.planning/ROADMAP.md`.
+None. A new active requirement set will be written only after the next milestone is approved.
 
 ### Out of Scope
 
@@ -124,7 +111,7 @@ conformance are not claims of this milestone.
 
 | Decision | Rationale | Outcome |
 |---|---|---|
-| One core; console revisions and regions as machine profiles (`region`, `board` with derived GPU, SPU and CD firmware); v2 GPU and vC2 CD firmware default | Hardware differs by board; tests need fixed values; the region decides the video clock and the SCEx answer | ✓ v1.0: region and board profiles are implemented and exercised. |
+| One core; console revisions and regions as machine profiles (`region`, `board` with derived GPU, SPU and CD firmware); v2 GPU and vC2 CD firmware default | Hardware differs by board; tests need fixed values; the region decides the video clock and the SCEx answer | ✓ v1.0: region and board profiles are implemented and exercised. Phase 13 verifies PAL timing and board tuples through the hosts, serialized state and hashes. |
 | The tick is one CPU cycle at 33,868,800 Hz; the GPU clock comes from an exact ratio accumulator; the SPU steps every 768 ticks; a CD sector every 451,584 ticks; no floating point anywhere | Every documented edge is an integer on this lattice; no small LCM with the GPU clock exists | ✓ v1.0: integer timing, regional sample cadence and cross-platform hashes pass. |
 | A frame runs from vsync to vsync; `schway_run_frame` and `schway_run` return a stop reason and never sleep | Lowest input latency; bounded calls; handheld and browser hosts drive pacing | ✓ v1.0: bounded frame/run calls and stop-reason contracts pass. |
 | The R3000A and the GTE are finished against vectors before any game: the SingleStepTests/r3000 sample per PR, the full set nightly, the 1150 ps1-tests GTE cases transcoded into an own vector file | Siblings that grew CPUs from game traces stalled; the GTE cases are hardware-captured | ✓ Phases 2–3: public CPU vectors and hardware GTE cases pass. |
@@ -134,15 +121,17 @@ conformance are not claims of this milestone.
 | A retail BIOS is user-supplied only, recognised by digest; OpenBIOS is built in CI as the stand-in; an own stub kernel boots every PS-EXE fixture; no HLE | Firmware copyright; HLE is the top compatibility complaint | ✓ v1.0: BIOS digest recognition, CI OpenBIOS and own stub paths pass; no proprietary bytes committed. |
 | Video is the native display frame in GPU encoding with a metadata tuple plus a read-only VRAM view; conversion, borders and deinterlacing are host helpers outside the hash | Lossless and host-independent; ps1-tests compare whole VRAM | ✓ v1.0: native frames and host conversion are deterministic; GPU references pass. |
 | Audio is int16 stereo at 44,100 Hz with exactly `frame_cycles / 768` samples per frame; the hash is over that stream before any host resampling | Mixer-independent determinism | ✓ v1.0: hardware transfer logs, cross-platform hashes and runner/libretro PCM parity pass. |
-| The core never opens files: the host supplies `schway_disc` sector callbacks; host-side readers parse cue/bin, iso, m3u, CHD, PBP, bounded ECM and CloneCD/IMG/SUB through the shared contract | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | ✓ Phases 9–11: CHD/PBP/ECM/CCD readers and automated checks pass; Phase 11 hosted evidence is recorded at ship. |
+| The core never opens files: the host supplies `schway_disc` sector callbacks; host-side readers parse cue/bin, iso, m3u, CHD, PBP, bounded ECM and CloneCD/IMG/SUB through the shared contract | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | ✓ Phases 9–11: CHD/PBP/ECM/CCD readers and automated checks pass; Phase 11 hosted evidence passed at ship. |
 | PPF and BPS patches are validated host-side sector overlays; the source image stays unchanged | Patch inputs are untrusted, and patched reads must reuse the common disc boundary | ✓ Phase 16: PPF/BPS identity, bounds, source immutability and deterministic overlay tests passed. |
 | GameShark strings use one bounded host parser and an explicit checked RAM write; canonical cheat state participates in hashes and libretro serialization | Keep cheat parsing and mutation outside the deterministic core while preserving reproducible state | ✓ Phase 16: runner and libretro paths, invalid-input behavior, hashing and serialization passed. |
 | DAT occurrence accounting is not playability evidence; libretro stays experimental until every required capability row passes | Compatibility claims must follow measured boot-to-play evidence, not inventory counts | ✓ Phase 16: all 13,407 DAT occurrences remain accounted, the 51-row matrix retains unknowns, and experimental metadata remains true. |
-| Card bytes stay instance-owned and file access stays in hosts. Runner save names use normalized serials when valid and content-derived fallbacks otherwise; libretro card 1 belongs to frontend SAVE_RAM and card 2 persists separately. PocketStation support is storage-only over the card port. | Preserve deterministic host boundaries, portable card files and frontend ownership without claiming a PocketStation handheld emulator | ✓ Phase 8 verification: SAVE-01–05 passed local and hosted behavior checks; phase release pending. |
+| Card bytes stay instance-owned and file access stays in hosts. Runner save names use normalized serials when valid and content-derived fallbacks otherwise; libretro card 1 belongs to frontend SAVE_RAM and card 2 persists separately. PocketStation support is storage-only over the card port. | Preserve deterministic host boundaries, portable card files and frontend ownership without claiming a PocketStation handheld emulator | ✓ Phase 8 verification: SAVE-01–05 passed local and hosted behavior checks; v0.8.0 was published. |
 | Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | ✓ v1.0: no speed-changing option or enhancement enters the hashed path. |
 | Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | ✓ Six phase PRs merged; the automatic release workflow published v0.6.0. |
 | Cachegrind Ir/frame on three fixtures as the only per-PR speed gate; proportional gates; real-host e2e at most 300 lines; pins public and fetched with `gh api`; pre-seeded GSD bootstrap, interactive, one step per session | Wall-clock tails are noise on shared runners; two siblings stalled on their own machinery; a sibling lost six plans to an unpushed pin | ✓ v1.0: performance/policy checks passed, real-host e2e stayed within cap and source pins remained public. |
-| v2.0 expands playable library breadth while keeping the deterministic core, permissive reuse policy and host-owned I/O boundaries | The owner approved the whole-library direction; the browser and save-state directions remain later milestones | ✓ Phase 16 goal verified and all 10 phase plans are complete; its release and the milestone audit remain. |
+| v2.0 expands playable library breadth while keeping the deterministic core, permissive reuse policy and host-owned I/O boundaries | The owner approved the whole-library direction; the browser and save-state directions remain later milestones | ✓ All ten phases shipped; v0.16.0, the v2.0 audit and phase archive are complete. Untested compatibility combinations remain unknown. |
+| Special controller input is latched by the host at a frame boundary and modeled by deterministic core protocols; host device identifiers and mappings stay public | Keep host device I/O outside the core while allowing new controller classes without changing existing callers | ✓ Phases 14–15 verify multitap, mouse, neGcon, Jogcon, Dual Analog, GunCon and Justifier protocols, mappings and compatibility. |
+| Preserve every required CI case and platform; use measured critical paths, cheap preflights and local routing checks before expensive hosted runs | Avoid repeated work while keeping release and regression coverage intact | ✓ v2.0 closeout measured the BE32 bottleneck and kept TODO-051/052 pending until complete route/shard coverage and hosted before/after evidence are available. |
 
 The full list with sources is `.planning/preparation/DECISIONS.md`.
 
@@ -159,4 +148,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-26 after Phase 16 goal verification*
+*Last updated: 2026-11-26 after v2.0 milestone completion*

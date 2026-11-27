@@ -1,10 +1,10 @@
 #!/bin/sh
 #   scripts/classify-changes.sh COUNT < paths   (changed paths, both names of a rename)
-# Fault prevented: a code change skipping CI as "planning only", or a release
-# pipeline change merging unrehearsed. heavy=false only for a non-empty list
-# wholly under .planning/ and COUNT at most 3000 (the most the files API lists);
-# release_inputs=true for a release input and for any list that cannot be
-# trusted. Reads all input, so the writer never meets a closed pipe.
+# Fault prevented: heavy CI skipped for an unclassified code change, or a release
+# pipeline merging unrehearsed. heavy=false needs a non-empty, bounded list under
+# .planning/ plus its maintainer-doc allowlist, or exact verified release metadata.
+# release_inputs=true for release paths and untrusted lists. Read all input before
+# writing, so this filter never meets a closed pipe.
 set -u
 # Paths are compared as bytes.
 LC_ALL=C
@@ -44,7 +44,7 @@ while IFS= read -r path || [ -n "$path" ]; do
         esac
       else heavy=true
       fi ;;
-    .planning/*) metadata=false ;;
+    .planning/* | docs/testing.md | docs/maintaining.md) metadata=false ;;
     *) heavy=true; metadata=false ;;
   esac
   case "$path" in
