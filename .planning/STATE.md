@@ -2,9 +2,14 @@
 gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Prove a game plays
+current_phase: 17
+current_phase_name: A measured and trustworthy playability baseline; first of 3 in v3.0
 status: planning
-last_updated: "2026-11-27T20:55:21Z"
+stopped_at: Roadmap approved; Phase 17 has not started and awaits separate authorization
+last_updated: "2026-11-27T21:22:55.934Z"
 last_activity: 2026-11-27
+last_activity_desc: v3.0 roadmap approved and committed
+state_head: 5d6b3b196a861a48a8f7bd66c4265e575278c5df
 progress:
   total_phases: 3
   completed_phases: 0
@@ -20,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Review the v3.0 execution roadmap; Phase 17 opens with mandatory SEED-007 after approval and separate phase authorization.
+**Current focus:** Roadmap approved; Phase 17 planning waits for separate authorization.
 
 ## Current Position
 
 Phase: 17 of 19 (A measured and trustworthy playability baseline; first of 3 in v3.0)
 Plan: Not started (TBD)
-Status: Roadmap ready for review
-Last activity: 2026-11-27 — v3.0 roadmap created with all 9 approved requirements mapped once
+Status: Planning
+Last activity: 2026-11-27 — v3.0 roadmap approved and committed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -2706,7 +2711,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-27
-Stopped at: v3.0 roadmap written and ready for approval; Phase 17 has not started
+Stopped at: Roadmap approved; Phase 17 has not started and awaits separate authorization
 Resume file: .planning/ROADMAP.md
 
 Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
