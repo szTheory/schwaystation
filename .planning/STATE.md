@@ -5,11 +5,11 @@ milestone_name: Prove a game plays
 current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline; first of 3 in v3.0
 status: planning
-stopped_at: Roadmap approved; Phase 17 has not started and awaits separate authorization
-last_updated: "2026-11-27T21:22:55.934Z"
+stopped_at: Phase 17 context gathered
+last_updated: "2026-11-27T23:11:52.295Z"
 last_activity: 2026-11-27
-last_activity_desc: v3.0 roadmap approved and committed
-state_head: 5d6b3b196a861a48a8f7bd66c4265e575278c5df
+last_activity_desc: Phase 17 context captured; Codex/OpenGSD 1.23.0, primary model ID unavailable; three gsd-advisor-researcher agents used gpt-6-luna xhigh.
+state_head: b826f9fab9adf7a4fee849deb9ec9b190e2b6794
 progress:
   total_phases: 3
   completed_phases: 0
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Roadmap approved; Phase 17 planning waits for separate authorization.
+**Current focus:** Phase 17 context gathered; next step is plan phase 17 when invoked.
 
 ## Current Position
 
 Phase: 17 of 19 (A measured and trustworthy playability baseline; first of 3 in v3.0)
 Plan: Not started (TBD)
 Status: Planning
-Last activity: 2026-11-27 — v3.0 roadmap approved and committed
+Last activity: 2026-11-27 — Phase 17 context gathered
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -2710,9 +2710,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-27
-Stopped at: Roadmap approved; Phase 17 has not started and awaits separate authorization
-Resume file: .planning/ROADMAP.md
+Last session: 2026-11-27T23:10:09.363Z
+Stopped at: Phase 17 context gathered
+Resume file: .planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-CONTEXT.md
 
 Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
 
