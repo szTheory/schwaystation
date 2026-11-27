@@ -1,6 +1,7 @@
 # Requirements: schwaystation v3.0 — Prove a game plays
 
-**Defined:** 2026-11-27  
+**Defined:** 2026-11-27
+
 **Core Value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
 
 ## Milestone contract
