@@ -226,6 +226,10 @@ Nightly. Any mixed, unknown, renamed, incomplete or unclassified list runs the f
 failed/timed-out classifier job also fall back to full. Schedule and manual runs always keep every job. The local route controls exercise
 these decisions; `act --dryrun` checks job wiring but cannot call GitHub's PR files API or prove its outputs.
 
+Main CI's light route accepts complete change sets confined to `.planning/`, `docs/testing.md` and
+`docs/maintaining.md`. The `changes` preflight keeps the document byte-budget check; product documentation and any
+mixed or unclassified path still select the full build/test matrix.
+
 Two more jobs in the same workflow report through the same issue and are not part of `CI required`: `vectors-full`
 replays all 55,000 public CPU vectors at their pin, and `fuzz` replays the loader and nine media seed sets before
 running the loader and media campaigns for 60 seconds each. See [the fuzz target notes](testing.md#fuzz-targets);

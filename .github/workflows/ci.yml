@@ -52,8 +52,8 @@ defaults:
 
 jobs:
   # heavy=false only for a pull request or direct main push whose complete
-  # changed-path list is non-empty and entirely under .planning/, or for the
-  # release App's exact version/changelog metadata changes. Release CI retains
+  # changed-path list is confined to .planning/ and the maintainer-doc allowlist,
+  # or for the release App's exact metadata changes. Release CI retains
   # the full matrix and release artifacts on that same commit.
   # release_inputs=true when a path the release pipeline reads changed.
   changes:
@@ -80,6 +80,7 @@ jobs:
             LC_ALL=C sort -cu "$inventory"
           done
           cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake
+          cmake -DROOT=. -P tests/cmake/budgets.cmake
       # A failed listing adds a path outside .planning/, so it counts as heavy;
       # CHANGED catches a listing cut short at the API's 3000 files.
       - id: classify
