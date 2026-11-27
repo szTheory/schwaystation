@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 12
+open_count: 18
 waived_count: 5
 fixed_count: 10
-total_count: 27
-last_updated: 2026-11-25T15:07:38.675Z
+total_count: 33
+last_updated: 2026-11-26T00:26:23.515Z
 ---
 
 # Broken Windows Ledger
@@ -42,6 +42,12 @@ last_updated: 2026-11-25T15:07:38.675Z
 | 25 | 13 | deviation | tests/core/test_state.c |  | Task 2 validation assertions were green immediately because shared board-state validation landed in Task 1; no separate Task 2 RED run was fabricated. | waived | Task 2 adds planned regression coverage for validation implemented in Task 1; all negative cases passed the exact focused selector, and the sequencing exception is recorded in 13-04-SUMMARY and STATE. No test or behavior gap remains. | 2026-11-23T17:38:49.703Z | 2026-11-23T17:39:13.635Z |
 | 26 | 15 | deviation | src/pad.c |  | Raw fixed-width signed gun coordinates are required so the state visitor reproduces saved bytes. | open |  | 2026-11-25T15:06:00.729Z |  |
 | 27 | 15 | deviation | tests/core/test_state.c |  | Expanded the test-only state field-record capacity to cover the new serialized gun fields. | open |  | 2026-11-25T15:07:38.675Z |  |
+| 28 | 16 | stub | tests/disc/patch.c | 26 | Patch selector entry points fail until Plans 07-09 implement the source mapping and patch parsers. | open |  | 2026-11-26T00:26:23.287Z |  |
+| 29 | 16 | stub | tests/runner/cheats.c | 54 | Cheat parser, bounds and order selectors fail until Plan 03 implements the shared bounded write table. | open |  | 2026-11-26T00:26:23.333Z |  |
+| 30 | 16 | stub | tests/runner/tests.cmake | 37 | Runner cheat and patch CLI/hash modes fail until Plans 06 and 10 implement the options and hash behavior. | open |  | 2026-11-26T00:26:23.378Z |  |
+| 31 | 16 | stub | tests/libretro/tests.cmake | 444 | Libretro cheat callback and state selectors await the host behavior in Plans 04-05. | open |  | 2026-11-26T00:26:23.425Z |  |
+| 32 | 16 | stub | tests/compat/tests.cmake | 1292 | DAT inventory and capability evidence script modes fail until Plans 12-15 implement accounting and evaluation. | open |  | 2026-11-26T00:26:23.471Z |  |
+| 33 | 16 | stub | tests/fuzz/tests.cmake | 337 | Patch and cheat replay executables are absent until Plan 11 adds the replay targets. | open |  | 2026-11-26T00:26:23.515Z |  |
 
 ````json
 [
@@ -393,6 +399,84 @@ last_updated: 2026-11-25T15:07:38.675Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-11-25T15:07:38.675Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 28,
+    "kind": "stub",
+    "phase": "16",
+    "file": "tests/disc/patch.c",
+    "line": 26,
+    "description": "Patch selector entry points fail until Plans 07-09 implement the source mapping and patch parsers.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-26T00:26:23.287Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 29,
+    "kind": "stub",
+    "phase": "16",
+    "file": "tests/runner/cheats.c",
+    "line": 54,
+    "description": "Cheat parser, bounds and order selectors fail until Plan 03 implements the shared bounded write table.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-26T00:26:23.333Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 30,
+    "kind": "stub",
+    "phase": "16",
+    "file": "tests/runner/tests.cmake",
+    "line": 37,
+    "description": "Runner cheat and patch CLI/hash modes fail until Plans 06 and 10 implement the options and hash behavior.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-26T00:26:23.378Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 31,
+    "kind": "stub",
+    "phase": "16",
+    "file": "tests/libretro/tests.cmake",
+    "line": 444,
+    "description": "Libretro cheat callback and state selectors await the host behavior in Plans 04-05.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-26T00:26:23.425Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 32,
+    "kind": "stub",
+    "phase": "16",
+    "file": "tests/compat/tests.cmake",
+    "line": 1292,
+    "description": "DAT inventory and capability evidence script modes fail until Plans 12-15 implement accounting and evaluation.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-26T00:26:23.471Z",
+    "resolved_at": null,
+    "milestone": "v2.0"
+  },
+  {
+    "id": 33,
+    "kind": "stub",
+    "phase": "16",
+    "file": "tests/fuzz/tests.cmake",
+    "line": 337,
+    "description": "Patch and cheat replay executables are absent until Plan 11 adds the replay targets.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-26T00:26:23.515Z",
     "resolved_at": null,
     "milestone": "v2.0"
   }

@@ -165,6 +165,27 @@ schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uin
     return SCHWAY_STATUS_OK;
 }
 
+schway_status schway_write_ram(schway *inst, uint32_t offset, uint32_t width, uint32_t value)
+{
+    if (inst == NULL || (width != 1u && width != 2u)) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    if (offset >= SCHWAY__RAM_SIZE || (width == 2u && (offset & 1u) != 0u) ||
+        width > SCHWAY__RAM_SIZE - offset) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    if ((width == 1u && value > UINT8_MAX) || (width == 2u && value > UINT16_MAX)) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+
+    uint8_t *ram = inst->bus.ram;
+    ram[offset] = (uint8_t)value;
+    if (width == 2u) {
+        ram[offset + 1u] = (uint8_t)(value >> 8);
+    }
+    return SCHWAY_STATUS_OK;
+}
+
 /* The first-fault record, or all zero while none is latched. */
 schway_status schway_get_fault(const schway *inst, schway_fault *out)
 {

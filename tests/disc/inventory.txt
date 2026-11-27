@@ -51,4 +51,11 @@ disc.image.pbp_raw	disc,portable
 disc.image.sbi	disc,portable
 disc.media.fixture_controls	disc,portable
 disc.media.preflight	disc,portable
+disc.patch.atomic	disc,portable
+disc.patch.bounds	disc,portable
+disc.patch.bps	disc,portable
+disc.patch.mapping	disc,portable
+disc.patch.ppf1	disc,portable
+disc.patch.ppf2	disc,portable
+disc.patch.ppf3	disc,portable
 disc.playlist	disc,portable

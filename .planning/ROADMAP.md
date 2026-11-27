@@ -19,7 +19,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior. (completed 2026-11-23)
 - [x] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode. (completed 2026-11-24)
 - [x] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs. (completed 2026-11-25)
-- [ ] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support.
+- [x] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support. (completed 2026-11-26)
 
 ## Phase Details
 
@@ -389,13 +389,33 @@ Plans:
   3. The generated compatibility report accounts for all 13,407 entries at the pinned, licensed DAT revision and links supported pass and fail results to evidence. Untested entries and combinations remain explicitly unknown.
   4. `is_experimental` is false only when the committed required-capability matrix passes every row, with zero unknown or failing required rows. It stays true when that evidence is missing or fails. The matrix covers the specified boot-to-play disc families, region and board tuples, peripheral classes, card persistence, patches and cheats. DAT-wide playability is outside that claim.
 
-**Plans**: TBD
+**Plans**: 18/18 plans complete
+
+Plans:
+- [x] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
+- [x] 16-02-PLAN.md — Register api_v11 and expose checked RAM writes
+- [x] 16-03-PLAN.md — Wire shared host cheats and complete the bounded parser and canonical bytes
+- [x] 16-04-PLAN.md — Apply GameShark entries through libretro callbacks
+- [x] 16-05-PLAN.md — Serialize libretro cheat configuration atomically
+- [x] 16-06-PLAN.md — Expose runner cheats and configuration-aware state hashes
+- [x] 16-07-PLAN.md — Apply identity-bound PPF1 patches to an exact raw-track mapping
+- [x] 16-08-PLAN.md — Complete PPF2 and PPF3 native checks and records
+- [x] 16-09-PLAN.md — Stage and validate complete BPS transformations
+- [x] 16-10-PLAN.md — Expose the transactional patch path in the runner
+- [x] 16-11-PLAN.md — Replay and fuzz patch and cheat hostile input
+- [x] 16-12-PLAN.md — Account for DAT occurrences through a bounded runner inventory path
+- [x] 16-13-PLAN.md — Reconcile the pinned Redump source and retain aggregate provenance
+- [x] 16-14-PLAN.md — Define required capabilities and evaluate fresh results fail-closed
+- [x] 16-15-PLAN.md — Protect current feature evidence against the actual base
+- [x] 16-16-PLAN.md — Publish truthful inventory and required-capability reports
+- [x] 16-17-PLAN.md — Evaluate the full BE32 shard candidate with exact coverage
+- [x] 16-18-PLAN.md — Close local integration evidence before source review
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`, `PROVENANCE.md`, `ASSET_POLICY.md`
 
 ## Progress
 
-Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,901-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
+Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the per-phase repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
@@ -408,4 +428,4 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 12/12 | Complete    | 2026-11-25 |
-| 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |
+| 16. Patches, cheats and compatibility evidence | 18/18 | Complete    | 2026-11-26 |

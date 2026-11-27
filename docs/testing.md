@@ -42,7 +42,7 @@ persistence preflight before the longer portable suite.
 | `ci-msvc` | The same with MSVC and the static C runtime. | `ci` | all but `release` |
 | `hygiene` | The repository is clean: tree scan, BIOS and executable bytes, the integer-only text scan, titles, the publish script, the workflow's timeouts and action pins, and the gate-line and end-to-end budgets. | `hygiene` | `hygiene` |
 | `asan` | No memory or undefined-behaviour fault, with clang-21's AddressSanitizer and UndefinedBehaviorSanitizer; any finding stops the test. | `ci` | all but `abi` and `release`, whose binary-shape checks the instrumentation changes |
-| `fuzz` | The executable loader plus nine disc-media parser campaigns and replay targets, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
+| `fuzz` | The executable loader and twelve parser campaigns, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. CI runs `cmake --workflow --preset wasm32-build`, measures the linked module, then runs `ctest --preset wasm32-preflight` and the full `ctest --preset wasm32` suite. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
@@ -306,22 +306,20 @@ every lane; `vectors.r3000.full` runs all 55,000 cases in the `nightly` lane.
 
 ### Fuzz targets
 
-`tests/fuzz/exe.c` is the target. Each input is a whole PS-X EXE file: it is probed and loaded into a power-reset
-instance, and the probe and the load must agree, a refused file must change no RAM byte, an accepted one only the
-text segment and the launch block, and two frames of the loaded program (`SCHWAY_RUN_STOP_ON_FAULT`) must each
-return with a stop reason. A broken invariant prints which one and aborts. `tests/fuzz/seeds.c` builds the seeds in
-memory (one either side of each header bound, spans that wrap or leave RAM, and code that hammers addresses no
-device decodes), so no seed byte is committed.
+`tests/fuzz/exe.c` loads complete PS-X EXEs into reset instances. It checks probe/load agreement, no RAM changes
+on rejection, accepted writes confined to text and launch ranges, and two bounded stop-on-fault frames.
+`tests/fuzz/seeds.c` generates boundary inputs in memory, so no executable bytes are committed.
 
-`fuzz.regress.exe` replays every seed and every `tests/fuzz/regress/*.hex` through `schwaystation-fuzz-exe-replay`,
-which has no fuzzing engine and so runs on every leg, `be32` and `wasm32` included. It gates like any other test.
-The loader campaign is the report-only half: the `fuzz` job in `nightly.yml` writes the seeds with
-`schwaystation-fuzz-exe-replay --write DIR`, checks their count, and runs `schwaystation-fuzz-exe` for 60 seconds
-with `-max_len=2099200`. It checks the source fixtures, replay selectors, seed counts and per-file caps before
-running nine 60-second media campaigns: CUE (5 seeds, `65536`), CNF (5, `4096`), M3U (7, `65536`), CD-ROM (15,
-`16384`), CHD (12, `16384`), MDEC (6, `262144`), PBP (14, `256`), ECM (10, `2101249`) and CloneCD (10,
-`65536`). ECM seeds are capped at 2,099,201 bytes and CloneCD seeds at 65,541 bytes. A crash fails the job, which
-opens or updates the nightly issue and blocks nothing.
+Each portable `fuzz.regress.*` test replays its generated seeds and any `tests/fuzz/regress/*.hex` inputs without
+libFuzzer, including on `be32` and `wasm32`. The Nightly `fuzz` job checks fixtures, selectors, seed counts,
+names and byte caps before its bounded campaigns. It runs the EXE target and twelve parser targets for 60 seconds
+each: CUE 5/`65536`; CNF 5/`4096`; M3U 7/`65536`; CD-ROM 15/`16384`; CHD 12/`16384`; MDEC 6/`262144`; PBP
+14/`256`; ECM 10/`2101249`; CloneCD 10/`65536`; SBI 7/`65536`; PPF 14/`65536`; and cheat 10/`2048`.
+PPF uses an immutable generated 17-sector raw source and covers PPF1/2/3, BPS, identity, block, record and CRC
+rejection. Cheat inputs cover the 30/80 write subset and line, text, range and global-table caps; the replay checks
+canonical table bytes and bounded ordered writes against a generated RAM instance. Neither target opens a
+fuzz-controlled path. ECM seeds are capped at 2,099,201 bytes and CloneCD seeds at 65,541 bytes. A crash fails
+Nightly and opens or updates its report issue.
 
 To keep a crasher, minimise it (`schwaystation-fuzz-exe -minimize_crash=1 -runs=100000 FILE`), commit it as
 `tests/fuzz/regress/<name>.hex` (hexadecimal text; whitespace and `#` comments are skipped) with its fix, and add its

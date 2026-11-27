@@ -1,6 +1,27 @@
 # Compatibility results
 
-Generated from `tests/compat/ledger.csv` and `tests/compat/features.csv`.
+Generated from the compatibility ledgers, pinned DAT summary and required capability matrix.
+
+## Redump inventory
+
+| Entries | Pass | Fail | Unknown | Missing serial | Duplicate-serial entries |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 13407 | 0 | 0 | 13407 | 177 | 988 |
+
+[Source at the pinned revision](https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation.dat), CC BY-SA 4.0. [Reproduce the inventory](compatibility-inventory.md). Inventory counts describe the source entries.
+
+## Required capabilities
+
+Libretro stays experimental while any required result is missing or fails. Provider and profile rows require boot, input-driven control, changing picture and audible output. CHD is required when the core includes it. The checked-in summary records unknowns until it has current build evidence.
+
+| Category | Pass | Fail | Unknown |
+| --- | ---: | ---: | ---: |
+| card | 0 | 0 | 1 |
+| cheat | 0 | 0 | 2 |
+| patch | 0 | 0 | 4 |
+| peripheral | 0 | 0 | 9 |
+| profile | 0 | 0 | 27 |
+| provider | 0 | 0 | 8 |
 
 ## Counts
 
@@ -18,11 +39,9 @@ Generated from `tests/compat/ledger.csv` and `tests/compat/features.csv`.
 | memcard_roundtrip | fixture/memcard_roundtrip | pass | frame@120=cd1c037ef800397a9c95eb23ebc5524710f55db2eca8e03c975f841f0e9232db | measured fixture | fixtures.memcard_roundtrip.persistence:exit=0;core=59ad2c5d589b | 2026-11-11 |
 | pad_counter | fixture/pad_counter | pass | frame@300=cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4 | measured fixture | fixtures.pad_counter.press60:exit=0;core=59ad2c5d589b | 2026-11-11 |
 
-## Feature evidence
+## Historical feature evidence
 
-The key is provider, profile, protection, peripheral and predicate. Every field is required; unknown is valid until fresh evidence exists. A pass must match the fresh result status and evidence reference. Prior passes cannot regress or disappear without a matching dated allowance.
-The Results table records media-identity evidence tied to a serial and hash; Feature evidence records synthetic subsystem predicates from their cited tests. A synthetic pass does not establish retail-game playability or calibrated hardware behavior.
-Phase 10 onward adds provider/profile/protection/peripheral rows as each capability lands. A profile tuple describes only a tested profile-selection predicate; it does not establish title boot/play or hardware conformance. Feature allowances use `<date> <provider> <profile> <protection>!<peripheral>!<predicate> behavior-rev=4 expires=<date> <reason>` and may cover at most 60 days.
+Prior passes cannot regress or disappear without a dated allowance. Each row describes the named predicate and source. Profile selection and protocol checks leave boot-to-play unknown. See [patches](patches.md) and [cheats](cheats.md) for supported subsets.
 
 | Provider | Profile | Protection | Peripheral | Predicate | Status | Evidence | Date |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -50,6 +69,7 @@ Phase 10 onward adds provider/profile/protection/peripheral rows as each capabil
 | core | ntsc-u.pu8-late.v2 | none | dual-analog-flight | buttons.axes.frame_latch+unsupported_mode.refusal+host.mapping | pass | sio.special.flight.exit0;libretro.input.special.exit0 | 2026-11-24 |
 | core | ntsc-u.pu8-late.v2 | none | justifier | buttons_enable+irq10_timer_order+state_continuation | pass | sio.gun.justifier.exit0;gpu.gun.irq_order.exit0;gpu.gun.state.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | multitap | eight_socket.card_protocol+independent.persistence | pass | card.tap.protocol.exit0;card.tap.state.exit0;runner.cards.multitap.exit0;runner.cards.persistence.exit0;libretro.cards.multitap.exit0;libretro.cards.persistence.exit0 | 2026-11-24 |
+| core | ntsc-u.pu8-late.v2 | none | none | gameshark.byte+halfword+frame_write+state_continuation | pass | libretro.cheats.apply;libretro.cheats.state;runner.cheats.cli;runner.cheats.hash | 2026-11-26 |
 | core | ntsc-u.pu8-late.v2 | none | lightgun | host.lightgun+pointer_subset+fail_closed+frame_latch+direct_ports | pass | libretro.input.lightgun.exit0;libretro.input.pointer.exit0;libretro.input.gun_unavailable.exit0;libretro.input.multitap.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | state | malformed_reject+host_pending_excluded+stable_bytes | pass | sio.gun.state.exit0;gpu.gun.state.exit0;core.state.stable_bytes.exit0 | 2026-11-25 |
 | core | ntsc-u.pu8-late.v2 | none | jogcon | native_poll_payload+config_refusal+host.mapping | pass | sio.special.jogcon.exit0;libretro.input.special.exit0 | 2026-11-24 |
@@ -67,5 +87,9 @@ Phase 10 onward adds provider/profile/protection/peripheral rows as each capabil
 | core | pal.pu7.v0 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
 | core | pal.pu8-early.v0 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
 | core | pal.pu8-late.v2 | none | none | profile.select | pass | core.profile.machine.exit0;libretro.options.profile.exit0 | 2026-11-23 |
+| cue-bin | ntsc-u | none | cdrom | bps.crc+staging+transaction | pass | disc.patch.bps;disc.patch.atomic;runner.patch.cli | 2026-11-26 |
+| cue-bin | ntsc-u | none | cdrom | ppf1.identity+sector_overlay | pass | disc.patch.ppf1 | 2026-11-26 |
+| cue-bin | ntsc-u | none | cdrom | ppf2.size+validation_block+sector_overlay | pass | disc.patch.ppf2 | 2026-11-26 |
+| cue-bin | ntsc-u | none | cdrom | ppf3.bin+offset64+undo+sector_overlay | pass | disc.patch.ppf3 | 2026-11-26 |
 | ecm | ntsc-u | none | cdrom | disc_boot.one_data_track.64x1+toc+sectors+guest.boot+read+fmv | pass | disc.image.ecm.literal+modeled.exit0;disc.image.legacy_parity.ecm.64x1.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ecm.boot+read+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown | 2026-11-22 |
 | pbp | ntsc-u | none | cdrom | disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame | pass | provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run | 2026-11-21 |

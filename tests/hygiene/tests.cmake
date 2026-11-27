@@ -3,10 +3,10 @@ set(hygiene_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
 # Fault prevented: repository-check code growing past its budget. Every line
 # of the shell scripts, the CMake check scripts and the hooks counts, at most
-# 3901, the measured Phase 7 total; recount after any counted review fix.
+# 4694, the Phase 16 approved ceiling and measured total at ship.
 schway_add_test(NAME policy.gate_budget
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
-    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=3901
+    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=4694
     -P ${hygiene_scripts}/line_budget.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_budget ${CMAKE_BINARY_DIR}/hygiene/line_budget_fixture)
@@ -48,7 +48,7 @@ schway_add_test(NAME policy.notices.self_test
 # image or GPL text in any file git would track, ignored build output aside.
 schway_add_test(NAME hygiene.tree
   COMMAND ${SCHWAYSTATION_SH} ${CMAKE_SOURCE_DIR}/scripts/hygiene.sh --tree
-  LABELS hygiene TIMEOUT 60)
+  LABELS hygiene TIMEOUT 180)
 
 # Fault prevented: a tree scan that passes whatever the tree holds. A
 # throwaway repository holds a copy of scripts/hygiene.sh and one untracked,

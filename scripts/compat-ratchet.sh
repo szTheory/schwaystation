@@ -14,6 +14,14 @@ if [ -n "${COMPAT_BASE_DIR:-}" ] || [ -n "${COMPAT_BASE_SHA:-}" ]; then
     [ -n "${COMPAT_BASE_DIR:-}" ] && [ -n "${COMPAT_BASE_SHA:-}" ] || { printf '%s\n' 'compatibility: protected base directory and commit must be supplied together' >&2; exit 1; }
     actual=$(git -C "$COMPAT_BASE_DIR" rev-parse --verify HEAD 2>/dev/null) || { printf '%s\n' 'compatibility: protected base checkout is unavailable' >&2; exit 1; }
     [ "$actual" = "$COMPAT_BASE_SHA" ] || { printf '%s\n' 'compatibility: protected base checkout does not match its commit' >&2; exit 1; }
+    if [ "$kind" = features ]; then
+        matrix=tests/compat/required-capabilities.csv
+        tracked=$(git -C "$COMPAT_BASE_DIR" ls-tree --name-only HEAD -- "$matrix") || exit 1
+        if [ -n "$tracked" ]; then
+            missing=$(grep -Fvx -f "$root/$matrix" "$COMPAT_BASE_DIR/$matrix") || [ "$?" -eq 1 ] || exit 1
+            [ -z "$missing" ] || { printf '%s\n' "compatibility: protected capability rows changed or disappeared: $missing" >&2; exit 1; }
+        fi
+    fi
     have_ledger=no
     have_judge=no
     [ ! -f "$COMPAT_BASE_DIR/tests/compat/$ledger_name" ] || have_ledger=yes

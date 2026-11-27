@@ -33,7 +33,414 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   endfunction()
 
-  if(CASE STREQUAL "boot_full")
+  if(CASE STREQUAL "cheats_cli")
+    foreach(var PYTHON3 OUT)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner cheat CLI case requires ${var}")
+      endif()
+    endforeach()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(cheat_exe "${OUT}/runner-cheat-boundary.exe")
+    set(program [=[
+import struct, sys
+
+def lui(rt, immediate): return (0x0f << 26) | (rt << 16) | immediate
+def ori(rt, rs, immediate): return (0x0d << 26) | (rs << 21) | (rt << 16) | immediate
+def lbu(rt, offset, rs): return (0x24 << 26) | (rs << 21) | (rt << 16) | offset
+def lhu(rt, offset, rs): return (0x25 << 26) | (rs << 21) | (rt << 16) | offset
+def addiu(rt, rs, immediate): return (0x09 << 26) | (rs << 21) | (rt << 16) | (immediate & 0xffff)
+def bne(rs, rt, offset): return (0x05 << 26) | (rs << 21) | (rt << 16) | (offset & 0xffff)
+def sb(rt, offset, rs): return (0x28 << 26) | (rs << 21) | (rt << 16) | offset
+def jump(address): return (0x02 << 26) | ((address >> 2) & 0x03ffffff)
+
+instructions = [
+    lui(11, 0xbf80),
+    ori(11, 11, 0x2080),            # debug port in t3
+    lui(8, 0x8000),                 # RAM base in t0
+    lbu(9, 0x100, 8),               # expected byte cheat in t1
+    addiu(10, 0, 0x5a),
+    bne(9, 10, 9), 0,               # branch to fail
+    lhu(9, 0x102, 8),               # expected halfword cheat in t1
+    addiu(10, 0, 0x1234),
+    bne(9, 10, 5), 0,               # branch to fail
+    addiu(9, 0, ord('Y')),
+    sb(9, 0, 11),
+    jump(0x80010134), 0,            # stay after success output
+    addiu(9, 0, ord('N')),
+    sb(9, 0, 11),
+    jump(0x80010144), 0,            # stay after failure output
+]
+header = bytearray(0x800)
+header[:8] = b"PS-X EXE"
+struct.pack_into("<I", header, 0x10, 0x80010100)
+struct.pack_into("<I", header, 0x14, 0)
+struct.pack_into("<I", header, 0x18, 0x80010000)
+struct.pack_into("<I", header, 0x1c, 0x800)
+struct.pack_into("<I", header, 0x30, 0x801ff000)
+struct.pack_into("<I", header, 0x34, 0x1000)
+header[0x4c:0x4c + 55] = b"Sony Computer Entertainment Inc. for North America area"
+image = bytearray(0x800)
+struct.pack_into("<%dI" % len(instructions), image, 0x100, *instructions)
+with open(sys.argv[1], "wb") as output:
+    output.write(header)
+    output.write(image)
+]=])
+    execute_process(COMMAND "${PYTHON3}" -c "${program}" "${cheat_exe}"
+      RESULT_VARIABLE fixture_rc OUTPUT_VARIABLE fixture_out ERROR_VARIABLE fixture_err)
+    if(NOT fixture_rc STREQUAL "0")
+      message(FATAL_ERROR "could not generate the self-authored runner cheat executable: ${fixture_rc}\n"
+        "${fixture_out}${fixture_err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+      RESULT_VARIABLE baseline_rc OUTPUT_VARIABLE baseline_out ERROR_VARIABLE baseline_err)
+    set(baseline_output "${baseline_out}${baseline_err}")
+    if(NOT baseline_rc STREQUAL "0" OR NOT baseline_output MATCHES "tty N")
+      message(FATAL_ERROR "self-authored runner cheat executable did not report its expected no-cheat value:\\n"
+        "exit ${baseline_rc}\\n${baseline_output}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --cheat "30000100 00A5" --cheat "80000102 1234" --cheat "30000100 005A"
+      RESULT_VARIABLE valid_rc OUTPUT_VARIABLE valid_out ERROR_VARIABLE valid_err)
+    set(valid_output "${valid_out}${valid_err}")
+    if(NOT valid_rc STREQUAL "0" OR NOT valid_output MATCHES "tty Y" OR
+       valid_output MATCHES "tty N")
+      message(FATAL_ERROR "runner did not apply repeatable byte/halfword cheats in option order before the first frame:\n"
+        "exit ${valid_rc}\n${valid_output}")
+    endif()
+
+    set(rejected_png "${OUT}/runner-cheat-invalid.png")
+    file(REMOVE "${rejected_png}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --png "1:${rejected_png}" --cheat "D0000100 00A5"
+      RESULT_VARIABLE invalid_rc OUTPUT_VARIABLE invalid_out ERROR_VARIABLE invalid_err)
+    string(TOLOWER "${invalid_out}${invalid_err}" invalid_output_lower)
+    if(NOT invalid_rc STREQUAL "2" OR
+       NOT invalid_output_lower MATCHES "(cheat|unsupported|unknown option)" OR
+       "${invalid_out}${invalid_err}" MATCHES "(tty [YN]|frame [0-9])" OR EXISTS "${rejected_png}")
+      message(FATAL_ERROR "runner did not reject invalid cheat text before execution or output mutation:\n"
+        "exit ${invalid_rc}\n${invalid_out}${invalid_err}")
+    endif()
+
+    set(excess_args "")
+    foreach(index RANGE 1 33)
+      list(APPEND excess_args --cheat "30000100 00A5")
+    endforeach()
+    set(excess_png "${OUT}/runner-cheat-too-many.png")
+    file(REMOVE "${excess_png}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${cheat_exe}" --frames 1 --tty
+        --png "1:${excess_png}" ${excess_args}
+      RESULT_VARIABLE excess_rc OUTPUT_VARIABLE excess_out ERROR_VARIABLE excess_err)
+    string(TOLOWER "${excess_out}${excess_err}" excess_output_lower)
+    if(NOT excess_rc STREQUAL "2" OR NOT excess_output_lower MATCHES "too many --cheat entries" OR
+       "${excess_out}${excess_err}" MATCHES "(tty [YN]|frame [0-9])" OR EXISTS "${excess_png}")
+      message(FATAL_ERROR "runner did not reject an over-cap cheat list before execution or output mutation:\n"
+        "exit ${excess_rc}\n${excess_out}${excess_err}")
+    endif()
+  elseif(CASE STREQUAL "cheats_hash")
+    if(NOT DEFINED OUT OR "${OUT}" STREQUAL "")
+      message(FATAL_ERROR "runner cheat hash case requires OUT")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(cheat_state result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state ${ARGN}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ${digits}\n$")
+        message(FATAL_ERROR "runner cheat hash ${ARGN}: expected exit 0 and one state hash, got ${rc}\n${out}${err}")
+      endif()
+      string(REGEX MATCH "state sha256 ([0-9a-f]+)" state_line "${out}")
+      set(${result_name} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    endfunction()
+
+    cheat_state(no_cheat)
+    cheat_state(no_cheat_repeat)
+    cheat_state(normalized_upper --cheat "30000100 00A5")
+    cheat_state(normalized_lower --cheat "30000100+00a5")
+    cheat_state(single_entry --cheat "30000100 00A5")
+    cheat_state(duplicate_entry --cheat "30000100 00A5" --cheat "30000100 00A5")
+    cheat_state(order_ab --cheat "30000100 00A5" --cheat "30000101 00B6")
+    cheat_state(order_ba --cheat "30000101 00B6" --cheat "30000100 00A5")
+    if(no_cheat STREQUAL normalized_upper OR
+       NOT no_cheat STREQUAL no_cheat_repeat OR
+       NOT normalized_upper STREQUAL normalized_lower OR
+       NOT single_entry STREQUAL normalized_upper OR
+       single_entry STREQUAL duplicate_entry OR
+       order_ab STREQUAL order_ba)
+      message(FATAL_ERROR "runner state hashes did not preserve no-cheat and normalized configuration identity:\n"
+        "no-cheat=${no_cheat} repeat=${no_cheat_repeat}\n"
+        "upper=${normalized_upper} lower=${normalized_lower} single=${single_entry} duplicate=${duplicate_entry}\n"
+        "A+B=${order_ab} B+A=${order_ba}")
+    endif()
+
+    set(rejected_png "${OUT}/runner-cheat-invalid-hash.png")
+    file(REMOVE "${rejected_png}")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --png "1:${rejected_png}"
+        --cheat "D0000100 00A5"
+      RESULT_VARIABLE invalid_rc OUTPUT_VARIABLE invalid_out ERROR_VARIABLE invalid_err)
+    string(TOLOWER "${invalid_out}${invalid_err}" invalid_output_lower)
+    if(NOT invalid_rc STREQUAL "2" OR invalid_out MATCHES "state sha256" OR
+       NOT invalid_output_lower MATCHES "(cheat|unsupported|unknown option)" OR EXISTS "${rejected_png}")
+      message(FATAL_ERROR "invalid cheat input produced state output or a file: exit ${invalid_rc}\n${invalid_out}${invalid_err}")
+    endif()
+
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${OUT}/unused.bin"
+        --disc "${OUT}/unused.cue" --hash-state
+      RESULT_VARIABLE disc_rc OUTPUT_VARIABLE disc_out ERROR_VARIABLE disc_err)
+    if(NOT disc_rc STREQUAL "2" OR
+       NOT "${disc_out}${disc_err}" MATCHES "--hash-state is unavailable with --disc")
+      message(FATAL_ERROR "runner accepted --hash-state with --disc: exit ${disc_rc}\n${disc_out}${disc_err}")
+    endif()
+  elseif(CASE STREQUAL "patch_cli")
+    foreach(var IN ITEMS RUN RUN_HOOKED OUT PYTHON3)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner patch CLI case requires ${var}")
+      endif()
+    endforeach()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(program [=[
+import hashlib, os, struct, subprocess, sys, tempfile, zlib
+runner, hooked_runner, work_root, *emulator = sys.argv[1:]
+os.makedirs(work_root, exist_ok=True)
+
+def write(path, data):
+    with open(path, "wb") as stream:
+        stream.write(data)
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def digest_file(path):
+    with open(path, "rb") as stream:
+        return hashlib.sha256(stream.read()).hexdigest()
+
+def ppf1(raw, value, malformed_tail=False):
+    patch = bytearray(b"PPF10\x00" + b" " * 50)
+    patch.extend(struct.pack("<IBB", 24, 1, value))
+    if malformed_tail:
+        patch.extend(struct.pack("<I", len(raw) + 20) + b"\x02\xaa")
+    return bytes(patch)
+
+def ppf2(raw, value):
+    patch = bytearray(b"PPF20\x01" + b" " * 50)
+    patch.extend(struct.pack("<I", len(raw)))
+    patch.extend(raw[0x9320:0x9320 + 1024])
+    patch.extend(struct.pack("<IBB", 24, 1, value))
+    return bytes(patch)
+
+def ppf3(raw, value):
+    patch = bytearray(b"PPF30\x02" + b" " * 50 + b"\x00\x01\x00\x00")
+    patch.extend(raw[0x9320:0x9320 + 1024])
+    patch.extend(struct.pack("<QBB", 24, 1, value))
+    return bytes(patch)
+
+def bps_number(value):
+    out = bytearray()
+    while True:
+        part = value & 0x7f
+        value >>= 7
+        if value == 0:
+            out.append(part | 0x80)
+            return out
+        out.append(part)
+        value -= 1
+
+def bps_patch(source, value):
+    target = bytearray(source)
+    target[24] = value
+    patch = bytearray(b"BPS1")
+    patch.extend(bps_number(len(source)))
+    patch.extend(bps_number(len(target)))
+    patch.extend(bps_number(0))
+    patch.extend(bps_number(((24 - 1) << 2) | 0))
+    patch.extend(bps_number(1))
+    patch.append(value)
+    patch.extend(bps_number(((len(source) - 25 - 1) << 2) | 0))
+    patch.extend(struct.pack("<II", zlib.crc32(source), zlib.crc32(target)))
+    patch.extend(struct.pack("<I", zlib.crc32(patch)))
+    return bytes(patch)
+
+def ecm_number(count):
+    value = count - 1
+    out = bytearray()
+    part = (value & 0x1f) << 2
+    value >>= 5
+    if value:
+        part |= 0x80
+    out.append(part)
+    while value:
+        part = value & 0x7f
+        value >>= 7
+        if value:
+            part |= 0x80
+        out.append(part)
+    return out
+
+def ecm_edc(data):
+    value = 0
+    for byte in data:
+        value ^= byte
+        for _ in range(8):
+            value = (value >> 1) ^ (0xd8018001 if value & 1 else 0)
+    return value
+
+def invoke(executable, bios, disc, patch, source_sha=None, hooked=False,
+           extra=(), output_png=None):
+    args = ["--bios", bios, "--disc", disc, "--patch", patch]
+    if source_sha is not None:
+        args.extend(["--patch-source-sha256", source_sha])
+    args.extend(["--frames", "1", "--hash"])
+    if output_png is not None:
+        args.extend(["--png", "1:" + output_png])
+    if hooked:
+        args.append("--test-patch-sector-zero")
+    args.extend(extra)
+    return run(executable, args)
+
+def run(executable, args):
+    return subprocess.run([*emulator, executable, *args], stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, check=False)
+
+def valid(name, executable, bios, cue, patch, fmt, source_sha,
+          checks, value, with_sha=True, hooked=True):
+    report_sha = source_sha if with_sha else "not-supplied"
+    result = invoke(executable, bios, cue, patch,
+                    source_sha if with_sha else None, hooked=hooked)
+    expected = "patch format=%s source-sha256=%s checks=%s" % (fmt, report_sha, checks)
+    sector = "patch test sector0 byte24=%02X" % value
+    if result.returncode != 0 or expected not in result.stdout or \
+       "records=" not in result.stdout or (hooked and sector not in result.stdout):
+        raise AssertionError("%s did not report its validated provider byte: exit %s\\n%s" %
+                             (name, result.returncode, result.stdout))
+    if os.path.dirname(patch) in result.stdout:
+        raise AssertionError("%s leaked a private patch path" % name)
+
+def printed_frame(result):
+    return any(line.startswith("frame ") for line in result.stdout.splitlines())
+
+with tempfile.TemporaryDirectory(prefix="runner-patch-cli-", dir=work_root) as root:
+    source = os.path.join(root, "source.bin")
+    cue = os.path.join(root, "source.cue")
+    bios = os.path.join(root, "inert-bios.bin")
+    raw = bytearray((index * 13 + 7) & 0xff for index in range(32 * 2352))
+    raw = bytes(raw)
+    source_sha = digest(raw)
+    write(source, raw)
+    write(cue, b'FILE "source.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n')
+    write(bios, bytes(524288))
+    ppf1_path = os.path.join(root, "patch.ppf1")
+    ppf2_path = os.path.join(root, "patch.ppf2")
+    ppf3_path = os.path.join(root, "patch.ppf3")
+    bps_path = os.path.join(root, "patch.bps")
+    write(ppf1_path, ppf1(raw, 0xa5))
+    write(ppf2_path, ppf2(raw, 0xa6))
+    write(ppf3_path, ppf3(raw, 0xa7))
+    write(bps_path, bps_patch(raw, 0xb1))
+    baseline_sha = digest_file(source)
+
+    valid("production PPF1", runner, bios, cue, ppf1_path,
+          "PPF1", source_sha, "source-sha256", 0xa5, hooked=False)
+    valid("PPF1 provider callback", hooked_runner, bios, cue, ppf1_path,
+          "PPF1", source_sha, "source-sha256", 0xa5)
+    valid("PPF2 native checks", hooked_runner, bios, cue, ppf2_path,
+          "PPF2", source_sha,
+          "source-sha256,ppf2-source-size,ppf2-block", 0xa6)
+    valid("PPF3 native checks", hooked_runner, bios, cue, ppf3_path,
+          "PPF3", source_sha, "source-sha256,ppf3-block", 0xa7)
+    valid("BPS optional digest", hooked_runner, bios, cue, bps_path,
+          "BPS", source_sha,
+          "bps-source-crc,bps-target-crc,bps-patch-crc", 0xb1, with_sha=False)
+    valid("BPS explicit digest", hooked_runner, bios, cue, bps_path,
+          "BPS", source_sha,
+          "source-sha256,bps-source-crc,bps-target-crc,bps-patch-crc", 0xb1)
+
+    def rejected(name, expected, disc, patch, source_digest=None, extra=(),
+                 executable=runner):
+        png = os.path.join(root, name + ".png")
+        result = invoke(executable, bios, disc, patch, source_digest,
+                        extra=extra, output_png=png)
+        if result.returncode != expected or "patch:" not in result.stdout or \
+           printed_frame(result) or os.path.exists(png):
+            raise AssertionError("%s refusal failed: exit %s\\n%s" %
+                                 (name, result.returncode, result.stdout))
+        if digest_file(source) != baseline_sha:
+            raise AssertionError("%s changed the raw source" % name)
+
+    wrong_sha = "0" * 64
+    if wrong_sha == source_sha:
+        raise AssertionError("generated source accidentally has the all-zero digest")
+    rejected("wrong-digest", 1, cue, ppf1_path, wrong_sha)
+    missing_sha = invoke(runner, bios, cue, ppf1_path, hooked=False,
+                         output_png=os.path.join(root, "missing-digest.png"))
+    if missing_sha.returncode != 2 or "requires --patch-source-sha256" not in missing_sha.stdout or \
+       "frame " in missing_sha.stdout or os.path.exists(os.path.join(root, "missing-digest.png")):
+        raise AssertionError("PPF without a digest was not rejected before output")
+
+    malformed_path = os.path.join(root, "late-record.ppf")
+    write(malformed_path, ppf1(raw, 0xc1, malformed_tail=True))
+    rejected("malformed-late-record", 1, cue, malformed_path, source_sha)
+    bad_bps_path = os.path.join(root, "bad-crc.bps")
+    bad_bps = bytearray(bps_patch(raw, 0xb1))
+    bad_bps[-1] ^= 1
+    write(bad_bps_path, bad_bps)
+    rejected("bad-bps-crc", 1, cue, bad_bps_path)
+
+    def usage(name, arguments, contains):
+        png = os.path.join(root, name + ".png")
+        result = run(runner, arguments + ["--png", "1:" + png, "--hash"])
+        if result.returncode != 2 or contains not in result.stdout or \
+           printed_frame(result) or os.path.exists(png):
+            raise AssertionError("%s failed: exit=%s contains=%s frame=%s png=%s\\n%s" %
+                                 (name, result.returncode, contains in result.stdout,
+                                  printed_frame(result), os.path.exists(png), result.stdout))
+
+    usage("patch-without-disc", ["--bios", bios, "--patch", ppf1_path,
+          "--patch-source-sha256", source_sha], "--patch needs --disc")
+    usage("duplicate-patch", ["--bios", bios, "--disc", cue, "--patch", ppf1_path,
+          "--patch", ppf1_path, "--patch-source-sha256", source_sha], "give --patch once")
+    usage("duplicate-source-sha", ["--bios", bios, "--disc", cue, "--patch", ppf1_path,
+          "--patch-source-sha256", source_sha, "--patch-source-sha256", source_sha],
+          "64 hexadecimal digits once")
+    usage("malformed-sha", ["--bios", bios, "--disc", cue, "--patch", ppf1_path,
+          "--patch-source-sha256", "abcd"], "64 hexadecimal digits")
+    usage("sha-without-patch", ["--bios", bios, "--disc", cue,
+          "--patch-source-sha256", source_sha], "needs --patch")
+    usage("patch-bench", ["--bios", bios, "--disc", cue, "--patch", ppf1_path,
+          "--patch-source-sha256", source_sha, "--bench", "1"], "unavailable with --bench")
+    usage("patch-probe", ["--probe", cue, "--disc", cue, "--bios", bios,
+          "--patch", ppf1_path, "--patch-source-sha256", source_sha], "--probe takes no other option")
+
+    unsupported = []
+    iso = os.path.join(root, "cooked.iso")
+    write(iso, bytes(16 * 2048))
+    unsupported.append(("iso", iso))
+    ecm = os.path.join(root, "compressed.ecm")
+    write(ecm, b"ECM\0" + ecm_number(len(raw)) + raw +
+          b"\xfc\xff\xff\xff\x3f" + struct.pack("<I", ecm_edc(raw)))
+    unsupported.append(("compressed-ecm", ecm))
+    playlist = os.path.join(root, "source.m3u")
+    write(playlist, b"source.cue\n")
+    unsupported.append(("playlist", playlist))
+    multi = os.path.join(root, "multi.cue")
+    write(multi, b'FILE "source.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
+          b'  TRACK 02 MODE2/2352\n    INDEX 01 00:00:16\n')
+    unsupported.append(("multitrack", multi))
+    for name, disc in unsupported:
+        result = invoke(runner, bios, disc, ppf1_path, source_sha,
+                        output_png=os.path.join(root, name + ".png"))
+        if result.returncode != 77 or "patch:" not in result.stdout or \
+           printed_frame(result) or os.path.exists(os.path.join(root, name + ".png")):
+            raise AssertionError("unsupported %s layout was not refused before execution: exit %s\\n%s" %
+                                 (name, result.returncode, result.stdout))
+    if digest_file(source) != baseline_sha:
+        raise AssertionError("patch CLI cases changed the original raw source")
+print("PASS runner.patch.cli: PPF/BPS loading, provider reads and refusal boundaries")
+]=])
+    execute_process(COMMAND "${PYTHON3}" -c "${program}" "${RUN}" "${RUN_HOOKED}" "${OUT}" ${EMULATOR}
+      RESULT_VARIABLE fixture_rc OUTPUT_VARIABLE fixture_out ERROR_VARIABLE fixture_err)
+    if(NOT fixture_rc STREQUAL "0")
+      message(FATAL_ERROR "runner patch CLI integration failed: ${fixture_rc}\n${fixture_out}${fixture_err}")
+    endif()
+  elseif(CASE STREQUAL "boot_full")
     foreach(var RUN BIOS FIXTURES)
       if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
         message(FATAL_ERROR "runner full-boot case requires ${var}")
@@ -1802,6 +2209,13 @@ set_target_properties(schwaystation-test-runner PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-runner)
 
+add_executable(schwaystation-test-cheats ${CMAKE_CURRENT_LIST_DIR}/cheats.c)
+target_link_libraries(schwaystation-test-cheats PRIVATE
+  schwaystation::schwaystation schwaystation-host)
+set_target_properties(schwaystation-test-cheats PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cheats)
+
 # The region precedence resolver is deliberately host-only and has no runner,
 # disc-image or core dependency, so the table test links only this module.
 add_executable(schwaystation-test-region-probe
@@ -1962,6 +2376,34 @@ schway_add_test(NAME runner.disc.unsupported
 # a test-card frame cannot show are not compared across lanes.
 schway_add_test(NAME runner.hash_state
   COMMAND ${runner_check} -DCASE=hash_state -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Released memory reads stay exercised while cheat parsing and ordering are
+# added by later phase plans.
+schway_add_test(NAME runner.cheats.memory_read
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-cheats> memory-read
+  LABELS portable runner TIMEOUT 30)
+foreach(case parser bounds order)
+  schway_add_test(NAME runner.cheats.${case}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-cheats> ${case}
+    LABELS portable runner TIMEOUT 30)
+endforeach()
+
+# Fault prevented: runner options or state hashes silently claim unsupported
+# patch and cheat behavior.
+schway_add_test(NAME runner.cheats.cli
+  COMMAND ${runner_check} -DCASE=cheats_cli -DPYTHON3=${Python3_EXECUTABLE}
+    -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cheats -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+schway_add_test(NAME runner.cheats.hash
+  COMMAND ${runner_check} -DCASE=cheats_hash -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cheats
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+schway_add_test(NAME runner.patch.cli
+  COMMAND ${runner_check} -DCASE=patch_cli -DRUN=$<TARGET_FILE:schwaystation-run>
+    -DRUN_HOOKED=$<TARGET_FILE:schwaystation-run-test>
+    -DOUT=${PROJECT_BINARY_DIR}/tests/runner-patch-cli -DPYTHON3=${Python3_EXECUTABLE}
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: a movie applied after the frame latch, rejected after execution starts, or

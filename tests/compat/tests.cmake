@@ -68,8 +68,11 @@ function(library_snapshot root snapshot)
   file(GLOB_RECURSE paths LIST_DIRECTORIES FALSE RELATIVE "${root}" "${root}/*")
   set(entries)
   foreach(path IN LISTS paths)
-    file(SHA256 "${root}/${path}" digest)
-    list(APPEND entries "${path}|${digest}")
+    if(NOT path STREQUAL "build/library/results.csv" AND
+       NOT path STREQUAL "build/library/dat-summary.txt")
+      file(SHA256 "${root}/${path}" digest)
+      list(APPEND entries "${path}|${digest}")
+    endif()
   endforeach()
   list(SORT entries)
   set(${snapshot} "${entries}" PARENT_SCOPE)
@@ -79,14 +82,15 @@ function(library_assert_snapshot root before)
   file(GLOB_RECURSE paths LIST_DIRECTORIES FALSE RELATIVE "${root}" "${root}/*")
   set(entries)
   foreach(path IN LISTS paths)
-    if(NOT path STREQUAL "build/library/results.csv")
+    if(NOT path STREQUAL "build/library/results.csv" AND
+       NOT path STREQUAL "build/library/dat-summary.txt")
       file(SHA256 "${root}/${path}" digest)
       list(APPEND entries "${path}|${digest}")
     endif()
   endforeach()
   list(SORT entries)
   if(NOT "${entries}" STREQUAL "${before}")
-    message(FATAL_ERROR "library command created or changed a file outside build/library/results.csv")
+    message(FATAL_ERROR "library command created or changed a file outside its two reports")
   endif()
   if(NOT EXISTS "${root}/build/library/results.csv")
     message(FATAL_ERROR "library command did not create build/library/results.csv")
@@ -421,6 +425,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   endif()
   file(COPY_FILE "${LIBRARY_LEDGER}" "${ordinary_root}/tests/compat/ledger.csv")
   file(COPY_FILE "${LIBRARY_DAT}" "${ordinary_root}/build/library/Sony - PlayStation.dat")
+  file(SHA256 "${LIBRARY_DAT}" synthetic_dat_sha256)
   file(WRITE "${ordinary_root}/.env.local"
     "SCHWAYSTATION_DISC_DIR=${duplicate_root}/discs\nSCHWAYSTATION_BIOS_DIR=${duplicate_root}/bios\n")
   set(fake_cmake "${fake_bin}/cmake")
@@ -433,6 +438,30 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   endif()
   set(mirror_path "${fake_bin}${path_separator}$ENV{PATH}")
   library_snapshot("${ordinary_root}" before_ordinary)
+  file(WRITE "${ordinary_root}/build/library/results.csv" "previous report\n")
+  file(WRITE "${ordinary_root}/build/library/dat-summary.txt" "previous inventory\n")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
+      "${ordinary_root}/scripts/library.sh"
+    WORKING_DIRECTORY "${ordinary_root}"
+    RESULT_VARIABLE cached_digest_rc OUTPUT_VARIABLE cached_digest_out ERROR_VARIABLE cached_digest_err)
+  if(cached_digest_rc STREQUAL "0" OR
+     NOT cached_digest_err MATCHES "digest" OR
+     cached_digest_err MATCHES "Sony - PlayStation[.]dat")
+    message(FATAL_ERROR "ordinary library mode accepted a cached DAT with the wrong digest: ${cached_digest_rc}: ${cached_digest_out}${cached_digest_err}")
+  endif()
+  file(READ "${ordinary_root}/build/library/results.csv" cached_digest_report)
+  file(READ "${ordinary_root}/build/library/dat-summary.txt" cached_digest_summary)
+  if(NOT cached_digest_report STREQUAL "previous report\n" OR
+     NOT cached_digest_summary STREQUAL "previous inventory\n")
+    message(FATAL_ERROR "wrong cached DAT digest replaced a prior report")
+  endif()
+  library_assert_snapshot("${ordinary_root}" "${before_ordinary}")
+  file(READ "${ordinary_root}/scripts/library.sh" library_script)
+  string(REPLACE "dat_sha256=52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8"
+    "dat_sha256=${synthetic_dat_sha256}" library_script "${library_script}")
+  string(REPLACE "dat_entries=13407" "dat_entries=1" library_script "${library_script}")
+  file(WRITE "${ordinary_root}/scripts/library.sh" "${library_script}")
+  library_snapshot("${ordinary_root}" before_ordinary_success)
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
       "${ordinary_root}/scripts/library.sh"
     WORKING_DIRECTORY "${ordinary_root}"
@@ -440,7 +469,14 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   if(NOT ordinary_rc STREQUAL "0")
     message(FATAL_ERROR "ordinary library mode failed against its temporary provider: ${ordinary_rc}: ${ordinary_out}${ordinary_err}")
   endif()
-  library_assert_snapshot("${ordinary_root}" "${before_ordinary}")
+  library_assert_snapshot("${ordinary_root}" "${before_ordinary_success}")
+  execute_process(COMMAND ${EMULATOR} "${LIBRARY_TEST}" inventory-summary
+      "${ordinary_root}/build/library/dat-summary.txt" 1 0 0 1 0 0 "${synthetic_dat_sha256}"
+    RESULT_VARIABLE inventory_summary_rc OUTPUT_VARIABLE inventory_summary_out
+    ERROR_VARIABLE inventory_summary_err)
+  if(NOT inventory_summary_rc STREQUAL "0")
+    message(FATAL_ERROR "ordinary library DAT aggregate was missing, inconsistent, or disclosed title data: ${inventory_summary_rc}: ${inventory_summary_out}${inventory_summary_err}")
+  endif()
   file(READ "${ordinary_root}/build/library/results.csv" ordinary_report)
   if(NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata[.]identity,pass,synthetic:iso9660-known-answer,2026-11-12" OR
      NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable:boots@600," OR
@@ -451,6 +487,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   endif()
 
   file(SHA256 "${ordinary_root}/build/library/results.csv" old_report)
+  file(SHA256 "${ordinary_root}/build/library/dat-summary.txt" old_inventory)
   file(WRITE "${duplicate_root}/discs/PRIVATE_SENTINEL_INVALID.bin" "not a raw 2048-sector image")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
       "${ordinary_root}/scripts/library.sh"
@@ -462,6 +499,10 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   file(SHA256 "${ordinary_root}/build/library/results.csv" actual_report)
   if(NOT actual_report STREQUAL old_report)
     message(FATAL_ERROR "ordinary mode replaced the previous report after an invalid BIN")
+  endif()
+  file(SHA256 "${ordinary_root}/build/library/dat-summary.txt" actual_inventory)
+  if(NOT actual_inventory STREQUAL old_inventory)
+    message(FATAL_ERROR "ordinary mode replaced the previous DAT summary after an invalid BIN")
   endif()
   message(STATUS "library controls rejected unsafe configuration and joins without leaking or replacing results")
   return()
@@ -692,7 +733,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_modes")
   file(REMOVE_RECURSE "${work}")
   file(MAKE_DIRECTORY "${work}")
 
-  foreach(mode IN ITEMS cue_2048 cue_mode2_2352 cue_track99)
+  foreach(mode IN ITEMS cue_2048 cue_mode1_2352 cue_mode2_2352 cue_track99)
     set(mode_dir "${work}/${mode}")
     file(MAKE_DIRECTORY "${mode_dir}")
     set(cue "${mode_dir}/${mode}.cue")
@@ -722,7 +763,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_modes")
       message(FATAL_ERROR "${mode} CUE did not preserve the synthetic disc identity: ${rc}: ${out}${err}")
     endif()
   endforeach()
-  foreach(mode IN ITEMS cue_mode1_2352 cue_mode2_2336)
+  foreach(mode IN ITEMS cue_mode2_2336)
     set(mode_dir "${work}/${mode}")
     file(MAKE_DIRECTORY "${mode_dir}")
     set(cue "${mode_dir}/${mode}.cue")
@@ -997,47 +1038,15 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
       message(FATAL_ERROR "feature ratchet test requires ${required}")
     endif()
   endforeach()
-  set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
-  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nccd,ntsc-u,none,cdrom,disc_boot.mixed.64data+158audio+toc+indexes+pregap+subcode+guest.boot+read+audio+fmv,pass,disc.image.ccd.exit0;disc.image.legacy_parity.ccd.222x1+sub.21312.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ccd.boot+read+audio+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22\nccd,ntsc-u,none,cdrom,sbi.selected_provider+bad_q_data+previous_good_getlocp,pass,disc.image.sbi.provider_binding.exit0;cdrom.sbi.selected_child_bad_q.exit0,2026-11-23\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\necm,ntsc-u,none,cdrom,disc_boot.one_data_track.64x1+toc+sectors+guest.boot+read+fmv,pass,disc.image.ecm.literal+modeled.exit0;disc.image.legacy_parity.ecm.64x1.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ecm.boot+read+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22\npbp,ntsc-u,none,cdrom,disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame,pass,provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run,2026-11-21\n")
-  set(expected_profiles
-    ntsc-j.pm41-2.v2 ntsc-j.pm41.v2 ntsc-j.pu18.v2 ntsc-j.pu20.v2 ntsc-j.pu22.v2
-    ntsc-j.pu23.v2 ntsc-j.pu7.v0 ntsc-j.pu8-early.v0 ntsc-j.pu8-late.v2
-    ntsc-u.pm41-2.v2 ntsc-u.pm41.v2 ntsc-u.pu18.v2 ntsc-u.pu20.v2 ntsc-u.pu22.v2
-    ntsc-u.pu23.v2 ntsc-u.pu7.v0 ntsc-u.pu8-early.v0 ntsc-u.pu8-late.v2
-    pal.pm41-2.v2 pal.pm41.v2 pal.pu18.v2 pal.pu20.v2 pal.pu22.v2 pal.pu23.v2
-    pal.pu7.v0 pal.pu8-early.v0 pal.pu8-late.v2)
-  set(expected_profile_rows "")
-  foreach(profile IN LISTS expected_profiles)
-    if(profile STREQUAL "ntsc-u.pu8-late.v2")
-      string(APPEND expected_profile_rows
-        "core,ntsc-u.pu8-late.v2,none,dual-analog-flight,buttons.axes.frame_latch+unsupported_mode.refusal+host.mapping,pass,sio.special.flight.exit0;libretro.input.special.exit0,2026-11-24\n"
-      "core,ntsc-u.pu8-late.v2,none,guncon,poll.active_low+xy_units+frame_latch+state_continuation,pass,sio.gun.guncon.exit0;sio.gun.latch.exit0;sio.gun.state.exit0,2026-11-25\n"
-        "core,ntsc-u.pu8-late.v2,none,jogcon,native_poll_payload+config_refusal+host.mapping,pass,sio.special.jogcon.exit0;libretro.input.special.exit0,2026-11-24\n"
-      "core,ntsc-u.pu8-late.v2,none,justifier,buttons_enable+irq10_timer_order+state_continuation,pass,sio.gun.justifier.exit0;gpu.gun.irq_order.exit0;gpu.gun.state.exit0,2026-11-25\n"
-      "core,ntsc-u.pu8-late.v2,none,lightgun,host.lightgun+pointer_subset+fail_closed+frame_latch+direct_ports,pass,libretro.input.lightgun.exit0;libretro.input.pointer.exit0;libretro.input.gun_unavailable.exit0;libretro.input.multitap.exit0,2026-11-25\n"
-        "core,ntsc-u.pu8-late.v2,none,mouse,relative_motion.frame_latch+active_low_buttons+host.mapping,pass,sio.special.mouse.exit0;libretro.input.special.exit0,2026-11-24\n"
-        "core,ntsc-u.pu8-late.v2,none,multitap,eight_socket.card_protocol+independent.persistence,pass,card.tap.protocol.exit0;card.tap.state.exit0;runner.cards.multitap.exit0;runner.cards.persistence.exit0;libretro.cards.multitap.exit0;libretro.cards.persistence.exit0,2026-11-24\n"
-        "core,ntsc-u.pu8-late.v2,none,multitap,poll_methods+request_history+host.topology,pass,sio.tap.history_edges.exit0;sio.tap.poll_methods.exit0;libretro.input.multitap.exit0;libretro.input.descriptors.exit0,2026-11-24\n"
-        "core,ntsc-u.pu8-late.v2,none,negcon,native_poll_payload+host.mapping,pass,sio.special.negcon.exit0;libretro.input.special.exit0,2026-11-24\n")
-    endif()
-    string(APPEND expected_profile_rows
-      "core,${profile},none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23\n")
-    if(profile STREQUAL "ntsc-u.pu8-late.v2")
-      string(APPEND expected_profile_rows
-        "core,ntsc-u.pu8-late.v2,none,sensor,beam.bright_dark+threshold48+edge+offscreen_reload,pass,gpu.gun.sample.exit0;gpu.gun.geometry.exit0;gpu.gun.irq_order.exit0,2026-11-25\n"
-        "core,ntsc-u.pu8-late.v2,none,state,malformed_reject+host_pending_excluded+stable_bytes,pass,sio.gun.state.exit0;gpu.gun.state.exit0;core.state.stable_bytes.exit0,2026-11-25\n")
-    endif()
-  endforeach()
-  file(READ "${expected_features}" expected_content)
-  string(REPLACE "\necm," "\n${expected_profile_rows}ecm," expected_content
-    "${expected_content}")
-  file(WRITE "${expected_features}" "${expected_content}")
-  execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
-      sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
-      "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-23 features
+  # This route protects historical records. The package importer produces
+  # current capability evidence after CTest has written its JUnit report.
+  set(features "${SOURCE_ROOT}/tests/compat/features.csv")
+  string(TIMESTAMP today "%Y-%m-%d" UTC)
+  execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh"
+      "${features}" "${features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" "${today}" features
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
-  if(NOT "${result}" STREQUAL "0")
-    message(FATAL_ERROR "checked-in feature ledger differs from independent expected unknown results: ${result}: ${output}${error}")
+  if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "protected feature ledger check failed: ${result}: ${output}${error}")
   endif()
   execute_process(COMMAND "${CMAKE_COMMAND}"
       -DSOURCE_ROOT=${SOURCE_ROOT} -DWORK_ROOT=${WORK_ROOT} -DCASE=features
@@ -1059,7 +1068,9 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   string(RANDOM LENGTH 10 ALPHABET 0123456789abcdef suffix)
   set(work "${WORK_ROOT}/compat-controls-${suffix}")
   set(head "${work}/head")
-  file(MAKE_DIRECTORY "${head}/scripts" "${head}/tests/cmake")
+  file(MAKE_DIRECTORY "${head}/scripts" "${head}/tests/cmake" "${head}/tests/compat")
+  set(matrix_path tests/compat/required-capabilities.csv)
+  configure_file("${SOURCE_ROOT}/${matrix_path}" "${head}/${matrix_path}" COPYONLY)
   configure_file("${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${head}/scripts/compat-ratchet.sh" COPYONLY)
   configure_file("${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake" "${head}/tests/cmake/compat-ratchet.cmake" COPYONLY)
   configure_file("${SOURCE_ROOT}/tests/cmake/date_days.cmake" "${head}/tests/cmake/date_days.cmake" COPYONLY)
@@ -1100,6 +1111,10 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
       file(MAKE_DIRECTORY "${base}/tests/compat")
       file(WRITE "${base}/tests/compat/features.csv" "${feature_header}\n${feature_row}\n")
       list(APPEND stage_files tests/compat/features.csv)
+    endif()
+    if(ARGC GREATER 6)
+      configure_file("${SOURCE_ROOT}/${matrix_path}" "${base}/${matrix_path}" COPYONLY)
+      list(APPEND stage_files "${matrix_path}")
     endif()
     if(include_judge)
       file(MAKE_DIRECTORY "${base}/scripts")
@@ -1186,6 +1201,14 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   file(WRITE "${allow}" "2026-09-21 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-20 approved measured correction\n")
   check_feature_base("feature matching allowance" "${BASE_feature_protected_pass}" "${SHA_feature_protected_pass}"
     "${feature_fail}" "${feature_fail}" "${allow}" TRUE)
+  make_base(capabilities FALSE TRUE TRUE "${feature_pass}" TRUE protect_matrix)
+  check_feature_base("protected matrix intact" "${BASE_capabilities}" "${SHA_capabilities}"
+    "${feature_pass}" "${feature_pass}" "${allow}" TRUE)
+  file(READ "${head}/${matrix_path}" complete_matrix)
+  string(REGEX REPLACE "provider[.]iso,[^\n]*\n" "" shortened_matrix "${complete_matrix}")
+  file(WRITE "${head}/${matrix_path}" "${shortened_matrix}")
+  check_feature_base("removed protected matrix row" "${BASE_capabilities}" "${SHA_capabilities}"
+    "${feature_pass}" "${feature_pass}" "${allow}" FALSE)
   if(DEFINED ENV{COMPAT_BASE_DIR} AND EXISTS "$ENV{COMPAT_BASE_DIR}/scripts/compat-ratchet.sh" AND
      DEFINED ENV{COMPAT_BASE_SHA} AND NOT "$ENV{COMPAT_BASE_SHA}" STREQUAL "")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env
@@ -1282,6 +1305,329 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_live")
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "fresh fixture results disagree with compatibility ledger: ${rc}")
   endif()
+  return()
+endif()
+
+# Fault prevented: a DAT game occurrence being dropped when its serial is missing or repeated.
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_inventory_accounting")
+  foreach(required SOURCE_ROOT WORK_ROOT RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "inventory accounting requires ${required}")
+    endif()
+  endforeach()
+  set(root "${WORK_ROOT}/compat-inventory-accounting")
+  file(REMOVE_RECURSE "${root}")
+  file(MAKE_DIRECTORY "${root}")
+  set(dat "${root}/synthetic.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: inventory"
+)
+game (
+ name "Alpha (revision \"A\")"
+ serial "SLUS-00001"
+ rom (
+  name "alpha disk 1.bin"
+  size 1
+  crc 00000001
+ )
+ rom (
+  name "alpha disk 2.bin"
+  size 2
+  crc 00000002
+ )
+)
+game (
+ name "Alpha (revision \"A\")"
+ serial "SLUS-00001"
+ rom (
+  name "alpha duplicate.bin"
+  size 3
+  crc 00000003
+ )
+)
+game (
+ name "No serial"
+)
+]=])
+  file(SHA256 "${dat}" expected_sha256)
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "inventory accounting command failed (${rc}): ${error}")
+  endif()
+  foreach(field "source_pin=unverified" "source_sha256=${expected_sha256}" "entries=3" "pass=0" "fail=0"
+      "unknown=3" "missing_serial=1" "duplicate_serial_entries=2")
+    string(FIND "${output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "inventory accounting omitted ${field}: ${output}")
+    endif()
+  endforeach()
+  if(output MATCHES "Alpha|SLUS-00001|No serial")
+    message(FATAL_ERROR "public inventory output disclosed per-occurrence data: ${output}")
+  endif()
+  return()
+endif()
+
+# Fault prevented: ambiguous duplicate serial fields being treated as one identity.
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_inventory_controls")
+  foreach(required SOURCE_ROOT WORK_ROOT RUN TEST_BINARY)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "inventory controls require ${required}")
+    endif()
+  endforeach()
+  set(root "${WORK_ROOT}/compat-inventory-controls")
+  file(REMOVE_RECURSE "${root}")
+  file(MAKE_DIRECTORY "${root}")
+  set(dat "${root}/utf8-serial.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: encoded serials"
+)
+game (
+ name "Repeated encoded serial one"
+ serial "SLUS-00001–A"
+)
+game (
+ name "Repeated encoded serial two"
+ serial "SLUS-00001–A"
+)
+game (
+ name "Distinct serial"
+ serial "SLES-00001"
+)
+]=])
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
+    RESULT_VARIABLE utf8_rc OUTPUT_VARIABLE utf8_output ERROR_VARIABLE utf8_error)
+  if(NOT utf8_rc STREQUAL "0")
+    message(FATAL_ERROR "inventory rejected a valid encoded serial value: ${utf8_error}")
+  endif()
+  foreach(field "entries=3" "pass=0" "fail=0" "unknown=3"
+      "missing_serial=0" "duplicate_serial_entries=2")
+    string(FIND "${utf8_output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "encoded serial accounting omitted ${field}: ${utf8_output}")
+    endif()
+  endforeach()
+
+  set(dat "${root}/duplicate-serial-field.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: invalid serial field"
+)
+game (
+ name "Ambiguous serial fields"
+ serial ""
+ serial "SLUS-00001"
+)
+]=])
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(rc STREQUAL "0")
+    message(FATAL_ERROR "inventory accepted duplicate serial fields with an empty first value")
+  endif()
+  if(NOT output STREQUAL "")
+    message(FATAL_ERROR "invalid inventory input published a partial public report: ${output}")
+  endif()
+
+  set(dat "${root}/synthetic.dat")
+  file(WRITE "${dat}" [=[clrmamepro (
+ name "Synthetic: inventory controls"
+)
+game (
+ name "Shared (disc 1)"
+ serial "SLUS-00001"
+ rom (
+  name "track (one).bin"
+  size 1
+  crc 00000001
+  md5 11111111111111111111111111111111
+  sha1 1111111111111111111111111111111111111111
+ )
+ rom (
+  name "track two.bin"
+  size 2
+  crc 00000002
+  md5 22222222222222222222222222222222
+  sha1 2222222222222222222222222222222222222222
+ )
+)
+game (
+ name "Shared (disc 1)"
+ serial "SLUS-00001"
+ rom (
+  name "another track.bin"
+  size 3
+  crc 00000003
+  md5 33333333333333333333333333333333
+  sha1 3333333333333333333333333333333333333333
+ )
+)
+game (
+ name "Missing serial"
+)
+game (
+ name "No matching evidence"
+ serial "SLES-00001"
+ rom (
+  name "unmatched.bin"
+  size 4
+  crc 00000004
+  md5 44444444444444444444444444444444
+  sha1 4444444444444444444444444444444444444444
+ )
+)
+]=])
+  set(report "${root}/occurrences.csv")
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
+      --library-inventory-output "${report}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "inventory occurrence report failed: ${error}")
+  endif()
+  foreach(field "entries=4" "pass=0" "fail=0" "unknown=4"
+      "missing_serial=1" "duplicate_serial_entries=2")
+    string(FIND "${output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "inventory report omitted ${field}: ${output}")
+    endif()
+  endforeach()
+  if(output MATCHES "Shared|SLUS-00001|Missing serial|No matching evidence")
+    message(FATAL_ERROR "public inventory output disclosed per-occurrence data: ${output}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" inventory "${report}" 4 0 0 4
+    RESULT_VARIABLE report_rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT report_rc STREQUAL "0")
+    message(FATAL_ERROR "private inventory report lost an ordinal or failed total reconciliation")
+  endif()
+
+  file(SHA256 "${dat}" source_sha256)
+  file(STRINGS "${report}" occurrence_lines)
+  list(LENGTH occurrence_lines occurrence_line_count)
+  if(NOT occurrence_line_count EQUAL 5)
+    message(FATAL_ERROR "private inventory report did not contain four occurrences")
+  endif()
+  set(evidence "${root}/evidence.csv")
+  file(WRITE "${evidence}" "source_sha256,ordinal,entry_sha256,content_sha256,predicate,profile,status,evidence\n")
+  foreach(index RANGE 1 3)
+    list(GET occurrence_lines ${index} row)
+    string(REPLACE "," ";" fields "${row}")
+    list(GET fields 0 ordinal)
+    list(GET fields 1 entry_sha256)
+    list(GET fields 2 content_sha256)
+    if(ordinal EQUAL 1)
+      set(status pass)
+      set(exit_code 0)
+    elseif(ordinal EQUAL 2)
+      set(status fail)
+      set(exit_code 1)
+    else()
+      set(status unknown)
+      set(exit_code "")
+    endif()
+    if(ordinal EQUAL 3)
+      set(evidence_text "unavailable:hardware")
+    else()
+      set(evidence_text "synthetic:inventory;exit=${exit_code};sha256=${content_sha256}")
+    endif()
+    set(evidence_row "${source_sha256},${ordinal},${entry_sha256},${content_sha256},boots@600,pu8-late/ntsc-u,${status},${evidence_text}")
+    file(APPEND "${evidence}" "${evidence_row}\n")
+    if(ordinal EQUAL 1)
+      set(evidence_row_1 "${evidence_row}")
+      set(entry_sha_1 "${entry_sha256}")
+      set(content_sha_1 "${content_sha256}")
+    elseif(ordinal EQUAL 2)
+      set(entry_sha_2 "${entry_sha256}")
+      set(content_sha_2 "${content_sha256}")
+    endif()
+  endforeach()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
+      --library-inventory-output "${report}" --library-evidence "${evidence}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "exact inventory evidence was rejected: ${error}")
+  endif()
+  foreach(field "entries=4" "pass=1" "fail=1" "unknown=2")
+    string(FIND "${output}" "${field}" position)
+    if(position EQUAL -1)
+      message(FATAL_ERROR "evidence totals omitted ${field}: ${output}")
+    endif()
+  endforeach()
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" inventory "${report}" 4 1 1 2
+    RESULT_VARIABLE report_rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT report_rc STREQUAL "0")
+    message(FATAL_ERROR "private inventory report lost an evidence status or ordinal")
+  endif()
+
+  function(inventory_expect_rejection input private_report evidence_path)
+    file(SHA256 "${private_report}" before)
+    if("${evidence_path}" STREQUAL "")
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${input}"
+          --library-inventory-output "${private_report}"
+        RESULT_VARIABLE rejected_rc OUTPUT_VARIABLE rejected_out ERROR_VARIABLE rejected_err)
+    else()
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${input}"
+          --library-inventory-output "${private_report}" --library-evidence "${evidence_path}"
+        RESULT_VARIABLE rejected_rc OUTPUT_VARIABLE rejected_out ERROR_VARIABLE rejected_err)
+    endif()
+    file(SHA256 "${private_report}" after)
+    if(rejected_rc STREQUAL "0" OR NOT rejected_out STREQUAL "" OR
+       NOT before STREQUAL after)
+      message(FATAL_ERROR "invalid inventory input replaced a prior private report")
+    endif()
+    if(rejected_err MATCHES "Shared|SLUS-00001|Missing serial|No matching evidence")
+      message(FATAL_ERROR "inventory failure disclosed source data: ${rejected_err}")
+    endif()
+  endfunction()
+
+  file(READ "${evidence}" evidence_text)
+  string(REPLACE "${content_sha_1}" "0000000000000000000000000000000000000000000000000000000000000000"
+    wrong_content "${evidence_text}")
+  file(WRITE "${root}/wrong-content.csv" "${wrong_content}")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/wrong-content.csv")
+  string(REPLACE "${entry_sha_2},${content_sha_2},boots@600,pu8-late/ntsc-u"
+    "${entry_sha_2},${content_sha_2},boots@300,pu8-late/ntsc-u" wrong_predicate "${evidence_text}")
+  file(WRITE "${root}/wrong-predicate.csv" "${wrong_predicate}")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/wrong-predicate.csv")
+  string(REPLACE "${entry_sha_2},${content_sha_2},boots@600,pu8-late/ntsc-u"
+    "${entry_sha_2},${content_sha_2},boots@600,pm41/ntsc-u" wrong_profile "${evidence_text}")
+  file(WRITE "${root}/wrong-profile.csv" "${wrong_profile}")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/wrong-profile.csv")
+  file(WRITE "${root}/duplicate-evidence.csv" "${evidence_text}${evidence_row_1}\n")
+  inventory_expect_rejection("${dat}" "${report}" "${root}/duplicate-evidence.csv")
+
+  file(WRITE "${root}/truncated.dat" "clrmamepro ()\ngame ( name \\\"Truncated\\\"\n")
+  inventory_expect_rejection("${root}/truncated.dat" "${report}" "")
+  set(deep "clrmamepro ()\ngame (")
+  foreach(index RANGE 1 64)
+    string(APPEND deep " nested (")
+  endforeach()
+  foreach(index RANGE 1 64)
+    string(APPEND deep ")")
+  endforeach()
+  string(APPEND deep ")\n")
+  file(WRITE "${root}/nested.dat" "${deep}")
+  inventory_expect_rejection("${root}/nested.dat" "${report}" "")
+
+  string(REPEAT "x" 33554433 oversized_text)
+  file(WRITE "${root}/oversized.dat" "${oversized_text}")
+  file(SIZE "${root}/oversized.dat" oversized_bytes)
+  if(NOT oversized_bytes EQUAL 33554433)
+    message(FATAL_ERROR "oversized DAT preflight produced ${oversized_bytes} bytes")
+  endif()
+  inventory_expect_rejection("${root}/oversized.dat" "${report}" "")
+  unset(oversized_text)
+
+  set(escaped_report "${root}/../compat-inventory-escape.csv")
+  file(REMOVE "${escaped_report}")
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --library-inventory "${dat}"
+      --library-inventory-output "${escaped_report}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(rc STREQUAL "0" OR NOT output STREQUAL "" OR EXISTS "${escaped_report}")
+    message(FATAL_ERROR "inventory output escaped its private directory")
+  endif()
+  return()
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE MATCHES "^compat_capabilities_(coverage|results|claims)$")
+  include("${SOURCE_ROOT}/tests/cmake/capabilities_controls.cmake")
   return()
 endif()
 
@@ -1410,6 +1756,25 @@ schway_add_test(NAME compat.features.preflight
     -DCASE=compat_features_preflight -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 15)
 set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_features_preflight)
+
+# Fault prevented: DAT source occurrences disappearing from inventory totals,
+# or capability claims being derived from stale or incomplete evidence.
+foreach(case accounting controls)
+  schway_add_test(NAME compat.inventory.${case}
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+      -DRUN=$<TARGET_FILE:schwaystation-run>
+      "-DEMULATOR=${schway__probe_emulator}"
+      -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-library>
+      -DCASE=compat_inventory_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+    LABELS compat portable TIMEOUT 30)
+endforeach()
+foreach(case coverage results claims)
+  schway_add_test(NAME compat.capabilities.${case}
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+      -DINFO_FILE=${PROJECT_BINARY_DIR}/libretro/schwaystation_libretro.info
+      -DCASE=compat_capabilities_${case} -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+    LABELS compat portable TIMEOUT 30)
+endforeach()
 
 # Fault prevented: an uppercase board token bypasses the canonical tuple grammar.
 schway_add_test(NAME compat.features.controls

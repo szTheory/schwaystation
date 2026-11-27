@@ -13,6 +13,12 @@ runner.cards.controls	portable,runner
 runner.cards.multitap	portable,runner
 runner.cards.persistence	portable,runner
 runner.cards.sigterm	portable,runner
+runner.cheats.bounds	portable,runner
+runner.cheats.cli	portable,runner
+runner.cheats.hash	portable,runner
+runner.cheats.memory_read	portable,runner
+runner.cheats.order	portable,runner
+runner.cheats.parser	portable,runner
 runner.disc.api	portable,runner
 runner.disc.api.chd	portable,runner
 runner.disc.chd	portable,runner
@@ -40,6 +46,7 @@ runner.inputs.disc_apply	portable,runner
 runner.inputs.disc_controls	portable,runner
 runner.inputs.script	portable,runner
 runner.native_hash	portable,runner
+runner.patch.cli	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
 runner.region.auto	portable,runner

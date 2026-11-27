@@ -224,7 +224,11 @@
         "schwaystation-fuzz-mdec",
         "schwaystation-fuzz-mdec-replay",
         "schwaystation-fuzz-sbi",
-        "schwaystation-fuzz-sbi-replay"
+        "schwaystation-fuzz-sbi-replay",
+        "schwaystation-fuzz-ppf",
+        "schwaystation-fuzz-ppf-replay",
+        "schwaystation-fuzz-cheat",
+        "schwaystation-fuzz-cheat-replay"
       ]
     },
     { "name": "nofp", "configurePreset": "nofp" },

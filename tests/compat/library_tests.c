@@ -7,6 +7,180 @@
 
 #define LIBRARY_HEADER "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date"
 #define LIBRARY_LINE 2048
+#define INVENTORY_HEADER "ordinal,entry_sha256,content_sha256,status,predicate,profile,evidence"
+#define INVENTORY_LINE 8192
+#define INVENTORY_SUMMARY_LINE 256
+
+static int parse_count(const char *text, unsigned *value)
+{
+    char *end = NULL;
+    unsigned long parsed = strtoul(text, &end, 10);
+    if (end == text || *end != '\0' || parsed > 32768ul) return 0;
+    *value = (unsigned)parsed;
+    return 1;
+}
+
+static int valid_sha256(const char *text)
+{
+    if (strlen(text) != 64u) return 0;
+    for (size_t i = 0u; i < 64u; i++) {
+        char value = text[i];
+        if (!((value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'))) return 0;
+    }
+    return 1;
+}
+
+static int inventory_csv_field(char **cursor, char *field, size_t capacity)
+{
+    char *position = *cursor;
+    size_t length = 0u;
+    int quoted = *position == '"';
+    int closed = !quoted;
+    if (quoted) position++;
+    while (*position != '\0') {
+        if (quoted && *position == '"') {
+            if (position[1] == '"') {
+                if (length + 1u >= capacity) return 0;
+                field[length++] = '"';
+                position += 2;
+                continue;
+            }
+            position++;
+            closed = 1;
+            break;
+        }
+        if (!quoted && *position == ',') break;
+        if (length + 1u >= capacity) return 0;
+        field[length++] = *position++;
+    }
+    if (!closed || (quoted && *position != ',' && *position != '\0')) return 0;
+    field[length] = '\0';
+    if (*position == ',') {
+        *cursor = position + 1;
+    } else {
+        *cursor = position;
+    }
+    return 1;
+}
+
+static int check_inventory(const char *path, unsigned expected_entries,
+                           unsigned expected_pass, unsigned expected_fail,
+                           unsigned expected_unknown)
+{
+    char line[INVENTORY_LINE];
+    FILE *file = schway__test_open_file(path, "rb");
+    if (file == NULL || fgets(line, sizeof line, file) == NULL) return 1;
+    line[strcspn(line, "\r\n")] = '\0';
+    if (strcmp(line, INVENTORY_HEADER) != 0) {
+        (void)fclose(file);
+        return 1;
+    }
+    unsigned entries = 0u;
+    unsigned pass = 0u;
+    unsigned fail = 0u;
+    unsigned unknown = 0u;
+    while (fgets(line, sizeof line, file) != NULL) {
+        size_t length = strlen(line);
+        if (length == sizeof line - 1u && line[length - 1u] != '\n' && !feof(file)) {
+            (void)fclose(file);
+            return 1;
+        }
+        line[strcspn(line, "\r\n")] = '\0';
+        char *cursor = line;
+        char ordinal[16];
+        char entry_sha[65];
+        char content_sha[65];
+        char status[16];
+        char predicate[INVENTORY_LINE];
+        char profile[INVENTORY_LINE];
+        char evidence[INVENTORY_LINE];
+        if (!inventory_csv_field(&cursor, ordinal, sizeof ordinal) ||
+            !inventory_csv_field(&cursor, entry_sha, sizeof entry_sha) ||
+            !inventory_csv_field(&cursor, content_sha, sizeof content_sha) ||
+            !inventory_csv_field(&cursor, status, sizeof status) ||
+            !inventory_csv_field(&cursor, predicate, sizeof predicate) ||
+            !inventory_csv_field(&cursor, profile, sizeof profile) ||
+            !inventory_csv_field(&cursor, evidence, sizeof evidence) || *cursor != '\0') {
+            (void)fclose(file);
+            return 1;
+        }
+        unsigned number = 0u;
+        if (!parse_count(ordinal, &number) || number != entries + 1u ||
+            !valid_sha256(entry_sha) || !valid_sha256(content_sha)) {
+            (void)fclose(file);
+            return 1;
+        }
+        if (strcmp(status, "pass") == 0) pass++;
+        else if (strcmp(status, "fail") == 0) fail++;
+        else if (strcmp(status, "unknown") == 0) unknown++;
+        else {
+            (void)fclose(file);
+            return 1;
+        }
+        entries++;
+    }
+    int failed = ferror(file) != 0;
+    if (fclose(file) != 0) failed = 1;
+    if (failed || entries != expected_entries || pass != expected_pass ||
+        fail != expected_fail || unknown != expected_unknown ||
+        pass + fail + unknown != entries) return 1;
+    return 0;
+}
+
+static int check_inventory_summary(const char *path, unsigned expected_entries,
+                                   unsigned expected_pass, unsigned expected_fail,
+                                   unsigned expected_unknown, unsigned expected_missing,
+                                   unsigned expected_duplicates, const char *expected_sha256)
+{
+    static const char *const keys[] = {
+        "source_pin", "source_sha256", "entries", "pass", "fail", "unknown",
+        "missing_serial", "duplicate_serial_entries"
+    };
+    char line[INVENTORY_SUMMARY_LINE];
+    char values[8][65] = {{0}};
+    unsigned seen = 0u;
+    FILE *file = schway__test_open_file(path, "rb");
+    if (file == NULL) return 1;
+    while (fgets(line, sizeof line, file) != NULL) {
+        size_t length = strlen(line);
+        if (length == sizeof line - 1u && line[length - 1u] != '\n' && !feof(file)) {
+            (void)fclose(file);
+            return 1;
+        }
+        line[strcspn(line, "\r\n")] = '\0';
+        char *equals = strchr(line, '=');
+        if (equals == NULL || strchr(equals + 1, '=') != NULL) {
+            (void)fclose(file);
+            return 1;
+        }
+        *equals = '\0';
+        unsigned key = 0u;
+        while (key < sizeof keys / sizeof keys[0] && strcmp(line, keys[key]) != 0) key++;
+        if (key == sizeof keys / sizeof keys[0] ||
+            (seen & (1u << key)) != 0u || strlen(equals + 1) >= sizeof values[key]) {
+            (void)fclose(file);
+            return 1;
+        }
+        (void)snprintf(values[key], sizeof values[key], "%s", equals + 1);
+        seen |= 1u << key;
+    }
+    int failed = ferror(file) != 0;
+    if (fclose(file) != 0) failed = 1;
+    if (failed || seen != 0xffu || !valid_sha256(values[1]) ||
+        strcmp(values[1], expected_sha256) != 0) return 1;
+    const char *expected_pin = strcmp(expected_sha256,
+        "52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8") == 0 ?
+        "12c21cf79f1e20eff6ac68b80875816c717d0a7a" : "unverified";
+    if (strcmp(values[0], expected_pin) != 0) return 1;
+    unsigned actual[6];
+    for (unsigned i = 0u; i < 6u; i++) {
+        if (!parse_count(values[i + 2u], &actual[i])) return 1;
+    }
+    return actual[0] == expected_entries && actual[1] == expected_pass &&
+        actual[2] == expected_fail && actual[3] == expected_unknown &&
+        actual[4] == expected_missing && actual[5] == expected_duplicates &&
+        actual[1] + actual[2] + actual[3] == actual[0] ? 0 : 1;
+}
 
 static int valid_date(const char *date)
 {
@@ -105,8 +279,25 @@ static int check_report(const char *path, const char *mode, const char *track_sh
 
 int main(int argc, char **argv)
 {
+    if (argc == 10 && strcmp(argv[1], "inventory-summary") == 0) {
+        unsigned expected[6];
+        for (unsigned i = 0u; i < 6u; i++) {
+            if (!parse_count(argv[i + 3u], &expected[i])) return 2;
+        }
+        return check_inventory_summary(argv[2], expected[0], expected[1], expected[2],
+            expected[3], expected[4], expected[5], argv[9]);
+    }
+    if (argc == 7 && strcmp(argv[1], "inventory") == 0) {
+        unsigned entries;
+        unsigned pass;
+        unsigned fail;
+        unsigned unknown;
+        if (!parse_count(argv[3], &entries) || !parse_count(argv[4], &pass) ||
+            !parse_count(argv[5], &fail) || !parse_count(argv[6], &unknown)) return 2;
+        return check_inventory(argv[2], entries, pass, fail, unknown);
+    }
     if (argc != 4) {
-        (void)fprintf(stderr, "usage: schwaystation-test-library <identity|empty|unlisted> <results.csv> <track-sha1>\n");
+        (void)fprintf(stderr, "usage: schwaystation-test-library <identity|empty|unlisted> <results.csv> <track-sha1> | inventory <report> <entries> <pass> <fail> <unknown>\n");
         return 2;
     }
     return check_report(argv[2], argv[1], argv[3]);

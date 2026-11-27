@@ -22,6 +22,21 @@ schway__library_absolute_file() {
     printf '%s/%s\n' "$schway__directory" "$(basename "$schway__file")"
 }
 
+schway__library_inventory() {
+    actual=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi) || fail 'cannot verify PlayStation DAT digest'
+    actual=${actual%% *}
+    expected=${2:-$actual}; [ "$actual" = "$expected" ] || fail 'PlayStation DAT digest is invalid'
+    LIBRARY_PROBE_LOG= "$4" --library-inventory "$1" > "$temporary/inventory" 2>/dev/null || fail 'PlayStation DAT inventory failed'
+    awk -F= -v digest="$expected" -v pinsha=52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8 \
+        -v pin=12c21cf79f1e20eff6ac68b80875816c717d0a7a -v count="$3" '
+        BEGIN { n=split("source_pin source_sha256 entries pass fail unknown missing_serial duplicate_serial_entries", keys, " "); for(i=1;i<=n;i++) allowed[keys[i]]=1 }
+        NF!=2 || !($1 in allowed) || ($1 in value) { exit 1 }
+        { value[$1]=$2; if($1!="source_pin" && $1!="source_sha256" && $2!~/^[0-9]+$/) exit 1 }
+        END { if(NR!=8 || value["source_pin"]!=(digest==pinsha?pin:"unverified") || value["source_sha256"]!=digest || length(value["source_sha256"])!=64 || value["source_sha256"]!~/^[0-9a-f]+$/ || (count!=0 && value["entries"]!=count) || value["entries"]+0!=value["pass"]+value["fail"]+value["unknown"] || value["pass"]!=0 || value["fail"]!=0 || value["unknown"]!=value["entries"] || value["missing_serial"]>value["entries"] || value["duplicate_serial_entries"]>value["entries"]) exit 1 }
+    ' "$temporary/inventory" || fail 'PlayStation DAT inventory accounting is invalid'
+    cp "$temporary/inventory" "$5" || fail 'cannot write PlayStation DAT summary'
+}
+
 test_root= test_config= test_ledger= test_dat= test_probe_config= test_runner=
 test_mode=0
 while [ "$#" -gt 0 ]; do
@@ -108,38 +123,22 @@ mkdir "$temporary" || fail 'cannot create temporary report'
 trap 'rm -rf "$temporary"' 0 HUP INT TERM
 if [ "$test_mode" -eq 1 ]; then
     sh "$project_root/scripts/compat-ratchet.sh" "$ledger" "$ledger" "" \
-        "$project_root/tests/compat/allow.txt" "$(date -u +%F)" >/dev/null 2>&1 || fail 'temporary ledger is invalid'
+        "$project_root/tests/compat/allow.txt" "$(date -u +%F)" >/dev/null 2>&1 || fail 'temporary ledger is invalid'; schway__library_inventory "$dat" "" 0 "$runner" "$temporary/dat-summary"
 else
     cmake --workflow --preset library >/dev/null || fail 'local library workflow failed'
-    dat_sha256=52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8
+    dat_sha256=52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8 dat_entries=13407
+    [ -f "$ledger" ] || fail 'compatibility ledger is unavailable'
     if [ ! -f "$dat" ]; then
         curl -fsSL 'https://raw.githubusercontent.com/libretro/libretro-database/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation.dat' -o "$temporary/library.dat" || fail 'pinned PlayStation DAT download failed'
-        [ "$(shasum -a 256 "$temporary/library.dat" | awk '{print $1}')" = "$dat_sha256" ] || fail 'pinned PlayStation DAT digest is invalid'
-        cp "$temporary/library.dat" "$dat" || fail 'cannot install pinned PlayStation DAT'
-    fi
-    [ -f "$ledger" ] || fail 'compatibility ledger is unavailable'
+        schway__library_inventory "$temporary/library.dat" "$dat_sha256" "$dat_entries" "$runner" "$temporary/dat-summary"; cp "$temporary/library.dat" "$dat" || fail 'cannot install pinned PlayStation DAT'
+    else schway__library_inventory "$dat" "$dat_sha256" "$dat_entries" "$runner" "$temporary/dat-summary"; fi
 fi
-
-rows=$temporary/rows
-cues=$temporary/cue-files
+rows=$temporary/rows cues=$temporary/cue-files
 : > "$rows"
 : > "$cues"
 for cue in "$disc_dir"/*.cue; do
     [ -f "$cue" ] || continue
-    awk '
-        toupper($1) == "FILE" {
-            line=$0
-            sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+/, "", line)
-            sub(/^[[:space:]]*/, "", line)
-            if (substr(line, 1, 1) == "\"") {
-                sub(/^\"/, "", line)
-                sub(/\".*/, "", line)
-            } else {
-                sub(/[[:space:]].*$/, "", line)
-            }
-            if (line != "") print line
-        }
-    ' "$cue" >> "$cues" 2>/dev/null || fail 'cannot inspect CUE companion metadata'
+    awk 'toupper($1)=="FILE" { line=$0; sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+/, "", line); sub(/^[[:space:]]*/, "", line); if(substr(line,1,1)=="\"") { sub(/^\"/, "", line); sub(/\".*/, "", line) } else sub(/[[:space:]].*$/, "", line); if(line!="") print line }' "$cue" >> "$cues" 2>/dev/null || fail 'cannot inspect CUE companion metadata'
 done
 unmatched=0
 unsupported=0
@@ -202,4 +201,5 @@ mkdir -p "$output_dir"
 printf '%s\n' 'serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date' > "$temporary/results.csv"
 LC_ALL=C sort -u "$rows" >> "$temporary/results.csv"
 mv -f "$temporary/results.csv" "$output_dir/results.csv"
+mv -f "$temporary/dat-summary" "$output_dir/dat-summary.txt"
 printf '%s\n' "library: unmatched=$unmatched unsupported=$unsupported"

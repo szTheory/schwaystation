@@ -53,3 +53,29 @@ replacing playlist entries.
 
 The frontend owns file access. Keep the cue, its tracks, and any M3U playlist together at stable paths while a game is
 loaded.
+
+## GameShark cheats
+
+The core accepts the bounded unconditional `30` byte-write and `80` halfword-write subset through
+`retro_cheat_set`; see [the cheat syntax and limits](cheats.md). Accepted entries are replaced atomically, and an
+invalid replacement keeps the previous entry and does not touch RAM. Enabled entries apply once after the frame's
+options and input are prepared, immediately before core frame execution. Entries run by ascending index and then
+text order, so the last overlapping write wins. Disabling an entry stops its future writes without undoing bytes
+already written. `retro_cheat_reset` clears all entries; `retro_reset` preserves them. Unload, deinit, and a new
+content load clear the configuration. The `.info` advertises this tested cheat subset. The
+[compatibility report](compatibility.md) shows which evidence is required to clear the experimental marker.
+
+## Serialized state
+
+`retro_serialize_size` includes a 32-byte host header, the fixed 16,656-byte canonical cheat table, and the
+existing core state. The size is independent of the configured cheat entries. Envelope version 1 starts with
+`SCHL`, followed by little-endian version, header size, total size, core-state size, cheat-table size, and a
+CRC-32/ISO-HDLC checksum. Header bytes 24–31 are reserved and must be zero. The checksum covers the complete
+envelope with its own four-byte field treated as zero; it detects accidental corruption and is not an
+authentication mechanism.
+
+The payload contains the `SCHT` version 1 cheat table followed by the unchanged core-state bytes. Loading
+requires the exact total and component lengths, valid reserved fields, a matching checksum, and a fully valid
+cheat table before the core state is considered. The host replaces its current cheat configuration only after
+the core accepts its state, so a rejected envelope leaves both states unchanged. Older raw core-state buffers and
+unknown envelope versions are rejected. This envelope does not change the `.info` save-state metadata claim.

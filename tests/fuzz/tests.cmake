@@ -60,6 +60,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
   set(chd_guest_work_dir "/tests/fuzz-work/chd")
   set(chd_guest_fixture "/fixtures/disc_boot.chd")
 endif()
+
 add_executable(schwaystation-fuzz-chd-replay ${fuzz_dir}/chd.c)
 target_compile_definitions(schwaystation-fuzz-chd-replay PRIVATE
   SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_CHD_SEEDS
@@ -332,3 +333,40 @@ if(SCHWAYSTATION_FUZZ)
   endforeach()
 
 endif()
+
+foreach(subsystem IN ITEMS ppf cheat)
+  set(replay_target schwaystation-fuzz-${subsystem}-replay)
+  add_executable(${replay_target} ${fuzz_dir}/${subsystem}.c)
+  target_compile_definitions(${replay_target} PRIVATE SCHWAY_FUZZ_REPLAY)
+  target_include_directories(${replay_target} PRIVATE
+    ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner)
+  if(subsystem STREQUAL "ppf")
+    target_link_libraries(${replay_target} PRIVATE schwaystation_disc_image)
+  else()
+    target_link_libraries(${replay_target} PRIVATE schwaystation-host schwaystation::schwaystation)
+  endif()
+  set_target_properties(${replay_target} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(${replay_target})
+
+  schway_add_test(NAME fuzz.regress.${subsystem}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:${replay_target}>"
+    LABELS fuzz portable TIMEOUT 60)
+
+  if(SCHWAYSTATION_FUZZ)
+    set(fuzz_target schwaystation-fuzz-${subsystem})
+    add_executable(${fuzz_target} ${fuzz_dir}/${subsystem}.c)
+    target_include_directories(${fuzz_target} PRIVATE
+      ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner)
+    if(subsystem STREQUAL "ppf")
+      target_link_libraries(${fuzz_target} PRIVATE schwaystation_disc_image)
+    else()
+      target_link_libraries(${fuzz_target} PRIVATE schwaystation-host schwaystation::schwaystation)
+    endif()
+    target_compile_options(${fuzz_target} PRIVATE -fsanitize=fuzzer)
+    target_link_options(${fuzz_target} PRIVATE -fsanitize=fuzzer)
+    set_target_properties(${fuzz_target} PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+    schway_warnings(${fuzz_target})
+  endif()
+endforeach()

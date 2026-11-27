@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 10
+#define SCHWAY_API_VERSION 11
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -355,6 +355,7 @@ schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_r
 schway_status schway_set_input(schway *inst, const schway_input *input);
 schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uint32_t width,
                           uint32_t *value);
+schway_status schway_write_ram(schway *inst, uint32_t offset, uint32_t width, uint32_t value);
 schway_status schway_get_fault(const schway *inst, schway_fault *out);
 schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);

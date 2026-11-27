@@ -53,6 +53,10 @@
 #define FRAMES 60u
 #define SAVE_AT 30u
 #define POISON 0xA5u
+#define LR_TEST_STATE_HEADER_SIZE 32u
+#define LR_TEST_STATE_CHEAT_SIZE (16u + 32u * (8u + 64u * 8u))
+#define LR_TEST_STATE_CORE_OFFSET (LR_TEST_STATE_HEADER_SIZE + LR_TEST_STATE_CHEAT_SIZE)
+#define LR_TEST_STATE_CHECKSUM_OFFSET 20u
 
 /* a == b as doubles, printed with every digit. */
 #define CHECK_EQ_DBL(a, b)                                                                         \
@@ -149,6 +153,114 @@ static int(RETRO_CALLCONV *p_test_gun_sensor)(unsigned, unsigned *, unsigned *);
 static int(RETRO_CALLCONV *p_test_fill_gun_frame)(void);
 
 static const char *missing;
+
+static uint16_t libretro_state_get_u16(const uint8_t *bytes)
+{
+    return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8u));
+}
+
+static uint32_t libretro_state_get_u32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) |
+           ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
+}
+
+static void libretro_state_put_u32(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8u);
+    bytes[2] = (uint8_t)(value >> 16u);
+    bytes[3] = (uint8_t)(value >> 24u);
+}
+
+static uint32_t libretro_state_checksum(const uint8_t *bytes, size_t size)
+{
+    uint32_t crc = UINT32_MAX;
+    for (size_t i = 0u; i < size; i++) {
+        const uint8_t byte = i >= LR_TEST_STATE_CHECKSUM_OFFSET &&
+                                     i < LR_TEST_STATE_CHECKSUM_OFFSET + sizeof(uint32_t)
+                                 ? 0u
+                                 : bytes[i];
+        crc ^= byte;
+        for (unsigned bit = 0u; bit < 8u; bit++) {
+            crc = (crc >> 1u) ^ ((0u - (crc & 1u)) & UINT32_C(0xEDB88320));
+        }
+    }
+    return ~crc;
+}
+
+static void libretro_state_refresh_checksum(uint8_t *bytes, size_t size)
+{
+    libretro_state_put_u32(bytes + LR_TEST_STATE_CHECKSUM_OFFSET,
+                           libretro_state_checksum(bytes, size));
+}
+
+static const uint8_t *libretro_state_core_payload(const uint8_t *bytes, size_t total_size,
+                                                  size_t core_size)
+{
+    if (bytes == NULL || total_size != LR_TEST_STATE_CORE_OFFSET + core_size ||
+        memcmp(bytes, "SCHL", 4u) != 0 || libretro_state_get_u16(bytes + 4u) != 1u ||
+        libretro_state_get_u16(bytes + 6u) != LR_TEST_STATE_HEADER_SIZE ||
+        libretro_state_get_u32(bytes + 8u) != total_size ||
+        libretro_state_get_u32(bytes + 12u) != core_size ||
+        libretro_state_get_u32(bytes + 16u) != LR_TEST_STATE_CHEAT_SIZE) {
+        return NULL;
+    }
+    return bytes + LR_TEST_STATE_CORE_OFFSET;
+}
+
+static void libretro_state_rejection_preserves(const uint8_t *candidate, size_t candidate_size,
+                                               const uint8_t *baseline, size_t baseline_size,
+                                               const char *label)
+{
+    unsigned char *after = baseline_size != 0u ? (unsigned char *)malloc(baseline_size) : NULL;
+    int saved = 0;
+
+    CHECK(candidate != NULL);
+    CHECK(baseline != NULL);
+    CHECK(after != NULL);
+    if (candidate == NULL || baseline == NULL || after == NULL) {
+        free(after);
+        return;
+    }
+
+    CHECK_EQ_U64(p_unserialize(candidate, candidate_size), false);
+    saved = p_serialize(after, baseline_size) ? 1 : 0;
+    CHECK(saved);
+    if (saved && memcmp(after, baseline, baseline_size) != 0) {
+        fprintf(stderr, "%s: rejected state changed the serialized core or cheat table\n", label);
+        check_failures++;
+    }
+    free(after);
+}
+
+static void libretro_state_expect_byte_rejection(const uint8_t *baseline, size_t state_size,
+                                                 size_t offset, uint8_t value,
+                                                 int refresh_checksum, const char *label)
+{
+    unsigned char *damaged = (unsigned char *)malloc(state_size);
+    CHECK(damaged != NULL);
+    if (damaged == NULL) return;
+    memcpy(damaged, baseline, state_size);
+    damaged[offset] = value;
+    if (refresh_checksum != 0) libretro_state_refresh_checksum(damaged, state_size);
+    libretro_state_rejection_preserves(damaged, state_size, baseline, state_size, label);
+    free(damaged);
+}
+
+static void libretro_state_expect_u32_rejection(const uint8_t *baseline, size_t state_size,
+                                                size_t offset, uint32_t value,
+                                                const char *label)
+{
+    unsigned char *damaged = (unsigned char *)malloc(state_size);
+    CHECK(damaged != NULL);
+    if (damaged == NULL) return;
+    memcpy(damaged, baseline, state_size);
+    libretro_state_put_u32(damaged + offset, value);
+    libretro_state_refresh_checksum(damaged, state_size);
+    libretro_state_rejection_preserves(damaged, state_size, baseline, state_size, label);
+    free(damaged);
+}
 
 /* ISO C has no conversion from void * to a function pointer, so the address
    is copied byte for byte. The first missing name is kept. */
@@ -1113,23 +1225,26 @@ static void compare_loaded_profile(uint32_t expected_region, uint32_t expected_b
     unsigned char *module_state = module_size != 0u ? (unsigned char *)malloc(module_size) : NULL;
     unsigned char *reference_state = reference_size != 0u
                                          ? (unsigned char *)malloc(reference_size) : NULL;
+    const uint8_t *module_core_state = NULL;
     CHECK(reference != NULL);
     CHECK(module_state != NULL);
     CHECK(reference_state != NULL);
-    CHECK_EQ_U64(module_size, reference_size);
+    CHECK_EQ_U64(module_size, LR_TEST_STATE_CORE_OFFSET + reference_size);
     if (reference != NULL && module_state != NULL && reference_state != NULL &&
-        module_size == reference_size) {
+        module_size == LR_TEST_STATE_CORE_OFFSET + reference_size) {
         CHECK_EQ_U64(p_serialize(module_state, module_size), true);
         CHECK_EQ_U64(schway_save_state(reference, reference_state, reference_size),
                      SCHWAY_STATUS_OK);
-        if (memcmp(module_state, reference_state, module_size) != 0) {
-            size_t offset = 20u;
-            while (offset < module_size && module_state[offset] == reference_state[offset]) {
+        module_core_state = libretro_state_core_payload(module_state, module_size, reference_size);
+        CHECK(module_core_state != NULL);
+        if (module_core_state != NULL && memcmp(module_core_state, reference_state, reference_size) != 0) {
+            size_t offset = 0u;
+            while (offset < reference_size && module_core_state[offset] == reference_state[offset]) {
                 offset++;
             }
-            fprintf(stderr, "profile state differs for region=%u board=%u at byte %lu: module=%02x reference=%02x\n",
+            fprintf(stderr, "profile core state differs for region=%u board=%u at byte %lu: module=%02x reference=%02x\n",
                     expected_region, expected_board, (unsigned long)offset,
-                    module_state[offset], reference_state[offset]);
+                    module_core_state[offset], reference_state[offset]);
             check_failures++;
         }
     }
@@ -5418,8 +5533,9 @@ static void check_module_input_state(const struct movie_state_reference *state, 
     }
     reference_state = state->bytes[checkpoint];
     CHECK(reference_state != NULL);
-    CHECK_EQ_U64(module_size, state->size);
-    if (reference_state == NULL || module_size == 0u || module_size != state->size) {
+    CHECK_EQ_U64(module_size, LR_TEST_STATE_CORE_OFFSET + state->size);
+    if (reference_state == NULL || module_size == 0u ||
+        module_size != LR_TEST_STATE_CORE_OFFSET + state->size) {
         return;
     }
     module_state = (unsigned char *)malloc(module_size);
@@ -5428,13 +5544,16 @@ static void check_module_input_state(const struct movie_state_reference *state, 
         return;
     }
     CHECK_EQ_U64(p_serialize(module_state, module_size), true);
-    if (memcmp(module_state, reference_state, module_size) != 0) {
+    const uint8_t *module_core_state =
+        libretro_state_core_payload(module_state, module_size, state->size);
+    CHECK(module_core_state != NULL);
+    if (module_core_state != NULL && memcmp(module_core_state, reference_state, state->size) != 0) {
         size_t offset = 0u;
-        while (offset < module_size && module_state[offset] == reference_state[offset]) {
+        while (offset < state->size && module_core_state[offset] == reference_state[offset]) {
             offset++;
         }
-        fprintf(stderr, "input state layout %u frame %u differs at byte %lu: %02X != %02X\n",
-                layout, frame_index, (unsigned long)offset, module_state[offset],
+        fprintf(stderr, "input core state layout %u frame %u differs at byte %lu: %02X != %02X\n",
+                layout, frame_index, (unsigned long)offset, module_core_state[offset],
                 reference_state[offset]);
         check_failures++;
     }
@@ -5850,8 +5969,8 @@ static void check_controls_state(schway *reference, const schway_input *input_sn
     if (compare_serialized == 0) {
         return;
     }
-    CHECK_EQ_U64(module_size, reference_size);
-    if (module_size == 0u || module_size != reference_size) {
+    CHECK_EQ_U64(module_size, LR_TEST_STATE_CORE_OFFSET + reference_size);
+    if (module_size == 0u || module_size != LR_TEST_STATE_CORE_OFFSET + reference_size) {
         return;
     }
     module_state = (unsigned char *)malloc(module_size);
@@ -5865,12 +5984,15 @@ static void check_controls_state(schway *reference, const schway_input *input_sn
     }
     CHECK_EQ_U64(p_serialize(module_state, module_size), true);
     CHECK_EQ_U64(schway_save_state(reference, reference_state, reference_size), SCHWAY_STATUS_OK);
-    if (memcmp(module_state, reference_state, module_size) != 0) {
+    const uint8_t *module_core_state =
+        libretro_state_core_payload(module_state, module_size, reference_size);
+    CHECK(module_core_state != NULL);
+    if (module_core_state != NULL && memcmp(module_core_state, reference_state, reference_size) != 0) {
         size_t offset = 0u;
-        while (offset < module_size && module_state[offset] == reference_state[offset]) {
+        while (offset < reference_size && module_core_state[offset] == reference_state[offset]) {
             offset++;
         }
-        fprintf(stderr, "%s: serialized input state differs at byte %lu\n", label,
+        fprintf(stderr, "%s: serialized input core state differs at byte %lu\n", label,
                 (unsigned long)offset);
         check_failures++;
     }
@@ -6477,6 +6599,435 @@ static int test_rumble_controls(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_cheats_apply(void)
+{
+    unsigned char *ram = NULL;
+
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        p_cheat_reset();
+        p_cheat_set(0u, true, "30000010 00A5\n80000012 1234");
+        run_one();
+        CHECK_EQ_U64(ram[0x10u], 0xA5u);
+        CHECK_EQ_U64(ram[0x12u], 0x34u);
+        CHECK_EQ_U64(ram[0x13u], 0x12u);
+    }
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static void cheat_expect_rejection_preserves_state(unsigned index, const char *code)
+{
+    const size_t ram_size = 2u * 1024u * 1024u;
+    unsigned char *ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    size_t state_size = p_serialize_size();
+    unsigned char *saved_ram = ram != NULL ? (unsigned char *)malloc(ram_size) : NULL;
+    unsigned char *before = state_size != 0u ? (unsigned char *)malloc(state_size) : NULL;
+    unsigned char *after = state_size != 0u ? (unsigned char *)malloc(state_size) : NULL;
+    int before_ok = 0;
+    int after_ok = 0;
+
+    CHECK(ram != NULL);
+    CHECK(saved_ram != NULL);
+    CHECK(state_size != 0u);
+    CHECK(before != NULL);
+    CHECK(after != NULL);
+    if (ram == NULL || saved_ram == NULL || state_size == 0u || before == NULL || after == NULL) {
+        free(after);
+        free(before);
+        free(saved_ram);
+        return;
+    }
+
+    memcpy(saved_ram, ram, ram_size);
+    before_ok = p_serialize(before, state_size) ? 1 : 0;
+    CHECK(before_ok);
+    p_cheat_set(index, true, code);
+    CHECK(memcmp(saved_ram, ram, ram_size) == 0);
+    after_ok = p_serialize(after, state_size) ? 1 : 0;
+    CHECK(after_ok);
+    if (before_ok && after_ok) {
+        CHECK(memcmp(before, after, state_size) == 0);
+    }
+
+    free(after);
+    free(before);
+    free(saved_ram);
+}
+
+static size_t make_cheat_text(char *text, size_t capacity, unsigned first, unsigned count)
+{
+    size_t used = 0u;
+    for (unsigned line = 0u; line < count; line++) {
+        const char *separator = used == 0u ? "" : "\n";
+        size_t available = capacity - used;
+        int written = snprintf(text + used, available, "%s30%06X 0001", separator,
+                               first + line);
+        if (written < 0 || (size_t)written >= available) {
+            return 0u;
+        }
+        used += (size_t)written;
+    }
+    return used;
+}
+
+static int test_cheats_controls(void)
+{
+    unsigned char *ram = NULL;
+    char bulk[4][1025];
+    char fifth_entry[] = "30081200 00AA";
+    int loaded = p_load_game(NULL) ? 1 : 0;
+
+    CHECK(loaded);
+    if (!loaded) goto cleanup;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+
+    /* Keep the test addresses out of the test-card guest's code and stack. */
+    p_cheat_reset();
+    ram[0x80000u] = 0x5Au;
+    ram[0x80020u] = 0x5Bu;
+    ram[0x80021u] = 0x5Cu;
+    run_one();
+    CHECK_EQ_U64(ram[0x80000u], 0x5Au);
+    CHECK_EQ_U64(ram[0x80020u], 0x5Bu);
+    CHECK_EQ_U64(ram[0x80021u], 0x5Cu);
+    p_cheat_set(0u, true, "30080020 0011\n30080020 0022");
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x22u);
+    p_cheat_reset();
+    p_cheat_set(0u, true, "30080020 0011\n30080020 0022");
+    p_cheat_set(1u, true, "30080020 0033\n30080021 0044");
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x33u);
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+
+    p_cheat_set(1u, false, "30080020 0033\n30080021 0044");
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+    ram[0x80021u] = 0x55u;
+    unsigned video_before_disable = video_calls;
+    run_one();
+    CHECK_EQ_U64(video_calls, video_before_disable + 1u);
+    CHECK_EQ_U64(ram[0x80020u], 0x22u);
+    CHECK_EQ_U64(ram[0x80021u], 0x55u);
+    p_cheat_set(1u, true, "30080020 0033\n30080021 0044");
+    run_one();
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+
+    p_reset();
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x33u);
+    CHECK_EQ_U64(ram[0x80021u], 0x44u);
+
+    p_cheat_reset();
+    ram[0x80020u] = 0x5Au;
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x5Au);
+
+    p_cheat_set(0u, true, "30080030 007E");
+    ram[0x80030u] = 0xA5u;
+    cheat_expect_rejection_preserves_state(0u, "30080030 00BE\n80080032");
+    CHECK_EQ_U64(ram[0x80030u], 0xA5u);
+    cheat_expect_rejection_preserves_state(32u, "30080031 0099");
+    cheat_expect_rejection_preserves_state(0u, "30080030 00BE\n80080033 0001");
+    run_one();
+    CHECK_EQ_U64(ram[0x80030u], 0x7Eu);
+
+    p_cheat_reset();
+    for (unsigned entry = 0u; entry < 4u; entry++) {
+        size_t text_size = make_cheat_text(bulk[entry], sizeof bulk[entry],
+                                           0x81000u + entry * 64u, 64u);
+        CHECK(text_size != 0u);
+        if (text_size != 0u) {
+            p_cheat_set(entry, true, bulk[entry]);
+        }
+    }
+    ram[0x81200u] = 0x6Bu;
+    cheat_expect_rejection_preserves_state(4u, fifth_entry);
+    run_one();
+    CHECK_EQ_U64(ram[0x81000u], 0x01u);
+    CHECK_EQ_U64(ram[0x810FFu], 0x01u);
+    CHECK_EQ_U64(ram[0x81200u], 0x6Bu);
+
+    p_cheat_reset();
+    ram[0x81200u] = 0x6Bu;
+    run_one();
+    CHECK_EQ_U64(ram[0x81200u], 0x6Bu);
+
+    p_cheat_set(0u, true, "30080120 00A7");
+    CHECK(p_load_game(NULL));
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+    ram[0x80120u] = 0x5Cu;
+    run_one();
+    CHECK_EQ_U64(ram[0x80120u], 0x5Cu);
+
+    p_cheat_set(0u, true, "30080120 00A7");
+    p_unload_game();
+    loaded = 0;
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    CHECK(p_load_game(NULL));
+    loaded = 1;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        ram[0x80120u] = 0x5Cu;
+        run_one();
+        CHECK_EQ_U64(ram[0x80120u], 0x5Cu);
+    }
+
+    p_cheat_set(0u, true, "30080120 00A7");
+    p_deinit();
+    p_set_environment(env);
+    p_init();
+    set_callbacks();
+    CHECK(p_load_game(NULL));
+    loaded = 1;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        ram[0x80120u] = 0x5Cu;
+        run_one();
+        CHECK_EQ_U64(ram[0x80120u], 0x5Cu);
+    }
+
+cleanup:
+    if (loaded) {
+        p_unload_game();
+    }
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static void test_cheats_state_continuation(unsigned char *ram, size_t ram_size,
+                                           size_t *state_size)
+{
+    unsigned char *saved_ram = (unsigned char *)malloc(ram_size);
+    unsigned char *expected_ram = (unsigned char *)malloc(ram_size);
+    unsigned char *empty = NULL, *configured = NULL, *ordered = NULL, *reversed = NULL;
+    unsigned char *saved = NULL, *expected_after = NULL;
+    size_t configured_size = 0u, ordered_size = 0u, reversed_size = 0u;
+    size_t saved_size = 0u, expected_after_size = 0u;
+
+    CHECK(saved_ram != NULL);
+    CHECK(expected_ram != NULL);
+    if (saved_ram == NULL || expected_ram == NULL) goto cleanup;
+    p_cheat_reset();
+    memcpy(saved_ram, ram, ram_size);
+    empty = save_libretro_state(state_size);
+    CHECK(empty != NULL);
+    CHECK(*state_size != 0u);
+    if (empty == NULL || *state_size == 0u) goto cleanup;
+
+    p_cheat_set(0u, true, "30080020 0011");
+    configured = save_libretro_state(&configured_size);
+    CHECK(configured != NULL);
+    CHECK_EQ_U64(configured_size, *state_size);
+    CHECK(memcmp(saved_ram, ram, ram_size) == 0);
+    if (configured != NULL && configured_size == *state_size) {
+        CHECK(memcmp(empty, configured, *state_size) != 0);
+    }
+
+    p_cheat_reset();
+    p_cheat_set(1u, false, "30080020 0011");
+    unsigned char *disabled = save_libretro_state(&configured_size);
+    CHECK(disabled != NULL);
+    CHECK_EQ_U64(configured_size, *state_size);
+    if (configured != NULL && disabled != NULL && configured_size == *state_size) {
+        CHECK(memcmp(configured, disabled, *state_size) != 0);
+    }
+    free(disabled);
+
+    p_cheat_reset();
+    ram[0x80020u] = 0x5Au;
+    p_cheat_set(1u, true, "30080020 0011");
+    p_cheat_set(2u, true, "30080020 0022");
+    ordered = save_libretro_state(&ordered_size);
+    CHECK(ordered != NULL);
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x22u);
+    CHECK_EQ_U64(p_unserialize(ordered, ordered_size), true);
+    p_cheat_reset();
+    p_cheat_set(1u, true, "30080020 0022");
+    p_cheat_set(2u, true, "30080020 0011");
+    reversed = save_libretro_state(&reversed_size);
+    CHECK(reversed != NULL);
+    CHECK_EQ_U64(ordered_size, *state_size);
+    CHECK_EQ_U64(reversed_size, *state_size);
+    if (ordered != NULL && reversed != NULL && ordered_size == *state_size &&
+        reversed_size == *state_size) {
+        CHECK(memcmp(ordered, reversed, *state_size) != 0);
+    }
+    CHECK_EQ_U64(ram[0x80020u], 0x5Au);
+    run_one();
+    CHECK_EQ_U64(ram[0x80020u], 0x11u);
+
+    p_cheat_reset();
+    p_cheat_set(3u, true, "30080030 007E");
+    p_cheat_set(4u, false, "30080031 0099");
+    ram[0x80030u] = 0xA5u;
+    ram[0x80031u] = 0x5Au;
+    saved = save_libretro_state(&saved_size);
+    CHECK(saved != NULL);
+    CHECK_EQ_U64(saved_size, *state_size);
+    if (saved == NULL || saved_size != *state_size) goto cleanup;
+    run_one();
+    CHECK_EQ_U64(ram[0x80030u], 0x7Eu);
+    CHECK_EQ_U64(ram[0x80031u], 0x5Au);
+    memcpy(expected_ram, ram, ram_size);
+    expected_after = save_libretro_state(&expected_after_size);
+    CHECK(expected_after != NULL);
+    CHECK_EQ_U64(expected_after_size, *state_size);
+    if (expected_after == NULL || expected_after_size != *state_size) goto cleanup;
+
+    p_cheat_reset();
+    p_cheat_set(3u, true, "30080030 00BE");
+    p_cheat_set(4u, true, "30080031 0044");
+    run_one();
+    CHECK_EQ_U64(p_unserialize(saved, saved_size), true);
+    CHECK(libretro_state_matches(saved, saved_size));
+    run_one();
+    CHECK(libretro_state_matches(expected_after, expected_after_size));
+    CHECK(memcmp(expected_ram, ram, ram_size) == 0);
+    CHECK_EQ_U64(p_unserialize(empty, *state_size), true);
+    CHECK(libretro_state_matches(empty, *state_size));
+
+cleanup:
+    free(expected_after);
+    free(saved);
+    free(reversed);
+    free(ordered);
+    free(configured);
+    free(empty);
+    free(expected_ram);
+    free(saved_ram);
+}
+
+static void test_cheats_state_capacity(size_t state_size)
+{
+    char bulk[4][1025];
+    size_t maximum_size = 0u;
+    unsigned char *maximum;
+
+    p_cheat_reset();
+    for (unsigned entry = 0u; entry < 4u; entry++) {
+        size_t text_size = make_cheat_text(bulk[entry], sizeof bulk[entry],
+                                           0x81000u + entry * 64u, 64u);
+        CHECK(text_size != 0u);
+        if (text_size != 0u) p_cheat_set(entry, true, bulk[entry]);
+    }
+    maximum = save_libretro_state(&maximum_size);
+    CHECK(maximum != NULL);
+    CHECK_EQ_U64(maximum_size, state_size);
+    if (maximum != NULL && maximum_size == state_size) {
+        CHECK(memcmp(maximum + LR_TEST_STATE_HEADER_SIZE, "SCHT", 4u) == 0);
+        CHECK_EQ_U64(libretro_state_get_u32(maximum + LR_TEST_STATE_HEADER_SIZE + 8u), 256u);
+        p_cheat_reset();
+        CHECK_EQ_U64(p_unserialize(maximum, maximum_size), true);
+        CHECK(libretro_state_matches(maximum, maximum_size));
+    }
+    free(maximum);
+}
+
+static void test_cheats_state_rejections(size_t state_size)
+{
+    unsigned char *baseline = NULL;
+    size_t baseline_size = 0u;
+    const size_t core_size = state_size - LR_TEST_STATE_CORE_OFFSET;
+    const uint8_t *core_payload;
+
+    p_cheat_reset();
+    p_cheat_set(0u, true, "30080040 00A1");
+    run_one();
+    baseline = save_libretro_state(&baseline_size);
+    CHECK(baseline != NULL);
+    CHECK_EQ_U64(baseline_size, state_size);
+    if (baseline == NULL || baseline_size != state_size) goto cleanup;
+    core_payload = libretro_state_core_payload(baseline, baseline_size, core_size);
+    CHECK(core_payload != NULL);
+    if (core_payload == NULL) goto cleanup;
+
+    libretro_state_expect_byte_rejection(baseline, state_size, 4u, 2u, 1,
+                                         "unknown envelope version");
+    libretro_state_expect_byte_rejection(baseline, state_size, 6u,
+                                         (uint8_t)(LR_TEST_STATE_HEADER_SIZE - 1u), 1,
+                                         "incorrect header length");
+    libretro_state_expect_u32_rejection(baseline, state_size, 8u,
+                                        (uint32_t)state_size - 1u,
+                                        "incorrect total length");
+    libretro_state_expect_u32_rejection(baseline, state_size, 12u,
+                                        (uint32_t)core_size + 1u,
+                                        "incorrect core length");
+    libretro_state_expect_u32_rejection(baseline, state_size, 16u,
+                                        (uint32_t)LR_TEST_STATE_CHEAT_SIZE - 1u,
+                                        "incorrect cheat length");
+    libretro_state_expect_byte_rejection(baseline, state_size,
+                                         LR_TEST_STATE_CHECKSUM_OFFSET,
+                                         (uint8_t)(baseline[LR_TEST_STATE_CHECKSUM_OFFSET] ^ 1u),
+                                         0, "incorrect envelope checksum");
+    libretro_state_rejection_preserves(baseline, baseline_size - 1u, baseline, baseline_size,
+                                       "truncated envelope");
+    libretro_state_rejection_preserves(core_payload, core_size, baseline, baseline_size,
+                                       "legacy raw core state");
+    libretro_state_expect_byte_rejection(baseline, state_size, 24u, 1u, 1,
+                                         "nonzero header reserved byte");
+    libretro_state_expect_byte_rejection(baseline, state_size,
+                                         LR_TEST_STATE_HEADER_SIZE + 24u, 3u, 1,
+                                         "invalid canonical write width");
+    libretro_state_expect_byte_rejection(baseline, state_size,
+                                         LR_TEST_STATE_HEADER_SIZE + 25u, 1u, 1,
+                                         "nonzero canonical record reserved byte");
+    libretro_state_expect_byte_rejection(baseline, state_size,
+                                         LR_TEST_STATE_HEADER_SIZE + 17u, 1u, 1,
+                                         "nonzero canonical entry reserved byte");
+    libretro_state_expect_byte_rejection(baseline, state_size,
+                                         LR_TEST_STATE_HEADER_SIZE + 32u, 1u, 1,
+                                         "nonzero unused canonical record");
+    libretro_state_expect_byte_rejection(
+        baseline, state_size, LR_TEST_STATE_CORE_OFFSET + core_size - 1u,
+        (uint8_t)(baseline[LR_TEST_STATE_CORE_OFFSET + core_size - 1u] ^ 1u), 1,
+        "valid envelope checksum with invalid core state");
+
+cleanup:
+    free(baseline);
+}
+
+static int test_cheats_state(void)
+{
+    const size_t ram_size = 2u * 1024u * 1024u;
+    unsigned char *ram;
+    size_t state_size = 0u;
+    int loaded = p_load_game(NULL) ? 1 : 0;
+
+    CHECK(loaded);
+    if (!loaded) goto cleanup;
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram == NULL) goto cleanup;
+    test_cheats_state_continuation(ram, ram_size, &state_size);
+    CHECK(state_size != 0u);
+    if (state_size == 0u) goto cleanup;
+    test_cheats_state_capacity(state_size);
+    test_cheats_state_rejections(state_size);
+
+cleanup:
+    if (loaded) p_unload_game();
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -6488,7 +7039,7 @@ int main(int argc, char **argv)
     schway_versions v;
     schway *ref;
     unsigned char *state, *ref_state;
-    size_t size;
+    size_t size, core_size = 0u;
     unsigned run, lo, other_lo;
     uint32_t region, other;
     int audio_batch_mode = argc == 6 && strcmp(argv[2], "audio-equality-batch") == 0;
@@ -6519,6 +7070,9 @@ int main(int argc, char **argv)
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
+    int cheats_apply_mode = argc == 3 && strcmp(argv[2], "cheats-apply") == 0;
+    int cheats_controls_mode = argc == 3 && strcmp(argv[2], "cheats-controls") == 0;
+    int cheats_state_mode = argc == 3 && strcmp(argv[2], "cheats-state") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
@@ -6536,6 +7090,7 @@ int main(int argc, char **argv)
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
+         !cheats_apply_mode && !cheats_controls_mode && !cheats_state_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                         argv[5][0] == '\0')) ||
@@ -6579,7 +7134,8 @@ int main(int argc, char **argv)
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
                 "card-controls <exe> <save-dir> | cards-multitap <save-dir> | memory-aliases | memory-boundaries | "
                 "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
-                "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
+                "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe> | "
+                "cheats-apply | cheats-controls\n");
         return 2;
     }
     content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || content_boot_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
@@ -6609,7 +7165,8 @@ int main(int argc, char **argv)
     int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode ||
                         card_persistence_mode || input_multitap_mode || input_special_mode ||
                         input_lightgun_mode || input_pointer_mode || input_gun_unavailable_mode ||
-                        cards_multitap_mode;
+                        cards_multitap_mode || cheats_apply_mode || cheats_controls_mode;
+    inspect_card2 = inspect_card2 || cheats_state_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -6657,6 +7214,18 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
+
+    if (cheats_apply_mode) {
+        return test_cheats_apply();
+    }
+
+    if (cheats_controls_mode) {
+        return test_cheats_controls();
+    }
+
+    if (cheats_state_mode) {
+        return test_cheats_state();
+    }
 
     if (audio_mode) {
         return test_audio_equality(argv[4], argv[5], region);
@@ -6881,10 +7450,11 @@ int main(int argc, char **argv)
                           SCHWAY_INPUT_DEVICE_DIGITAL);
         if (run == SAVE_AT) {
             size = p_serialize_size();
+            core_size = schway_state_size(ref);
             CHECK(size > 0u);
-            CHECK_EQ_U64(size, schway_state_size(ref));
+            CHECK_EQ_U64(size, LR_TEST_STATE_CORE_OFFSET + core_size);
             state = (unsigned char *)malloc(size);
-            ref_state = (unsigned char *)malloc(size);
+            ref_state = (unsigned char *)malloc(core_size);
             CHECK(state != NULL && ref_state != NULL);
             if (state == NULL || ref_state == NULL) {
                 free(state);
@@ -6895,8 +7465,13 @@ int main(int argc, char **argv)
             }
             CHECK_EQ_U64(p_serialize(state, size - 1u), 0);
             CHECK_EQ_U64(p_serialize(state, size), 1);
-            CHECK_EQ_U64(schway_save_state(ref, ref_state, size), SCHWAY_STATUS_OK);
-            CHECK(memcmp(state, ref_state, size) == 0);
+            CHECK_EQ_U64(schway_save_state(ref, ref_state, core_size), SCHWAY_STATUS_OK);
+            const uint8_t *module_core_state =
+                libretro_state_core_payload(state, size, core_size);
+            CHECK(module_core_state != NULL);
+            if (module_core_state != NULL) {
+                CHECK(memcmp(module_core_state, ref_state, core_size) == 0);
+            }
         }
     }
     CHECK_EQ_U64(video_calls, FRAMES);
@@ -6910,7 +7485,7 @@ int main(int argc, char **argv)
         CHECK_EQ_U64(p_unserialize(state, size), 0);
         state[size - 1u] ^= 0xFFu;
         CHECK_EQ_U64(p_unserialize(state, size), 1);
-        CHECK_EQ_U64(schway_load_state(ref, ref_state, size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(ref, ref_state, core_size), SCHWAY_STATUS_OK);
         for (run = SAVE_AT + 1u; run <= FRAMES; run++) {
             step_with_devices(ref, "replayed frame", lo, SCHWAY_INPUT_DEVICE_DIGITAL,
                               SCHWAY_INPUT_DEVICE_DIGITAL);

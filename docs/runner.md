@@ -14,14 +14,15 @@ test card, described in
 ## Synopsis
 
 ```text
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-state]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-state]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]
-                  [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
+                  [--patch FILE [--patch-source-sha256 HEX]]
+                  [--stop-on mailbox] [--inputs FILE] [--cheat CODE ...] [--hash] [--hash-audio]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
-                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
+                  [--memcard-names basename|serial] [--serial SERIAL] [--cheat CODE ...] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
 schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
 schwaystation-run --help | --version
 ```
@@ -34,6 +35,8 @@ schwaystation-run --help | --version
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
 | `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
 | `--disc FILE` | Attach a supported CUE, ISO, M3U, unencrypted PBP, ECM or CloneCD image to a BIOS run. A `.cue` names BINARY or ECM track files; `.ccd` uses its same-stem `.img` and optional `.sub`; an `.m3u` selects initial disc 0. Needs `--bios`. Give it once. |
+| `--patch FILE` | Validate and apply one PPF1, PPF2, PPF3 or BPS patch to the supported raw CUE source before emulation. Needs `--disc`; unavailable with `--bench` and `--probe`. See [patches](patches.md). |
+| `--patch-source-sha256 HEX` | Bind PPF to the whole source file's SHA-256 using 64 hexadecimal digits. Required for PPF; optional for BPS, which has its own CRC checks. Give it once with `--patch`. |
 | `--boot MODE` | Choose `full` (the default) or `fast` for a BIOS-backed disc run. Fast requires a valid boot executable found through the disc's ISO9660 boot metadata. Give it once. |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
 | `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
@@ -48,6 +51,7 @@ schwaystation-run --help | --version
 | `--save-dir DIR` | Load and save all eight card sockets under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
 | `--memcard-names MODE` | Use `basename` (default) or opt into `serial` naming to select the basename used for all eight card socket paths. Serial naming resolves the title serial from an executable or the first disc member. Give it once. |
 | `--serial SERIAL` | Keep this literal, validated card basename with `--memcard-names serial`. It overrides serial extraction and content hashing. |
+| `--cheat CODE` | Add one enabled GameShark entry. Repeat up to 32 times; entries run in command-line order at the start of each frame. Invalid or unsupported text rejects the invocation before the run starts. See [GameShark cheats](cheats.md). |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
 | `--metadata-ledger CSV` and `--metadata-dat DAT` | Supply both bounded lookup files to `--probe`; identity is shown only after an exact DAT and passing-ledger match. |
@@ -59,7 +63,7 @@ schwaystation-run --help | --version
 Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
 `--metadata-dat` pair. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--disc`, `--exe` or `--probe`,
-`--bios`, `--disc` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--boot` without both `--bios` and `--disc`, `--exe` with `--probe`, `--tty` without `--exe` or
+`--bios`, `--disc`, `--exe` or `--patch` twice, either patch option without its required companion, `--patch` without `--disc`, `--patch` with `--bench` or `--probe`, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--boot` without both `--bios` and `--disc`, `--exe` with `--probe`, `--tty` without `--exe` or
 `--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
 `--trace` with anything but `first-fault`, `--hash-state` with `--disc`, `--serial` without serial naming, serial naming
 without `--save-dir`, or serial naming without either a standalone `--exe` or a literal `--serial`, and any option
@@ -70,6 +74,10 @@ PS-EXE marker. If those hints disagree, it prints their values and the selected 
 wins among automatic hints. When no hint is available, auto keeps the NTSC-U default. An explicit `--region` value
 overrides the hints while disagreement diagnostics remain visible. The console board, video region and title serial
 are separate values: changing `--machine` does not change region selection or content identity.
+
+Each `--cheat` option is parsed before the instance runs. At every requested frame boundary, its normalized writes
+are applied in option order before emulation begins. Overlapping writes therefore use last-write-wins behavior. The
+bounded syntax, widths, address range and write limits are described in [GameShark cheats](cheats.md).
 
 ## BIOS images
 
@@ -112,6 +120,20 @@ sectors, then closes it after destroying the instance. It never extracts or side
 ```sh
 schwaystation-run --bios ./openbios.bin --disc ./game.cue --frames 900 --stop-on mailbox --hash
 ```
+
+To run a supported patch, pass one patch file with the disc. PPF needs the SHA-256 of the complete raw source file;
+BPS uses its source, target and patch CRCs and accepts the SHA-256 option as an additional source check:
+
+```sh
+schwaystation-run --bios ./openbios.bin --disc ./game.cue --patch ./game.ppf \
+  --patch-source-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --frames 900
+```
+
+The runner validates the disc mapping, patch and applicable source checks before creating the emulator instance or
+running frames. It prints the patch format and checks performed without printing either input path. A rejected patch
+exits before frame output or PNG creation, and the source image remains unchanged. The patch provider and the core's
+existing sector callback share the overlay; patch parsing and transformation stay in the host. See
+[the supported patch formats and limits](patches.md).
 
 The BIOS-backed disc path defaults to `--boot full`; spelling `--boot full` produces the same ordinary firmware
 startup. `--boot fast` opts into the core's initialized shell handoff only after the runner has loaded the supplied
@@ -624,10 +646,10 @@ report. The report is written only to ignored `build/library/results.csv`.
 
 The local lookup uses `tests/compat/ledger.csv` and the DAT at `build/library/Sony - PlayStation.dat`. If the DAT
 is absent, it is fetched from libretro-database commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a` and checked by
-SHA-256; an existing local DAT is reused. Boot and play remain unknown until a disc
+SHA-256. Cached copies get the same digest check before use. Boot and play remain unknown until a disc
 backend measures them. CI exercises the same host lookup code with isolated temporary DAT and ledger fixtures,
-never `.env.local` or owner content. Public compatibility documentation is regenerated from the committed ledger
-only.
+never `.env.local` or owner content. The [public compatibility report](compatibility.md) combines the committed
+ledger, required capability matrix and pinned aggregate inventory.
 
 ## Stopping
 

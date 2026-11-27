@@ -37,6 +37,16 @@ set_target_properties(schwaystation-test-disc-sbi PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-sbi)
 
+# Patch cases are registered before their behavior is implemented so missing
+# coverage remains visible as a failing selector.
+add_executable(schwaystation-test-disc-patch ${CMAKE_CURRENT_LIST_DIR}/patch.c)
+target_include_directories(schwaystation-test-disc-patch PRIVATE
+  ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(schwaystation-test-disc-patch PRIVATE
+  schwaystation_disc_image schwaystation-host)
+set_target_properties(schwaystation-test-disc-patch PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-patch)
 schway_add_test(NAME disc.image.sbi
   COMMAND schwaystation-test-disc-sbi ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 10)
@@ -462,3 +472,14 @@ set_tests_properties(disc.fixture.ecm.boot disc.fixture.ecm.read
 set_tests_properties(disc.fixture.ecm.fmv disc.fixture.ccd.fmv PROPERTIES
   FIXTURES_REQUIRED
   "compat_features_preflight;disc_fmv_predicates;disc_legacy_preflight;disc_legacy_parity")
+
+# Fault prevented: a supported patch selector silently succeeds before its
+# production parser and atomic sector overlay have been implemented.
+foreach(case mapping ppf1 ppf2 ppf3 bps atomic bounds)
+  set(patch_work_root "${PROJECT_BINARY_DIR}/tests/disc-patch/${case}")
+  file(MAKE_DIRECTORY "${patch_work_root}")
+  schway_add_test(NAME disc.patch.${case}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-disc-patch>
+      ${case} "${patch_work_root}"
+    LABELS portable disc TIMEOUT 30)
+endforeach()

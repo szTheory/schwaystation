@@ -14,7 +14,7 @@
     }
   },
   "commit_docs": true,
-  "parallelization": false,
+  "parallelization": true,
   "search_gitignored": false,
   "brave_search": false,
   "firecrawl": false,
@@ -69,7 +69,7 @@
     "tdd_mode": false,
     "schema_push_detection": false,
     "schema_drift_gate": false,
-    "use_worktrees": false,
+    "use_worktrees": true,
     "test_command": "cmake --workflow --preset ci",
     "test_gate_timeout": 240,
     "_auto_chain_active": false

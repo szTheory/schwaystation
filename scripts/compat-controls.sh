@@ -82,6 +82,8 @@ docs)
     expect 'compatibility docs generation' TRUE '' sh "$source_root/scripts/compat-doc.sh" "$tmp/ledger.csv" "$tmp/docs.md"
     expect 'compatibility docs freshness' TRUE '' sh "$source_root/scripts/compat-doc.sh" "$tmp/ledger.csv" "$tmp/docs.md" --check
     grep -q '| Alpha |' "$tmp/docs.md" && grep -q '| Zulu |' "$tmp/docs.md" && grep -q 'measured fixture' "$tmp/docs.md" && grep -q 'fixtures.alpha:exit=0' "$tmp/docs.md" && grep -q '2026-11-11' "$tmp/docs.md" && awk '/\| Alpha \|/{a=NR} /\| Zulu \|/{z=NR} END{exit !(a && z && a<z)}' "$tmp/docs.md" || exit 1
+    grep -Fqx '| 13407 | 0 | 0 | 13407 | 177 | 988 |' "$tmp/docs.md"
+    grep -Fqx '| provider | 0 | 0 | 8 |' "$tmp/docs.md"
     printf '\nStale output\n' >> "$tmp/docs.md"
     expect 'compatibility docs stale output' FALSE '' sh "$source_root/scripts/compat-doc.sh" "$tmp/ledger.csv" "$tmp/docs.md" --check
     for value in 'Bad,Title' 'Bad"Title'; do

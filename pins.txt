@@ -167,3 +167,4 @@ ps1tests-gte-test-all f727802fead1 a03aa72173f122bf916039f438c8cde89e61e526 3874
 
 # BIOS digest facts only; the raw source is not vendored or packaged.
 libretro-system-dat 12c21cf79f1e20eff6ac68b80875816c717d0a7a https://raw.githubusercontent.com/libretro/libretro-database/12c21cf79f1e20eff6ac68b80875816c717d0a7a/dat/System.dat 57f83609a28122b0e5e0bfc6a1993a3b512580698be7dd2affb307913087544b
+libretro-redump-ps1-dat 12c21cf79f1e20eff6ac68b80875816c717d0a7a https://raw.githubusercontent.com/libretro/libretro-database/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation.dat 52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8

@@ -8,6 +8,14 @@ It also accepts ECM v1.0 images and supported CloneCD `.ccd` images. With
 `SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the same
 raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default.
 
+The runner's patch path has a narrower source mapping than ordinary disc
+playback. It accepts exactly one CUE `FILE`, one MODE1/2352 or MODE2/2352 data
+track, and an `INDEX 01` at the start of the file, with no pregap or additional
+indexes. Cooked ISO sectors, ECM or other compressed sources, playlists,
+multi-track layouts, and provider-specific images remain playable where their
+formats are supported, but cannot be patched. See [patch support](patches.md)
+for the patch format checks and source identity rules.
+
 ## SBI bad-Q companions
 
 A supported image may have a same-stem `.sbi` file beside it. The host loads the

@@ -38,6 +38,9 @@ if("chdr-static" IN_LIST info_disc_image_links)
   set(SCHWAYSTATION_INFO_DESCRIPTION "Sony PlayStation core. Loads PS-EXE homebrew and CUE, ISO, M3U, ECM (.ecm), CloneCD (.ccd), and CHD discs, plus supported unencrypted single-data-track PSISO PBP images.")
   set(SCHWAYSTATION_INFO_CHD TRUE)
 endif()
+include("${PROJECT_SOURCE_DIR}/tests/cmake/Capabilities.cmake")
+schway_capabilities_configure(SCHWAYSTATION_IS_EXPERIMENTAL)
+set(SCHWAYSTATION_INFO_CHEATS true)
 configure_file(schwaystation_libretro.info.in
   ${CMAKE_CURRENT_BINARY_DIR}/schwaystation_libretro.info @ONLY)
 
@@ -51,6 +54,8 @@ execute_process(
     -DINVENTORY=${info_claims_inventory}
     -DEXPECTED_EXTENSIONS=${SCHWAYSTATION_INFO_EXTENSIONS}
     -DEXPECTED_LICENSE=${SCHWAYSTATION_INFO_LICENSE}
+    -DEXPECTED_EXPERIMENTAL=${SCHWAYSTATION_IS_EXPERIMENTAL}
+    -DEXPECTED_CHEATS=${SCHWAYSTATION_INFO_CHEATS}
     -P ${info_claims_script}
   RESULT_VARIABLE info_claims_result
   OUTPUT_VARIABLE info_claims_out
@@ -66,6 +71,27 @@ if(PROJECT_IS_TOP_LEVEL)
   install(TARGETS schwaystation_libretro
     LIBRARY DESTINATION cores COMPONENT libretro
     RUNTIME DESTINATION cores COMPONENT libretro)
+  # CPack installs component files after the test workflow step. Import its
+  # completed report before copying the staged .info file into the archive.
+  set(capabilities_install_code [=[
+execute_process(
+  COMMAND "@CMAKE_COMMAND@"
+    "-DCAPABILITIES_MATRIX=@PROJECT_SOURCE_DIR@/tests/compat/required-capabilities.csv"
+    "-DCAPABILITIES_SOURCE_ROOT=@PROJECT_SOURCE_DIR@"
+    "-DCAPABILITIES_JUNIT=@PROJECT_BINARY_DIR@/junit.xml"
+    "-DCAPABILITIES_CONFIG=@PROJECT_BINARY_DIR@/compat/capabilities-config.csv"
+    "-DCAPABILITIES_OUTPUT=@PROJECT_BINARY_DIR@/compat/capabilities-results.csv"
+    "-DCAPABILITIES_INFO=@CMAKE_CURRENT_BINARY_DIR@/schwaystation_libretro.info"
+    -P "@PROJECT_SOURCE_DIR@/tests/cmake/Capabilities.cmake"
+  RESULT_VARIABLE import_result
+  OUTPUT_VARIABLE import_out
+  ERROR_VARIABLE import_err)
+if(NOT import_result STREQUAL "0")
+  message(FATAL_ERROR "libretro capability package import failed: ${import_out}${import_err}")
+endif()
+]=])
+  string(CONFIGURE "${capabilities_install_code}" capabilities_install_code @ONLY)
+  install(CODE "${capabilities_install_code}" COMPONENT libretro)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/schwaystation_libretro.info
     DESTINATION info COMPONENT libretro)
 endif()

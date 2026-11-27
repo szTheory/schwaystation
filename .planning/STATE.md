@@ -3,39 +3,104 @@ gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
-current_phase_name: Patches, cheats and compatibility evidence
 current_plan: Not started
-status: planning
-stopped_at: Phase 15 complete, ready to plan Phase 16
-last_updated: "2026-11-25T18:59:19.028Z"
-last_activity: 2026-11-25
-last_activity_desc: "Phase 15 shipped as PR #44"
-state_head: 27ad36e076d68a8a921f11a460d86923a6f52159
+status: completed
+stopped_at: Phase 16 complete — all phases complete
+last_updated: "2026-11-26T23:49:25Z"
+last_activity: 2026-11-26
+last_activity_desc: Phase 16 verified; ship preflight complete
+state_head: 12d2a2b2f53c0971c08b2a2e623e3990ceb3570e
 progress:
   total_phases: 10
-  completed_phases: 9
-  total_plans: 107
-  completed_plans: 107
-  percent: 90
+  completed_phases: 10
+  total_plans: 125
+  completed_plans: 125
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-19)
+See: .planning/PROJECT.md (updated 2026-11-26)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 15 — finish goal-backward verification and ship the reviewed GunCon and Justifier changes. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
+**Current focus:** Ship Phase 16 PR #46, then complete the v2.0 release and milestone closeout.
 
 ## Current Position
 
-Phase: 16 — Patches, cheats and compatibility evidence
+Phase: 16
 Current Plan: Not started
-Total Plans in Phase: 12
-Status: Ready to plan
-Last activity: 2026-11-25 -- Phase 15 shipped as PR #44
-Progress: [█████████░] 90% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
+Total Plans in Phase: 18
+Status: All phases complete
+Last activity: 2026-11-26 — Phase 16 complete
+Progress: [██████████] 100% (9/10 v2.0 phases released; Phase 16 goal verification and exact-head CI/Nightly passed, and PR #46 is open for ship. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing and TODO052 as a deferred BE32 sharding follow-up.)
+
+### Phase 16 planning (2026-11-25)
+
+Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. Eighteen plans cover the four Phase 16 requirements and eight locked decisions across eleven file-disjoint waves. Plan 01 registers the CMake skeleton and exact test inventories; later owners implement checked RAM writes, bounded GameShark text/state, PPF/BPS source-bound overlays, per-occurrence DAT accounting and the protected fresh-result capability matrix. Plan schemas/structures are validated; code review and final phase verification remain later steps. No application/build/behavior tests ran during planning. The source audit records coverage, concrete bounds and the experimental metadata evidence boundary.
+
+### Phase 16 plan-check revision (2026-11-25)
+
+Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. The independent check found that Plan 01's 15-file scope reached its blocker threshold and the research retained three open questions. Plan 01 now uses the existing api_v10 baseline and modifies 12 files while preserving the CMake skeleton and all six inventory checks; the plan and audit state the AGENTS.md rule 14 first-plan scope exception. A follow-up scope warning moves shared host-cheat wiring/test ownership from Plan 02 into the existing parser Plan 03. Plan 02 now has eight files in two API-only tasks; Plan 03 has five files in three tasks. Plan 02 creates/registers api_v11, adds the public write and updates only older callers' exact-current-version assertions. Every task remains at or below five files, all wave/dependency order is preserved, and the research records resolved source identity, raw-layout and BPS-staging choices consistent with the plans and current context. No application, build or behavior tests ran in this revision; independent recheck precedes execution.
+
+### Phase 16 wave 2 execution (2026-11-26)
+
+Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-02 took 16m41s; Plan 16-07 took 34m. Their isolated worktrees started from `1e5a01c`, completed with clean status, passed summary and commit-scope checks, and merged as two disjoint commits. Plan 16-02 added checked API v11 physical-RAM writes while preserving released v9/v10 callers; its four ABI/API selectors passed. Plan 16-07 added identity-bound PPF1 loading and a sparse overlay for one exact raw CUE track mapping; its three patch selectors, runner/libretro consumer builds, and `disc.image.iso_sector` passed. Its Task 2 regression was already green after Task 1; source inspection confirmed the implementation already met the behavior, so the test and documentation were retained and the ordering deviation recorded without redundant production changes.
+
+After merge, `git diff --check 1e5a01c..HEAD`, both affected sorted test inventories, `cmake --preset ci`, and a unique-selector preflight passed. The combined API, PPF1, and disc-image targets plus `schwaystation-run` and `schwaystation_libretro` built successfully; the eight focused selectors passed 8/8. The broad workflow remains for final phase verification after source review. No hosted CI, Act, or Docker work was needed at this wave boundary. Current plan is 3; wave 3 plans 16-03 and 16-08 are ready.
+
+### Phase 16 wave 3 execution (2026-11-26)
+
+Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-03 took 31 minutes; Plan 16-08 took 20m23s. Plan 16-03 added the bounded shared `30`/`80` cheat parser and checked RAM consumer with a fixed 16,656-byte canonical state format. Plan 16-08 added PPF2 source-size/block checks and PPF3 BIN, block, 64-bit-record, undo, and bounded FileID validation. The PPF malformed-input tests were already green from Task 1; the executor retained the regression coverage and documented the overlap without redundant production changes. Plan 16-03's measured 31-minute closeout exceeded the 30-minute planning threshold by one minute; its implementation and focused checks had completed before summary and hook closeout extended elapsed time.
+
+Both isolated worktrees started at `542580e`, ended clean, and had resolved commit-scope checks. `verify-summary` produced heuristic false positives: it treated Plan 16-03's documented test failure as a failed self-check and Plan 16-08's inventory-check command as a created file. Both summaries explicitly report `Self-Check: PASSED`; direct inspection confirmed the declared files exist, their task commits and checks match the records, and no changes were needed to the artifacts.
+
+After merge, `git diff --check 542580e..HEAD`, the ABI/runner/disc inventory sorts, `cmake --preset ci`, and the 11-selector preflight passed. The cheat, API, PPF and documentation-budget targets plus runner and libretro consumers built successfully; all 11 focused selectors passed. The broad workflow remains for final phase verification after code review. No hosted CI, Act, or Docker work was needed at this wave boundary. Current plan is 4; wave 4 plans 16-04, 16-06 and 16-09 are ready.
+
+### Phase 16 wave 4 execution (2026-11-26)
+
+Runtime/model: Codex orchestrator; typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-04 took 31 minutes, Plan 16-06 took 40 minutes, and Plan 16-09 took 63m51s. Plan 16-04 connected libretro cheat callbacks to frame execution and preserved state across `retro_reset`; its two focused selectors and docs budget passed. Plan 16-06 added repeatable runner `--cheat` options and normalized-configuration hash contribution while preserving no-cheat hash pins; the exact six-selector run passed with a pinned OpenBIOS fixture built through the repository's named container producer. Its hash implementation landed with Task 1; the later Task 2 tests passed against it, and the actual TDD ordering was documented without rewriting the passing commit. All generated BIOS/toolchain/source files and task-owned container resources were removed. Plan 16-09 added bounded BPS transformation and complete-target staging (memory through 1 MiB, private temporary file above that); its regression set includes malformed cursors/varints/CRCs, late failures, large targets and injected source-I/O failure. It took 63m51s, including large-target coverage and compaction needed to keep `tests/disc/patch.c` below its existing 1,200-line cap; the final file has 1,199 lines. Its Task 2 tests were already satisfied by Task 1, so the executor retained the regressions and documented the overlap without redundant production changes. These measured durations exceed the plan's 30-minute target; use them when estimating future work and split materially larger plans before execution.
+
+All three worktrees started at `445d699`, ended clean, and had resolved commit-scope checks. `git diff --check 445d699..HEAD`, runner/disc/libretro/ABI inventory sorts, `cmake --preset ci`, unique-selector preflight, and the combined builds passed. The 17 targeted post-merge API, cheat, libretro, PPF/BPS, disc-image and docs-budget selectors passed 17/17. The hygiene preset's `policy.gate_budget` passed 1/1; the measured repository checks remain 3,901/3,901. The exact `runner.hashes_file` case passed earlier in Plan 16-06 with its pinned OpenBIOS fixture; it is not in the post-merge 17-selector set because that generated fixture was cleaned after the plan. The full workflow remains for final phase verification after source review. No hosted CI or Act was run; the plan-owned OpenBIOS container and outputs were cleaned. Current plan is 5; wave 5 plans 16-05, 16-10 and 16-11 are ready.
+
+### Phase 16 wave 5 execution (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` agents ran on gpt-6-luna xhigh. Plan 16-05 took 33m19s, Plan 16-10 took 44m, and Plan 16-11 took 31m21s. Plan 16-05 added atomic libretro cheat configuration state; its five required selectors passed. Its optional content-profile probe could not run because the generated OpenBIOS fixture was absent after cleanup. Plan 16-10 added runner `--patch` transactional handling and passed eight required selectors plus `runner.hash_state` and repository/documentation budget checks. Its Task 2 tests were already green after Task 1; the test-harness argument mismatch was corrected, actual ordering recorded, and no artificial RED was introduced. Plan 16-11 added patch/cheat replay seeds and nightly fuzz routing; replay passed 2/2, exact seed and workflow checks passed, and `act --dryrun --container-architecture linux/arm64 -W .github/workflows/nightly.yml -j fuzz` exited 0. It added 14 PPF and 10 cheat seeds; local sanitizer execution was unavailable because clang-21 was not installed. Temporary seed/cache data was removed and no task-owned Docker resources remained.
+
+The isolated worktrees completed clean with resolved scope checks and merged. `verify-summary` flagged heuristic false positives for Plans 16-05 and 16-11; both summaries explicitly report `Self-Check: PASSED`, and their created files, commits and checks were verified. After merge, `git diff --check 3d19212..HEAD`, sorted test inventories, `cmake --preset ci`, the combined affected target builds and all 19 focused API/cheat/libretro/patch/fuzz/runner/disc/documentation selectors passed. The hygiene selectors `hygiene.timeout_comments`, `policy.action_pins` and `policy.gate_budget` passed 3/3. No hosted CI ran in this wave. Current plan is 6; wave 6 Plan 16-12 is ready.
+
+### Phase 16 wave 6 execution (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` gpt-6-luna xhigh. Plan 16-12 took 46m36s, exceeding its 20–28 minute target. It added a bounded host parser and non-emulating runner mode that preserves every DAT occurrence and publishes aggregate counts only; optional per-occurrence identity/evidence stays private. Parser tests first exposed ambiguous duplicate serial fields and synthetic pin mislabeling. A real parse of the pinned D-06 Redump source then exposed valid UTF-8 serial bytes; the encoded-serial regression and digest-based duplicate accounting fixed that without storing or printing serials. The verified source digest was `52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8`; the runner counted 13,407 entries, all unknown, with 177 missing serials and 988 entries in duplicate-serial groups. The raw DAT was held in a task-specific temporary path and removed after the run. An output-check wrapper's first assertion returned 1 despite correct runner output; a corrected field check returned 0. No owner BIOS/disc paths, Docker, hosted CI, or broad workflow were used.
+
+After merge, `git diff --check be22dcb..HEAD`, compatibility inventory sort, exact selector preflight, `cmake --preset ci`, and builds for `schwaystation-run`, `schwaystation-run-test` and `schwaystation-test-library` passed. The four plan selectors plus `compat.features.preflight` passed 5/5. The first cleanup-wave attempt rejected the abbreviated manifest base; ancestry inspection confirmed the worktree was exactly based on the current phase head, so the manifest was corrected to its full SHA and GSD merged/removed the worktree cleanly. Current plan is 7; wave 7 Plan 16-13 is ready.
+
+### Phase 16 wave 7 execution (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); typed `gsd-executor` gpt-6-luna xhigh. Plan 16-13 took 34 minutes, six minutes over its 20–28 minute target. `gh api` verified the exact public Redump commit, DAT blob/header and CC BY-SA 4.0 license. The pinned DAT digest matched D-06, and the runner reconciled all 13,407 occurrences as unknown without measured evidence, including 177 missing-serial and 988 duplicate-group entries. The library route now verifies cached and newly fetched DATs before parsing and writes aggregate-only reports; the raw source was removed. The cached-wrong-digest control produced accepted RED evidence. Focused runs exposed test-only probe-log contamination and a snapshot-baseline mismatch; those controls were corrected within the declared tests. The final repository-check measure was 3,900/3,901 lines.
+
+After merge, `git diff --check cdac692..HEAD`, the compatibility inventory sort, shell syntax, source/temp-file checks and exact selector preflight passed. `cmake --preset ci`, the runner/library targets and the four plan selectors plus setup fixture and `docs.budgets` passed; `policy.gate_budget` passed 1/1. The DAT, manifest and worktree were removed. Every bounded command session returned; the sandbox denied a separate OS process-table query, so no OS-wide listing is claimed. No owner BIOS/disc paths, Docker, Act, hosted CI, or broad workflow were used. Current plan is 8; wave 8 Plan 16-14 is ready.
+
+### Phase 16 Plan 16-14 budget proposal (2026-11-26)
+
+Runtime/model: Codex/OpenGSD coordinator (primary model ID unavailable); GSD executor gpt-6-luna xhigh. The complete candidate measured **4,694 counted gate lines**, including the 347-line synthetic-control file under the existing `tests/cmake/*.cmake` inventory. The owner approved 4,694 as the Phase 16 ceiling. The independent reuse audit found no duplicate logic to remove. The 51-row compatibility matrix lacks required provider/profile boot-to-play evidence, so generated metadata stays experimental. The focused capability/info/cheat selector set passed 7/7; targeted libretro builds, install staging and staged metadata checks passed. The final source later measured 4,694 at the approved cap. The temporary install prefix was removed. CI/CD efficiency, Act use, final verification and task-named Docker cleanup guidance are in `AGENTS.md`, `.planning/AUTONOMOUS.md` and `docs/maintaining.md`.
+
+### Phase 16 wave 8 completion (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); resumed the GPT-6 Luna xhigh executor's existing draft. The owner approved the 4,694-line ceiling with all checks counted. Focused capability, metadata, cheat, package staging and budget checks passed. A new truncated-JUnit control failed before the importer fix and passed afterward. The measured total at that plan boundary was 4,693 lines; later BE32 emulator transport checks brought the final producer to 4,694. Direct file and commit checks confirmed the summary despite the helper's documented false positives on command strings and test history. GSD manifest-scoped cleanup exited 0 and integrated the completed worktree. The staged libretro metadata remains experimental while provider and profile play evidence is missing. See the [plan summary](phases/16-patches-cheats-and-compatibility-evidence/16-14-SUMMARY.md).
+
+### Phase 16 execution, review and verification (2026-11-26)
+
+Runtime/model: Codex and OpenGSD 1.23.0, primary model ID unavailable. The coordinator completed Plans 16-15 through 16-18. The GPT-6 Luna xhigh source review identified WASI staging, Nightly target and JUnit result attribution defects. Focused native, pinned WASI, and sanitizer replay checks passed after the fixes. The first complete workflow attempt surfaced a CUE probe control that still expected raw Mode 1 to be refused. The corrected control verifies synthetic identity for that mode and retains the unsupported-mode assertion.
+
+`cmake --workflow --preset ci` exited 0 on the reviewed source and test correction, including package staging and release checks. The repository-check inventory measured 4,692 of the approved 4,694 lines. The linked WASI runner measured 1,014,609 bytes, and stable serialized state measured 3,757,754 bytes. The package's current capability report records 16 passing rows and 35 provider/profile rows as unknown. Libretro remains experimental. Hosted gates and the release remain for ship. See the [verification report](phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md).
+
+### Phase 16 final verification and ship preflight (2026-11-26)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable; typed `gsd-verifier` gpt-6-luna xhigh. Code review covered 40 files and found zero open findings. On corrected source head `06bb5da9c5213b81c53d5de606a10af87f9b2a37`, the local `cmake --workflow --preset ci` gate passed 742/742 tests in 78.04s and all 8 release checks in 1.61s. Final CI [45902643250](https://github.com/szTheory/schwaystation/actions/runs/45902643250) passed in 51m03s, using 8,094 raw runner-seconds (unweighted, not billing). BE32 was the critical path at 49m27s: 694/694 tests passed in 2,863.37s, both inventory cases passed under QEMU, and all eight cross-platform hashes matched. The slowest CTest cases were `libretro.host` (1,010.46s), `libretro.input.movies` (721.41s), `runner.disc.legacy` (608.58s), `runner.hashes_file` (493.08s) and `spu.fixture` (455.53s). ASan, WASI, all native build legs, RetroArch, release rehearsal and cleanup passed. Perf measured 1,620,381 testcard and 138,406,446 GPU-motion instructions/frame, each within 0 basis points of base. Nightly [45902643154](https://github.com/szTheory/schwaystation/actions/runs/45902643154) passed in 15m25s with all vectors, four benchmark legs and 13 bounded fuzz campaigns.
+
+The verifier found a documentation mismatch between the final 4,694-line gate inventory and the stale 4,693-line statement in REQUIREMENTS.md. The requirement now declares the already-approved measured 4,694 cap, matching CI, Nightly, hygiene and workflow registration. Final verification passed 4/4 roadmap truths with fingerprint `v4:sha256:f30911d4436ee9cbae45493760f3f89de5571b84a0918f255769cc3903e05745`; `gsd_run query verification.status` returned `passed`. `phase.complete` refreshed State without changing the already-complete roadmap row and reported existing command-as-path warnings in nine plan summaries; no source or verification gaps remain. TODO052 remains pending because BE32 sharding was not implemented and its own acceptance criteria require a measured post-shard union; the new full-suite baseline is recorded in `16-LOCAL-EVIDENCE.md`. The phase report, review, requirements, state and evidence are prepared for the final PR docs commit; PR #46 and release checks remain.
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -1570,7 +1635,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 302
+- Total plans completed: 320
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1593,6 +1658,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 13 | 9 | - | - |
 | 14 | 16 | - | - |
 | 15 | 12 | - | - |
+| 16 | 18 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -2617,9 +2683,21 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T16:39:57.389Z
-Stopped at: Phase 15 complete, ready to plan Phase 16
-Resume file: None
+Last session: 2026-11-26T16:18:55Z
+Stopped at: Phase 16 complete — all phases complete
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md
+
+Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
+
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
+
+Phase 16 execution started on `phase/16-patches-cheats-compatibility`. Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); GSD executor `codex exec` pinned to gpt-6-luna xhigh. Parallelization and GSD worktrees are enabled to follow the project’s disjoint-wave execution rule.
+
+Plan 16-01 completed on 2026-11-26 in 17 minutes. Runtime/model: Codex/OpenGSD 1.23.0; typed `gsd-executor` gpt-6-luna xhigh. The released API-v10 caller and exact patch, cheat, compatibility and fuzz selector graph are committed; the six intentional fail-first stubs are tracked for their owning plans. `git diff --check HEAD`, all six inventory sort checks, `cmake --preset ci`, the four target build, and the focused `abi.api_v10` plus `runner.cheats.memory_read` CTest selection exited 0. The 24-selector preflight exited 0 after accounting for CTest’s `compat.features.preflight` fixture dependency. GSD worktree cleanup/merge exited 0. The broad workflow remains for the phase closeout because Plan 01 deliberately registers gating selectors that their later implementation plans make pass; no test is removed or made non-gating.
+
+The GSD `verify-summary` helper exited 0 but returned `passed: false`: its matcher treated `## Verification Evidence` as the self-check section and then classified the later `fail-first` notes as a failure. The actual `## Self-Check: PASSED`, first two created files and plan-scoped commits were verified. This is a validator false positive, not an implementation failure. Process-spawned `codex exec` could not initialize its in-process app-server in this environment (`Operation not permitted`), so the plan ran through the typed GSD executor in a GSD-created worktree. Continue wave dispatch with typed executors and explicit worktree paths. Next: plans 16-02 and 16-07.
+
+Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
 
 ### v1.0 session history
 
