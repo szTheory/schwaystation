@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/szTheory/schwaystation/compare/v0.15.0...v0.16.0) (2026-11-27)
+
+
+### Features
+
+* add PlayStation patches, cheats, and compatibility evidence ([#46](https://github.com/szTheory/schwaystation/issues/46)) ([39e3ba1](https://github.com/szTheory/schwaystation/commit/39e3ba1a8e89a15473d9e4e6126dd4034f41e043))
+
 ## [0.15.0](https://github.com/szTheory/schwaystation/compare/v0.14.0...v0.15.0) (2026-11-25)
 
 
