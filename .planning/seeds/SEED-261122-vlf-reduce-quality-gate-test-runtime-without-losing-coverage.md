@@ -5,6 +5,10 @@ planted: 2026-11-22
 planted_during: v2.0 phase 11
 trigger_when: when CI quality-control runtime or CI/CD efficiency is next planned
 scope: unknown
+audit_acknowledged:
+  milestone: v2.0
+  at: 2026-11-26
+  status: dormant
 ---
 
 # SEED-261122-vlf: Reduce quality-gate test runtime without losing coverage

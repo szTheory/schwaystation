@@ -186,6 +186,26 @@ Suggested check: keep byte-exact marker producers explicitly LF and exercise CRL
 Sources: [Windows diagnostic run](https://github.com/szTheory/schwaystation/actions/runs/43329257561).
 Status: reproduced
 
+Lesson SW-CI-002 (2026-11-26, Phase 16 release CI)
+Symptom and reproduction: The exact-source Main CI run 45923003995 took 4,156 seconds wall time; BE32 took 4,103 seconds. The full Release run 45923155197 took 4,598 seconds, with BE32 at 4,110 seconds and build-and-test at 4,012 seconds. The metadata-only Main route completed in about one minute and skipped the heavy matrix.
+Root cause / invariant: BE32 is the measured critical path. Splitting it can reduce elapsed time only if selector unions, test reports, fixture ownership and downstream artifacts remain complete; repeated setup can offset the gain. Billing cost is not inferred from job wall time.
+Fix and evidence: Keep the full required lanes and track the measured candidate in TODO-052 until the exact hosted selector/JUnit/artifact/hash contract and a before/after speedup pass. The metadata route retains its cheap required checks. Main CI [45923003995](https://github.com/szTheory/schwaystation/actions/runs/45923003995) and Release [45923155197](https://github.com/szTheory/schwaystation/actions/runs/45923155197) passed.
+Applies when: A serial test or platform lane dominates CI wall time and a proposed shard duplicates setup or produces artifacts consumed downstream.
+Does not establish: That the shard is already safe, that runner time predicts billed cost, or that any required case can be removed.
+Suggested check: Compare exact disjoint selectors with the registered inventory, validate full JUnit union and downstream artifact/hash use, then measure one comparable hosted changed head before keeping a split.
+Sources: `.planning/milestones/v2.0-phases/16-patches-cheats-and-compatibility-evidence/16-LOCAL-EVIDENCE.md`; `.planning/milestones/v2.0-MILESTONE-AUDIT.md`.
+Status: observed
+
+Lesson SW-GSD-001 (2026-11-26, v2.0 milestone closeout)
+Symptom and reproduction: `gsd_run query summary-extract` rejected Phase 15-10 because a plain YAML scalar contained `: `; the requirement audit also found phase-level IDs intentionally absent from interim plan summaries until aggregate verification. Quoting the scalar and recording explicit phase-closeout metadata made all 125 summaries parse and all 34 requirement IDs appear in the frontmatter union.
+Root cause / invariant: Planning frontmatter is machine-read data. Grepping Markdown can miss parse errors and can confuse plan-local completion with later phase-level verification.
+Fix and evidence: Run GSD's parser over every summary, compare the requirement union with the milestone traceability table, reconcile held requirements against the final phase verification, and refresh the affected verification fingerprint. The exact release CI already passed; no test suite was repeated for this metadata fix.
+Applies when: Refreshing phase reports or auditing a completed milestone.
+Does not establish: Product correctness by itself; every requirement still needs a passed phase verification and its required hosted evidence.
+Suggested check: Use `gsd_run query summary-extract "$summary" --fields requirements_completed --pick requirements_completed --raw` for every summary, then check `verification.status` for each phase.
+Sources: `.planning/milestones/v2.0-MILESTONE-AUDIT.md`; `.planning/milestones/v2.0-phases/15-guncon-and-justifier/15-VERIFICATION.md`.
+Status: observed
+
 Lesson SW-TEST-002 (2026-11-18, Phase 6 generated playlist hash)
 Symptom and reproduction: exact-head CI run [44210060285](https://github.com/szTheory/schwaystation/actions/runs/44210060285) passed all build and test lanes but failed the final cross-platform hash comparison. Downloading and diffing the be32 and Windows arm64 hash artifacts isolated the only mismatch to `disc_boot_runner.m3u`.
 Root cause / invariant: CMake `file(WRITE)` preserves platform-native newlines on Windows. A generated text fixture included in byte-for-byte cross-platform hashes must specify its newline style explicitly.

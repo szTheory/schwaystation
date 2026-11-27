@@ -6,6 +6,9 @@ resolves_phase: 16
 source: "Phase 14 and Phase 15 final Main CI runs 45442543076 and 45685800743; CI efficiency review"
 created: 2026-11-24
 theme: ci
+audit_acknowledged:
+  milestone: v2.0
+  at: 2026-11-26
 ---
 
 ## Goal

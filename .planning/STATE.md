@@ -2,14 +2,12 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 16
-current_plan: Not started
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 16 complete — all phases complete
-last_updated: "2026-11-26T23:49:25Z"
+last_updated: "2026-11-27T04:32:25.609Z"
 last_activity: 2026-11-26
-last_activity_desc: Phase 16 verified; ship preflight complete
-state_head: 12d2a2b2f53c0971c08b2a2e623e3990ceb3570e
+last_activity_desc: Milestone v2.0 completed and archived
+state_head: a2f37b46eab24f53e30f99c6b3faff6eedc8f2f8
 progress:
   total_phases: 10
   completed_phases: 10
@@ -25,16 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-26)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Ship Phase 16 PR #46, then complete the v2.0 release and milestone closeout.
+**Current focus:** Plan the next milestone after its scope is approved.
 
 ## Current Position
 
-Phase: 16
-Current Plan: Not started
-Total Plans in Phase: 18
-Status: All phases complete
-Last activity: 2026-11-26 — Phase 16 complete
-Progress: [██████████] 100% (9/10 v2.0 phases released; Phase 16 goal verification and exact-head CI/Nightly passed, and PR #46 is open for ship. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing and TODO052 as a deferred BE32 sharding follow-up.)
+Phase: Milestone v2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-26 — Milestone v2.0 completed and archived
 
 ### Phase 16 planning (2026-11-25)
 
@@ -88,13 +84,13 @@ Runtime/model: Codex/OpenGSD coordinator (primary model ID unavailable); GSD exe
 
 ### Phase 16 wave 8 completion (2026-11-26)
 
-Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); resumed the GPT-6 Luna xhigh executor's existing draft. The owner approved the 4,694-line ceiling with all checks counted. Focused capability, metadata, cheat, package staging and budget checks passed. A new truncated-JUnit control failed before the importer fix and passed afterward. The measured total at that plan boundary was 4,693 lines; later BE32 emulator transport checks brought the final producer to 4,694. Direct file and commit checks confirmed the summary despite the helper's documented false positives on command strings and test history. GSD manifest-scoped cleanup exited 0 and integrated the completed worktree. The staged libretro metadata remains experimental while provider and profile play evidence is missing. See the [plan summary](phases/16-patches-cheats-and-compatibility-evidence/16-14-SUMMARY.md).
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); resumed the GPT-6 Luna xhigh executor's existing draft. The owner approved the 4,694-line ceiling with all checks counted. Focused capability, metadata, cheat, package staging and budget checks passed. A new truncated-JUnit control failed before the importer fix and passed afterward. The measured total at that plan boundary was 4,693 lines; later BE32 emulator transport checks brought the final producer to 4,694. Direct file and commit checks confirmed the summary despite the helper's documented false positives on command strings and test history. GSD manifest-scoped cleanup exited 0 and integrated the completed worktree. The staged libretro metadata remains experimental while provider and profile play evidence is missing. See the [plan summary](milestones/v2.0-phases/16-patches-cheats-and-compatibility-evidence/16-14-SUMMARY.md).
 
 ### Phase 16 execution, review and verification (2026-11-26)
 
 Runtime/model: Codex and OpenGSD 1.23.0, primary model ID unavailable. The coordinator completed Plans 16-15 through 16-18. The GPT-6 Luna xhigh source review identified WASI staging, Nightly target and JUnit result attribution defects. Focused native, pinned WASI, and sanitizer replay checks passed after the fixes. The first complete workflow attempt surfaced a CUE probe control that still expected raw Mode 1 to be refused. The corrected control verifies synthetic identity for that mode and retains the unsupported-mode assertion.
 
-`cmake --workflow --preset ci` exited 0 on the reviewed source and test correction, including package staging and release checks. The repository-check inventory measured 4,692 of the approved 4,694 lines. The linked WASI runner measured 1,014,609 bytes, and stable serialized state measured 3,757,754 bytes. The package's current capability report records 16 passing rows and 35 provider/profile rows as unknown. Libretro remains experimental. Hosted gates and the release remain for ship. See the [verification report](phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md).
+`cmake --workflow --preset ci` exited 0 on the reviewed source and test correction, including package staging and release checks. The repository-check inventory measured 4,692 of the approved 4,694 lines. The linked WASI runner measured 1,014,609 bytes, and stable serialized state measured 3,757,754 bytes. The package's current capability report records 16 passing rows and 35 provider/profile rows as unknown. Libretro remains experimental. Hosted gates and the release remain for ship. See the [verification report](milestones/v2.0-phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md).
 
 ### Phase 16 final verification and ship preflight (2026-11-26)
 
@@ -2434,36 +2430,36 @@ Recent decisions affecting current work:
 - [Phase 15]: Reject GunCon and Justifier in every saved multitap endpoint and guard direct-gun polling against endpoint indexes outside its two-port arrays.
 
 ### Pending Todos
-- [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
-- [2026-10-20] [general] "Port the release floor check (release.floor)" — [todo file](.planning/todos/pending/002-release-floor-gate.md)
-- [2026-10-20] [general] "Port the pins file check (policy.pins)" — [todo file](.planning/todos/pending/003-pins-gate.md)
-- [2026-10-20] [general] "Port the single version source check (release.single_version_source)" — [todo file](.planning/todos/pending/004-single-version-source-gate.md)
-- [2026-10-20] [general] "Port the notice checks (policy.notices and release.notices)" — [todo file](.planning/todos/pending/005-notices-gates.md)
-- [2026-10-20] [general] "Port the vendored-file digest check (libretro.vendored)" — [todo file](.planning/todos/pending/006-vendored-digest-gate.md)
-- [2026-10-20] [general] "Add the Dependabot configuration" — [todo file](.planning/todos/pending/010-dependabot-config.md)
-- [2026-10-20] [general] "Add the Dependabot auto-merge workflow" — [todo file](.planning/todos/pending/011-dependabot-automerge-workflow.md)
-- [2026-10-20] [general] "Port the Dependabot auto-merge decision check" — [todo file](.planning/todos/pending/012-dependabot-gate.md)
-- [2026-10-20] [general] "Port the test-only key check" — [todo file](.planning/todos/pending/014-no-test-entries-gate.md)
-- [2026-10-20] [general] "Add the weekly digest workflow" — [todo file](.planning/todos/pending/015-digest-workflow.md)
-- [2026-10-20] [general] "Add the formatting check (hygiene.format)" — [todo file](.planning/todos/pending/016-hygiene-format-gate.md)
-- [2026-10-20] [general] "Add the static analyzer check (hygiene.analyzer)" — [todo file](.planning/todos/pending/017-hygiene-analyzer-gate.md)
-- [2026-10-20] [general] "Teach a local actionlint run the runner labels and queue key the workflows use" — [todo file](.planning/todos/pending/021-actionlint-local-config.md)
-- [2026-10-20] [general] "Triage the one-off install.consumer.dll_crt failure on windows-x64" — [todo file](.planning/todos/pending/022-windows-dll-crt-consumer-flake.md)
-- [2026-11-10] [general] "Raise an address error for a user-mode instruction fetch outside KUSEG" — [todo file](.planning/todos/pending/025-user-mode-fetch-address-error.md)
-- [2026-11-10] [general] "Validate r0 and the COP0 registers when a state loads" — [todo file](.planning/todos/pending/026-state-load-cop0-and-r0-validation.md)
-- [2026-11-10] [general] "Keep a valid cached word when a later refill word bus-errors" — [todo file](.planning/todos/pending/027-icache-refill-bus-error-word.md)
-- [2026-11-10] [general] "Stop the exception-loop heuristic reporting a guest that makes progress" — [todo file](.planning/todos/pending/028-exception-loop-progress-heuristic.md)
-- [2026-11-10] [general] "Zero the vector harness case record and reject doubly covered store bytes" — [todo file](.planning/todos/pending/033-vector-harness-uninitialised-record.md)
-- [2026-11-10] [general] "Reject a long file stem in the SST slice tool" — [todo file](.planning/todos/pending/035-sst-slice-name-field.md)
-- [2026-11-10] [general] "Refuse schway_load_exe on an instance that has already run" — [todo file](.planning/todos/pending/036-load-exe-after-run.md)
-- [2026-11-10] [general] "Decide the bus contract for SWL and SWR and pin it with a test" — [todo file](.planning/todos/pending/037-swl-swr-single-bus-write.md)
-- [2026-11-10] [general] "Model the two-instruction write-to-use latency of MTC2, CTC2 and LWC2" — [todo file](.planning/todos/pending/038-gte-write-to-use-latency.md)
-- [2026-11-10] [general] "The DMA fault record uses addr and opcode like every other fault kind" — [todo file](.planning/todos/pending/042-dma-fault-record-fields.md)
-- [2026-11-10] [general] "Share the register-lane helpers" — [todo file](.planning/todos/pending/044-lane-helpers-shared.md)
-- [2026-11-10] [general] "Put the ISC permission text in the src/gte.c header" — [todo file](.planning/todos/pending/046-gte-file-header-notice.md)
-- [2026-11-10] [general] "Select the 40-clock CD-ROM DMA cost from the CD-ROM delay setting" — [todo file](.planning/todos/pending/047-cd-dma-40-clock-cost.md)
-- [2026-11-10] [general] "Split long GPU pixel test cases" — [todo file](.planning/todos/pending/048-split-gpu-pixel-test-cases.md)
-- [2026-11-11] [general] "Review runner and checkpoint repeats against existing frame and state output" — [todo file](.planning/todos/pending/049-review-runner-checkpoint-repeats.md)
+- [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](todos/pending/001-ci-required-gate.md)
+- [2026-10-20] [general] "Port the release floor check (release.floor)" — [todo file](todos/pending/002-release-floor-gate.md)
+- [2026-10-20] [general] "Port the pins file check (policy.pins)" — [todo file](todos/pending/003-pins-gate.md)
+- [2026-10-20] [general] "Port the single version source check (release.single_version_source)" — [todo file](todos/pending/004-single-version-source-gate.md)
+- [2026-10-20] [general] "Port the notice checks (policy.notices and release.notices)" — [todo file](todos/pending/005-notices-gates.md)
+- [2026-10-20] [general] "Port the vendored-file digest check (libretro.vendored)" — [todo file](todos/completed/006-vendored-digest-gate.md)
+- [2026-10-20] [general] "Add the Dependabot configuration" — [todo file](todos/pending/010-dependabot-config.md)
+- [2026-10-20] [general] "Add the Dependabot auto-merge workflow" — [todo file](todos/pending/011-dependabot-automerge-workflow.md)
+- [2026-10-20] [general] "Port the Dependabot auto-merge decision check" — [todo file](todos/pending/012-dependabot-gate.md)
+- [2026-10-20] [general] "Port the test-only key check" — [todo file](todos/pending/014-no-test-entries-gate.md)
+- [2026-10-20] [general] "Add the weekly digest workflow" — [todo file](todos/pending/015-digest-workflow.md)
+- [2026-10-20] [general] "Add the formatting check (hygiene.format)" — [todo file](todos/pending/016-hygiene-format-gate.md)
+- [2026-10-20] [general] "Add the static analyzer check (hygiene.analyzer)" — [todo file](todos/pending/017-hygiene-analyzer-gate.md)
+- [2026-10-20] [general] "Teach a local actionlint run the runner labels and queue key the workflows use" — [todo file](todos/pending/021-actionlint-local-config.md)
+- [2026-10-20] [general] "Triage the one-off install.consumer.dll_crt failure on windows-x64" — [todo file](todos/pending/022-windows-dll-crt-consumer-flake.md)
+- [2026-11-10] [general] "Raise an address error for a user-mode instruction fetch outside KUSEG" — [todo file](todos/pending/025-user-mode-fetch-address-error.md)
+- [2026-11-10] [general] "Validate r0 and the COP0 registers when a state loads" — [todo file](todos/pending/026-state-load-cop0-and-r0-validation.md)
+- [2026-11-10] [general] "Keep a valid cached word when a later refill word bus-errors" — [todo file](todos/pending/027-icache-refill-bus-error-word.md)
+- [2026-11-10] [general] "Stop the exception-loop heuristic reporting a guest that makes progress" — [todo file](todos/pending/028-exception-loop-progress-heuristic.md)
+- [2026-11-10] [general] "Zero the vector harness case record and reject doubly covered store bytes" — [todo file](todos/pending/033-vector-harness-uninitialised-record.md)
+- [2026-11-10] [general] "Reject a long file stem in the SST slice tool" — [todo file](todos/pending/035-sst-slice-name-field.md)
+- [2026-11-10] [general] "Refuse schway_load_exe on an instance that has already run" — [todo file](todos/pending/036-load-exe-after-run.md)
+- [2026-11-10] [general] "Decide the bus contract for SWL and SWR and pin it with a test" — [todo file](todos/pending/037-swl-swr-single-bus-write.md)
+- [2026-11-10] [general] "Model the two-instruction write-to-use latency of MTC2, CTC2 and LWC2" — [todo file](todos/pending/038-gte-write-to-use-latency.md)
+- [2026-11-10] [general] "The DMA fault record uses addr and opcode like every other fault kind" — [todo file](todos/completed/042-dma-fault-record-fields.md)
+- [2026-11-10] [general] "Share the register-lane helpers" — [todo file](todos/pending/044-lane-helpers-shared.md)
+- [2026-11-10] [general] "Put the ISC permission text in the src/gte.c header" — [todo file](todos/pending/046-gte-file-header-notice.md)
+- [2026-11-10] [general] "Select the 40-clock CD-ROM DMA cost from the CD-ROM delay setting" — [todo file](todos/pending/047-cd-dma-40-clock-cost.md)
+- [2026-11-10] [general] "Split long GPU pixel test cases" — [todo file](todos/pending/048-split-gpu-pixel-test-cases.md)
+- [2026-11-11] [general] "Review runner and checkpoint repeats against existing frame and state output" — [todo file](todos/pending/049-review-runner-checkpoint-repeats.md)
 - [Phase 07]: Keep historical push timing bounds tied to their workload fingerprint; the PR route remains unbaselined until exact-head hosted runs prove comparability.
 - [Phase 07]: Keep `size.wasm` unbounded until the linked Ubuntu 26 Release module is measured; set the bound only from its actual byte count.
 - [Phase 07]: Infrastructure verification with zero behavior-unverified invariants has no owner UAT; hosted delivery checks are recorded as ship evidence.
@@ -2481,7 +2477,6 @@ Recent decisions affecting current work:
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 261118-bvm | Skip heavyweight main-push CI for planning-only changes | 2026-11-18 | 11c9789 | [261118-bvm-skip-heavyweight-main-push-ci-for-planni](./quick/261118-bvm-skip-heavyweight-main-push-ci-for-planni/) |
 
 ## Deferred Items
 
@@ -2489,6 +2484,12 @@ Items acknowledged and deferred at milestone close, most recent first. Acknowled
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
+| todos | 051-nightly-pr-job-routing.md | (presence-only) | 2026-11-26 | v2.0 |
+| todos | 052-be32-movie-test-shard.md | (presence-only) | 2026-11-26 | v2.0 |
+| seeds | SEED-261122-vlf | dormant | 2026-11-26 | v2.0 |
+| deferred_items | 11/deferred-items.md | acknowledged | 2026-11-26 | v2.0 |
+| deferred_items | 15/deferred-items.md | acknowledged | 2026-11-26 | v2.0 |
+| deferred_items | 16/deferred-items.md | acknowledged | 2026-11-26 | v2.0 |
 | seeds | SEED-001 | dormant | 2026-11-18 | v1.0 |
 | seeds | SEED-002 | dormant | 2026-11-18 | v1.0 |
 | seeds | SEED-003 | dormant | 2026-11-18 | v1.0 |
@@ -2879,7 +2880,9 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Push the reviewed Phase 9 corrections and complete one exact-head hosted CI/Nightly rerun. If both pass, write Phase 9 verification, ship PR #32, and confirm the release and main CI before discussing Phase 10. Keep todo 005 for the first tracked SPDX-bearing source and todo 051 bound to Phase 10's first Nightly routing change. No owner UAT is needed.
+
+- Start the next milestone with $gsd-new-milestone
+
 
 ### v2.0 roadmap creation (2026-11-18)
 

@@ -2,7 +2,7 @@
 title: "Prompt coverage"
 summary: "Every ask in the owner's kickoff prompt (2026-10-19) mapped to the file and section that answers it, with a status; and where the owner's constraints and preparation's recommendations differ."
 read_when: "At kickoff review and at every milestone close; when the owner asks whether something was forgotten."
-updated: 2026-11-24
+updated: 2026-11-26
 ---
 
 # Prompt coverage
@@ -33,14 +33,14 @@ Rows are never renumbered or deleted; new asks take the next number.
 | 14 | Telemetry without overhead, optional | ARCHITECTURE 6 (counters, first fault, hooks); DEC.24 (traced loop only when hooks are installed); ECO 2 G.05 (no network telemetry) | Documented | hooks ABI v5.0 (SEED-004) |
 | 15 | Great day-0/1/2 DX, easy adoption, docs never stale, self-documenting code | ENGINEERING 11, 12; HOSTS 1, 4, 7; DEC.89 | Documented | |
 | 16 | Property-based testing, fuzzing, safe with hostile input | ENGINEERING 3; PER 7; CONFORMANCE 6; AGENTS rule 4; DEC.46, DEC.81 | Documented | fuzz targets report-only until green (AGENTS rule 8) |
-| 17 | Fast CI and builds | ENGINEERING 4; DEC.79; SEED-007 | Documented | Exact-attempt timing measures the current CI DAG; comparable historical full-CI pushes take 2,249–3,293 seconds. Release-App PR #29 retained required checks and measured heavy-matrix skips; its missing merge-ref SHA prevents an exact speedup comparison. See `07-CI-EFFICIENCY.md`. |
+| 17 | Fast CI and builds | ENGINEERING 4; DEC.79; SEED-007 | Documented | Exact-attempt timing measures the current CI DAG; comparable historical full-CI pushes take 2,249–3,293 seconds. Release-App PR #29 retained required checks and measured heavy-matrix skips; its missing merge-ref SHA prevents an exact speedup comparison. See `.planning/milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md`. |
 | 18 | Ship early and often; automated releases | AGENTS rule 10; ENGINEERING 5; DEC.06, DEC.87 | Documented | every phase a release; first one v1.0 ph1 |
 | 19 | Always PRs, green main, triage at every step, auto-merge and auto-release with zero human verification where possible | AGENTS rules 6, 10; ENGINEERING 5 to 7; `scripts/apply-repo-settings.sh`; DEC.88 | Documented | |
 | 20 | 12-factor secrets (`.env.local` locally, Actions secrets in CI) | ENGINEERING 13; `.env.example`; GSD-HANDOFF 7; DEC.95 | Documented | |
 | 21 | Rolling near/mid/long roadmap revised at every milestone | `.planning/PRODUCT-ROADMAP.md`; seeds; GSD-HANDOFF 4; DEC.05 | Documented | |
 | 22 | Performance stress testing to p99.999 on critical flows, folded into CI | ENGINEERING 8 (nightly `bench` tails over 300,000 frames; per-PR Ir gate); DEC.85 | Documented | |
-| 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Documented | `AGENTS.md`, `.planning/AUTONOMOUS.md` and `docs/maintaining.md` require critical-path, duplicate-work, iteration-time and Actions-cost review on every CI and ship/release run while preserving all gates. Phase 14's measured serial movie-test candidate is pending as todo 052. |
-| 24 | Recurring weakest-quality-dimension reviews baked in | ENGINEERING 12; SEED-007 | Partial | Phase 7 scored all seven dimensions and verified its selected README correction; recurring milestone reviews remain in SEED-007. See `07-QUALITY-REVIEW.md`. |
+| 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Documented | `AGENTS.md`, `.planning/AUTONOMOUS.md` and `docs/maintaining.md` require critical-path, duplicate-work, iteration-time and Actions-cost review on every CI and ship/release run while preserving all gates. v2.0's BE32 lane remained the critical path at about 68 minutes; TODO-052 requires exact shard/JUnit/artifact/hash coverage and a measured improvement before splitting it. TODO-051 keeps full Nightly coverage on uncertain routes. |
+| 24 | Recurring weakest-quality-dimension reviews baked in | ENGINEERING 12; SEED-007 | Partial | Phase 7 scored all seven dimensions and verified its selected README correction; recurring milestone reviews remain in SEED-007. See `.planning/milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-QUALITY-REVIEW.md`. |
 | 25 | Verification shifted left and automated; only the truly necessary handed to the owner; recorded so it never loops back | AGENTS rule 6; DEC.101; GSD-HANDOFF 3 | Documented | settled, never re-proposed |
 | 26 | Stop after each GSD phase so the owner can check and switch models | AGENTS rule 9; GSD-HANDOFF 3, 5, 6; `scripts/hygiene.sh` stop policy; DEC.98 | Documented | v1.0 and the authorized v2.0 autonomous run follow the phase-boundary stop; rule 9 retains the release/ship boundary |
 | 27 | Releases the owner can download and try on a Mac through some frontend (Playstead not ready) | HOSTS 3 (RetroArch Metal); README install line; DEC.70 | Documented | v1.0 capability milestones; current README install line matches the release-line control and linked `install-line-latest` evidence (run 44262491280) |
@@ -51,11 +51,11 @@ Rows are never renumbered or deleted; new asks take the next number.
 | 32 | Portable to low-power devices (DS, PSP, handhelds) | ECO 4; ENGINEERING 9, 14; GPU 9; SEED-005 | Partial | be32/wasm32 establish portability checks; assumed device MIPS remain unmeasured and `gpu_motion` exceeds each provisional budget. Cached interpreter and device runs remain in SEED-005. |
 | 33 | Consistent frame rate, no stutter, low latency | ARCHITECTURE 1 (bounded run); DEC.11 (input at vblank); HOSTS 1, 3; ENGINEERING 8; ECO 2 C.04, C.09, G.02 | Documented | |
 | 34 | Great interface design for integration ergonomics | ARCHITECTURE 3; HOSTS 7; DEC.75 | Documented | consumer-minimal API growth per phase |
-| 35 | All regions | SYS 8; DEC.04, DEC.17; ECO 2 C.12 | Documented | three region profiles v1.0; PAL and LibCrypt titles over the ledger v2.0 (SEED-001) |
+| 35 | All regions | SYS 8; DEC.04, DEC.17; ECO 2 C.12 | Documented | Three region profiles shipped in v1.0; PAL timing and LibCrypt evidence shipped in v2.0. Untested region/title combinations remain unknown. |
 | 36 | Different monitor/display types | GPU 4 (display mapping), GPU 8 (v1 frame format); HOSTS 8 (host helpers outside the hash); DEC.30, DEC.31, DEC.34 | Documented | |
-| 37 | Maximise and ratchet compatibility: disc formats, controllers, protections, revisions | CONFORMANCE 3.2; SCM 2.7, 3; PER 2, 8; SYS 8; DEC.43, DEC.61, DEC.83; SEED-001 | Documented | cue/bin, iso, m3u and two pads v1.0; CHD, PBP, ECM, LibCrypt, multitap, guns v2.0 |
-| 38 | Easy saves | PER 3.5, 3.6; HOSTS 1, 4, 8; DEC.62, DEC.67 | Documented | Beetle card layout v1.0; states v3.0 |
-| 39 | ROM-hacker friendly without compromising the design | PER 6; HOSTS 5; DEC.65; SEED-004 | Later | PPF/BPS overlay and GameShark in the host layers v2.0; hooks v5.0 |
+| 37 | Maximise and ratchet compatibility: disc formats, controllers, protections, revisions | CONFORMANCE 3.2; SCM 2.7, 3; PER 2, 8; SYS 8; DEC.43, DEC.61, DEC.83; SEED-001 | Documented | cue/bin, iso, m3u and pads shipped in v1.0; CHD, PBP, ECM, CCD, SBI/LibCrypt, controller classes, profiles and evidence-gated compatibility claims shipped in v2.0. Untested combinations remain unknown. |
+| 38 | Easy saves | PER 3.5, 3.6; HOSTS 1, 4, 8; DEC.62, DEC.67 | Documented | Per-game card identity, import/export and libretro persistence shipped in v2.0; rewind and save states remain in the v3.0 horizon. |
+| 39 | ROM-hacker friendly without compromising the design | PER 6; HOSTS 5; DEC.65; SEED-004 | Partial | PPF/BPS overlays and bounded GameShark writes shipped in the host layers in v2.0; debugger hooks remain a v5.0 direction. |
 | 40 | Public repo, no PII | AGENTS rule 3; `scripts/hygiene.sh`; ASSET_POLICY 1, 6 | Documented | |
 | 41 | MIT or Apache | DEC.03 (MIT); PROVENANCE 1 | Documented | |
 | 42 | What people like and dislike about emulators in general | ECO 1.3, 2 | Documented | |

@@ -573,12 +573,12 @@ each `docs/*.md` and `docs/*/*.md` page under 61,440 bytes, each strictly below 
 its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` counts every line of
-`scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*`; the Phase 7 measured shipping ceiling is 3,901 lines,
-and the gate meets that cap. `policy.e2e_budget` keeps all `tests/retroarch/*` at or below 300 lines; the
-current total is 300. Run the existing count preflight from the repo root:
+`scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*`. Phase 7 ratcheted the ceiling to its measured 3,901 lines;
+Phase 16 raised the current approved ceiling to 4,694 lines. `policy.e2e_budget` keeps all `tests/retroarch/*`
+at or below 300 lines; the current total is 300. Run the existing count preflight from the repo root:
 
 ```sh
-cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake
+cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4694 -P tests/cmake/line_budget.cmake
 cmake -DROOT=. -DPATTERNS=tests/retroarch/* -DLIMIT=300 -P tests/cmake/line_budget.cmake
 ```
 
