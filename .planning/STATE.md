@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Prove a game plays
 status: planning
-last_updated: "2026-11-27T20:46:09.601Z"
+last_updated: "2026-11-27T20:55:21Z"
 last_activity: 2026-11-27
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,36 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-26)
+See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Plan the next milestone after its scope is approved.
+**Current focus:** Review the v3.0 execution roadmap; Phase 17 opens with mandatory SEED-007 after approval and separate phase authorization.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-11-27 — Milestone v3.0 started
+Phase: 17 of 19 (A measured and trustworthy playability baseline; first of 3 in v3.0)
+Plan: Not started (TBD)
+Status: Roadmap ready for review
+Last activity: 2026-11-27 — v3.0 roadmap created with all 9 approved requirements mapped once
+
+Progress: [░░░░░░░░░░] 0%
+
+### v3.0 roadmap creation (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; typed `gsd-roadmapper` on gpt-6.1-sol high.
+Three phases preserve coarse granularity and continuous numbering: Phase 17 is mandatory SEED-007 (five tune-up
+requirements), Phase 18 proves the integrated owned homebrew session and runner parity, and Phase 19 proves one
+local retail session with measured-only compatibility reporting. All nine requirements are mapped exactly once;
+no requirement is complete and no phase plan or implementation has begun. Plan 1 establishes each phase's CMake
+skeleton and per-directory inventories; work exceeding 30 minutes is split. The Phase 17 check ceiling remains
+4,694 lines, and the real-host RetroArch code ceiling remains 300 lines total.
+
+Authorization is milestone planning only. Return the written roadmap for approval; do not start Phase 17 or a
+later milestone from this handoff. The retail run uses the owner's machine, BIOS and disc, retains only the
+existing ASSET_POLICY-approved identity/predicate metadata and date, and never supplies commercial content to
+CI. No physical-console capture is available or required. Untested combinations remain unknown and libretro
+remains experimental. PRODUCT-ROADMAP.md is not changed by this roadmapping step. Existing history and deferred
+items below are preserved.
 
 
 ### Phase 16 planning (2026-11-25)
@@ -1932,6 +1951,8 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 Decisions are logged in PROJECT.md Key Decisions table (full list: `.planning/preparation/DECISIONS.md`).
 Recent decisions affecting current work:
 
+- [v3.0 roadmap]: Phases 17–19 map all 9 approved requirements once: tune-up, automated owned-game playability, then local retail playability and scoped compatibility evidence.
+- [v3.0 boundary]: Roadmap approval and phase authorization remain with the orchestrator/owner; this planning handoff starts no phase workflow. No commercial capture or physical-console capture is required.
 - [Roadmap]: Six phases, one per requirement category, kept despite the `coarse` granularity because each category is one branch, one pull request and one release.
 - [Roadmap]: Phase 1 is the content-free walking skeleton ported from cogmaster and muhtari; every later phase ends in an automated release.
 - [Phase 01]: schway_video is 80 + 2P bytes with trailing reserved1; schway_audio 16 + 2P; schway_config has reserved0 so the allocator sits at offset 8 on every target
@@ -2466,6 +2487,7 @@ Recent decisions affecting current work:
 - [Phase 11]: The final local CI run is green; hosted Main/Nightly/Release evidence must be recorded at ship before Phase 12 planning.
 ### Blockers/Concerns
 
+- [v3.0]: No blocker to roadmap review. The retail title and local BIOS/disc access are owner-bound inputs for Phase 19, not CI prerequisites; obtain them only when that phase is authorized. Keep the accepted MDEC/external frame/movie accuracy limits and all untested compatibility combinations explicit.
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
 - [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
@@ -2541,6 +2563,7 @@ come from `AGENTS.md`.
 
 | Date | Step | Runtime | Model |
 |------|------|---------|-------|
+| 2026-11-27 | v3.0 execution roadmap creation | Codex/OpenGSD 1.23.0; milestone planning only, no phase workflow | gsd-roadmapper gpt-6.1-sol high |
 | 2026-11-25 | /gsd-execute-plan 15-05 | Codex/OpenGSD executor gpt-6-luna; 2h28m wall from 06:01:43Z to 08:29Z. Focused ABI/budget preflight passed 2/2; beam timing controls passed 3/3; geometry matrix passed 28 assertions and the required selector set passed 4/4 in 0.03s. Task commits: `6d3fba9`, `b519b6a`, `bc72f56`. No broad suite, hosted CI, Act or Docker. The 20–28m low-confidence estimate was exceeded while deriving scheduler deadline/retarget behavior and adding edge coverage; next plans should compile the smallest visible path before expanding geometry cases. | gpt-6-luna |
 | 2026-11-18 | v1.0 audit, completion and cleanup | Codex/OpenGSD 1.20.0; reused exact-tree hosted CI; no local long suite rerun | Primary GPT-6 session (exact model ID unavailable); integration checker gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-discuss-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; three read-only advisors and adversarial synthesis | GPT-6 session (exact model ID not exposed); advisors gpt-6-luna xhigh |
@@ -2682,9 +2705,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-26T16:18:55Z
-Stopped at: Phase 16 complete — all phases complete
-Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-VERIFICATION.md
+Last session: 2026-11-27
+Stopped at: v3.0 roadmap written and ready for approval; Phase 17 has not started
+Resume file: .planning/ROADMAP.md
 
 Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
 

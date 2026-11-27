@@ -63,21 +63,21 @@ later phase that needs a repository-check change declares its absolute per-phase
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TUNE-07 | Pending roadmap | Pending |
-| TUNE-08 | Pending roadmap | Pending |
-| TUNE-09 | Pending roadmap | Pending |
-| TUNE-10 | Pending roadmap | Pending |
-| TUNE-11 | Pending roadmap | Pending |
-| PLAY-01 | Pending roadmap | Pending |
-| PLAY-02 | Pending roadmap | Pending |
-| RETAIL-01 | Pending roadmap | Pending |
-| COMPAT-04 | Pending roadmap | Pending |
+| TUNE-07 | Phase 17 | Pending |
+| TUNE-08 | Phase 17 | Pending |
+| TUNE-09 | Phase 17 | Pending |
+| TUNE-10 | Phase 17 | Pending |
+| TUNE-11 | Phase 17 | Pending |
+| PLAY-01 | Phase 18 | Pending |
+| PLAY-02 | Phase 18 | Pending |
+| RETAIL-01 | Phase 19 | Pending |
+| COMPAT-04 | Phase 19 | Pending |
 
 **Coverage:**
 - v1 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9
+- Mapped to phases: 9
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-11-27*
-*Last updated: 2026-11-27 after v3.0 scope approval*
+*Last updated: 2026-11-27 after v3.0 roadmap traceability*
