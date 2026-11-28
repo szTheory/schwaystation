@@ -43,12 +43,12 @@ available or required. A one-title pass does not establish broad compatibility o
 **Plans**: 9 plans across 7 waves
 Plans:
 **Wave 1**
-- [ ] 17-01-PLAN.md — Establish the existing CMake/inventory path and audit installation guidance
+- [x] 17-01-PLAN.md — Establish the existing CMake/inventory path and audit installation guidance
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 17-02-PLAN.md — Compare bounded CI runs and reliability evidence
-- [ ] 17-03-PLAN.md — Remeasure quality producers and retain only supported bounds
-- [ ] 17-04-PLAN.md — Audit repository policy, runners, tools and update settings
+- [x] 17-02-PLAN.md — Compare bounded CI runs and reliability evidence
+- [x] 17-03-PLAN.md — Remeasure quality producers and retain only supported bounds
+- [x] 17-04-PLAN.md — Audit repository policy, runners, tools and update settings
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 17-05-PLAN.md — Re-evaluate the BE32 shard candidate with its full preservation contract
@@ -116,7 +116,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 3/9 | Executing | - |
+| 17. A measured and trustworthy playability baseline | 4/9 | Executing | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 

@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T02:50:10Z"
+last_updated: "2026-11-28T03:13:46Z"
 last_activity: 2026-11-27
-last_activity_desc: Plan 17-03 preserved producer-backed quality bounds; exact WASI bytes and Plan 17-09 timing remain pending. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: 202353a
+last_activity_desc: Plan 17-04 recorded the live settings/pin audit and reconciled Dependabot policy; TUNE-11 remains pending for later documentation/score work. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: df78726
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 44
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03 complete; 17-04 next in Wave 2; 9 plans across 7 waves
+Plan: 17-01/02/03/04 complete; 17-05 next in Wave 3; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-27 — Plan 17-03 preserved producer-backed quality bounds; exact WASI bytes and Plan 17-09 timing remain pending
+Last activity: 2026-11-27 — Plan 17-04 recorded the live settings/pin audit and reconciled Dependabot policy; TUNE-11 remains pending for later documentation/score work
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 44%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -59,6 +59,18 @@ Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The bounded A
 ### Plan 17-03 execution (2026-11-27)
 
 Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two tasks took about 27 minutes. Hosted Cachegrind outputs of 1,620,381 and 138,406,446 Ir/frame and the exact Linux-x64 state length of 3,757,754 bytes match their current bounds. The latest matching WASI job passed the 1,014,617–1,014,665-byte interval but did not expose its exact linked size; preserve the interval. CI critical-path timing remains assigned to Plan 17-09. Existing quality boundary, malformed-input, integer and wiring controls passed. `quality.json` is unchanged; no build or product suite ran and TUNE-10 remains pending. Evidence is in `17-BASELINES.md` and `17-03-SUMMARY.md`.
+
+### Plan 17-04 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two audit tasks took about 21 minutes.
+The live settings check exited 0 with no drift; Dependabot alerts are enabled with zero open alerts, while version-
+update configuration is absent. All active runner labels, action SHAs, external pin consumers and documentation
+dispositions are recorded in `17-UPGRADE-AUDIT.md`. The audit found an active optional libchdr CI consumer missing
+from the old Phase 7 report, and records the Wasmtime 48.0.10 LTS patch candidate and exact official digests without
+changing pins. DEC.94 now preserves its historical wording while resolving to Phase 7's reviewable, no-auto-merge
+policy; TODO-010 stays conditional and TODO-011/012 deferred. Required shell/diff checks and summary validation
+passed. No build or product suite ran; TUNE-11 remains pending for later score and documentation work. Evidence is in
+`17-UPGRADE-AUDIT.md` and `17-04-SUMMARY.md`.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
