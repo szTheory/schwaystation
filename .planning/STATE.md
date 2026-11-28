@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T03:42:12Z"
+last_updated: "2026-11-28T03:59:54Z"
 last_activity: 2026-11-28
-last_activity_desc: Plan 17-05 proved the current BE32 partition and preserved production gates pending comparable hosted shard evidence. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: 907b18c
+last_activity_desc: Plan 17-06 scored the seven dimensions and selected the existing frame-120 compatibility predicate for Plan 17-07. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: 777a7ac
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 5
-  percent: 55
+  completed_plans: 6
+  percent: 67
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04/05 complete; 17-06 next in Wave 4; 9 plans across 7 waves
+Plan: 17-01/02/03/04/05/06 complete; 17-07 next in Wave 5; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-28 — Plan 17-05 proved the BE32 selector and preservation contract; production gates remain unchanged pending comparable hosted shard evidence
+Last activity: 2026-11-28 — Plan 17-06 scored all seven dimensions and selected compatibility breadth for the one improvement; Plan 17-07 owns implementation
 
-Progress: [█████░░░░░] 55%
+Progress: [███████░░░] 67%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -82,6 +82,17 @@ rejected missing, duplicate, extra, wrong-shard, failed and skipped reports. The
 production gate and `hashes-be32` route remain unchanged and TODO-052 stays pending. Summary validation passed;
 no build or product test ran and no long BE32 test was started. Evidence is in `17-BE32-REVIEW.md`, TODO-052
 and `17-05-SUMMARY.md`.
+
+### Plan 17-06 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The two scoring and contract tasks
+took about 14 minutes. All seven dimensions were scored before selecting an improvement. Upgrade path and
+compatibility breadth tied at 2; direct impact on the measured playability evidence favored compatibility breadth.
+The contract is limited to adding a fresh `gpu_motion` frame-120 result using its existing pinned predicate, while
+preserving frame 60 and unknown rows. Plan 17-07 owns implementation and focused proof. TODO-010 remains unchanged;
+no source, build or product test changed or ran, and TUNE-09/TUNE-11 remain pending. The summary validator passed
+after correcting metadata and wording; evidence is in `17-QUALITY-REVIEW.md`, `17-IMPROVEMENT-CONTRACT.md` and
+`17-06-SUMMARY.md`.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
