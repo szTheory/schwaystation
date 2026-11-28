@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T04:25:23Z"
+last_updated: "2026-11-28T04:43:39Z"
 last_activity: 2026-11-28
-last_activity_desc: Plan 17-07 added and measured the selected gpu_motion frame-120 compatibility row while preserving frame 60. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: 4b193f6
+last_activity_desc: Plan 17-08 corrected demonstrated testing-guide drift and assigned final compatibility generation to Plan 17-09. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: e0ab08ab
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04/05/06/07 complete; 17-08 next in Wave 6; 9 plans across 7 waves
+Plan: 17-01/02/03/04/05/06/07/08 complete; 17-09 next in Wave 7; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-28 — Plan 17-07 implemented and verified the selected frame-120 compatibility evidence improvement; Plans 17-08 and 17-09 remain
+Last activity: 2026-11-28 — Plan 17-08 corrected demonstrated documentation drift; Plan 17-09 owns final compatibility freshness and phase evidence reconciliation
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -105,6 +105,16 @@ documentation budgets and the 4,694-line repository-check cap passed. No hosted 
 test/ledger/report change, and no process or temporary output remains. TUNE-09 is complete; TUNE-11 remains
 pending for later documentation and roadmap work. Evidence is in `17-IMPROVEMENT-EVIDENCE.md` and
 `17-07-SUMMARY.md`.
+
+### Plan 17-08 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The three documentation tasks took
+about 16 minutes. The testing guide now uses canonical producer sources, four repaired archived links, and clear
+limits for low-power assumptions and Wasmtime hash coverage. The README, maintaining guide, five hardware pages
+and generated compatibility page stayed unchanged after review found no drift. Every audit row now has a final
+disposition; Plan 17-09 owns compatibility regeneration and freshness. Budget/diff/link checks passed, including
+the 61,435-byte testing guide under its 61,440-byte cap. No build or product test ran, and TUNE-10/TUNE-11 remain
+pending for Plan 17-09 reconciliation. Evidence is in `17-DOC-AUDIT.md` and `17-08-SUMMARY.md`.
 
 ### Phase 17 planning and plan review (2026-11-27)
 

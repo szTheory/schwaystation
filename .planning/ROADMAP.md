@@ -60,7 +60,7 @@ Plans:
 - [x] 17-07-PLAN.md — Implement and verify only the evidence-selected improvement
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 17-08-PLAN.md — Refresh only guidance whose drift is reproduced
+- [x] 17-08-PLAN.md — Refresh only guidance whose drift is reproduced
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 17-09-PLAN.md — Refresh roadmap/lessons and reconcile phase evidence
@@ -116,7 +116,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 7/9 | Executing | - |
+| 17. A measured and trustworthy playability baseline | 8/9 | Executing | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 
