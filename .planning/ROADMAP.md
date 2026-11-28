@@ -116,7 +116,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 0/9 | Executing | - |
+| 17. A measured and trustworthy playability baseline | 1/9 | Executing | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 

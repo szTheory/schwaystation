@@ -5,17 +5,17 @@ milestone_name: Prove a game plays
 current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
-stopped_at: Phase 17 planning complete; stop before execution
-last_updated: "2026-11-28T01:09:25Z"
+stopped_at: Phase 17 verification; stop before ship
+last_updated: "2026-11-28T01:30:24Z"
 last_activity: 2026-11-27
-last_activity_desc: Phase 17 planning complete; 9 plans across 7 waves passed independent review. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: c6a208803d28d3be74bfc19d9336df53f70eb8c4
+last_activity_desc: Plan 17-01 passed its install, inventory and documentation audit checks. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: ab1c099
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 11
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01 executing; 9 plans across 7 waves
+Plan: 17-01 complete; 17-02/03/04 next in Wave 2; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-27 — Owner authorized Phase 17 execution after independent plan review
+Last activity: 2026-11-27 — Plan 17-01 passed its install, inventory and documentation audit checks
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 11%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -42,6 +42,15 @@ Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The owner ins
 recommendation to begin Phase 17 after its nine plans passed independent review. Authorization covers the nine
 plans, required local checks, code review and phase verification only. It does not cover ship/release or Phases
 18–19. Execution begins at Plan 17-01; stop at the Phase 17 verify boundary.
+
+### Plan 17-01 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two tasks took about 13 minutes. The
+release `v0.16.0` README installer succeeded and the flipped-byte control rejected its archive; the existing
+inventory names matched both sorted per-directory inventories. The public-claim audit records four broken Phase 7
+links and stale published quality values for later measured correction. Repository-check and RetroArch budgets
+passed at their unchanged 4,694- and 300-line limits. Plan artifacts and task evidence are in `17-SKELETON.md`,
+`17-DOC-AUDIT.md` and `17-01-SUMMARY.md`. No requirement is complete from this evidence-gathering plan alone.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
