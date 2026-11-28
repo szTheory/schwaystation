@@ -99,7 +99,6 @@ string(JSON checked_reason ERROR_VARIABLE reason_error GET "${checked_registry}"
 if(NOT reason_error STREQUAL "NOTFOUND" OR NOT checked_reason MATCHES "^2026-11-18.*07-01-SUMMARY[.]md.*07-CONTEXT[.]md")
   message(FATAL_ERROR "quality_controls: checked-in registry is missing its dated, sourced budget rationale")
 endif()
-string(JSON fingerprint GET "${checked_registry}" ci critical_path_s workload_sha256)
 file(WRITE "${quality_file}" "${registry}")
 function(extract_block begin_marker end_marker output)
   set(found_begin FALSE)
@@ -225,7 +224,6 @@ foreach(source IN LISTS workload_files)
 endforeach()
 file(MAKE_DIRECTORY "${input_root}/src")
 file(WRITE "${input_root}/src/product.c" "int product_source;\n")
-
 set(job_specs "changes|ubuntu-26.04|01|success" "hygiene|ubuntu-26.04|04|success" "title|ubuntu-26.04|01|success" "gpu-reference|ubuntu-26.04|02|success"
   "openbios|ubuntu-26.04|02|success" "build (linux-x64)|ubuntu-26.04|04|success" "build (linux-arm64)|ubuntu-26.04-arm|03|success" "build (macos-arm64)|macos-15|04|success"
   "build (macos-x64)|macos-15-intel|04|success" "build (windows-x64)|windows-2025|03|success" "build (windows-arm64)|windows-11-arm|03|success" "asan|ubuntu-26.04|05|success"
@@ -293,7 +291,10 @@ function(timing_case name pages expected testing input_override quality_path rel
   endif()
   set("${name}_out" "${out}${err}" PARENT_SCOPE)
 endfunction()
-timing_case(checked_pr_baseline "${good_pages}" unbaselined false "" "${ROOT}/quality.json" false)
+# Force the full-route fixture to remain unbaselined as the live fingerprint changes.
+string(JSON checked_pr_registry SET "${checked_registry}" ci critical_path_s workload_sha256 "\"0000000000000000000000000000000000000000000000000000000000000000\"")
+file(WRITE "${quality_file}" "${checked_pr_registry}")
+timing_case(checked_pr_baseline "${good_pages}" unbaselined false "" "${quality_file}" false)
 file(WRITE "${quality_file}" "${registry}")
 timing_case(unbaselined "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
 if(NOT "${unbaselined_out}" MATCHES "fingerprint=([0-9a-f]+)")
@@ -326,7 +327,6 @@ endif()
 file(WRITE "${input_root}/tests/cmake/lessons_unique.cmake" "${changed_lessons}")
 timing_case(changed_bracket_comment "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
 file(COPY_FILE "${ROOT}/tests/cmake/lessons_unique.cmake" "${input_root}/tests/cmake/lessons_unique.cmake")
-
 string(JSON missing_job REMOVE "${good_pages}" 0 jobs 15)
 string(JSON missing_job SET "${missing_job}" 0 total_count 21)
 timing_case(missing_required_job "${missing_job}" "required job" true "${input_root}" "${quality_file}" false)
