@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T03:59:54Z"
+last_updated: "2026-11-28T04:25:23Z"
 last_activity: 2026-11-28
-last_activity_desc: Plan 17-06 scored the seven dimensions and selected the existing frame-120 compatibility predicate for Plan 17-07. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: 777a7ac
+last_activity_desc: Plan 17-07 added and measured the selected gpu_motion frame-120 compatibility row while preserving frame 60. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: 4b193f6
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 6
-  percent: 67
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04/05/06 complete; 17-07 next in Wave 5; 9 plans across 7 waves
+Plan: 17-01/02/03/04/05/06/07 complete; 17-08 next in Wave 6; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-28 — Plan 17-06 scored all seven dimensions and selected compatibility breadth for the one improvement; Plan 17-07 owns implementation
+Last activity: 2026-11-28 — Plan 17-07 implemented and verified the selected frame-120 compatibility evidence improvement; Plans 17-08 and 17-09 remain
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 78%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -93,6 +93,18 @@ preserving frame 60 and unknown rows. Plan 17-07 owns implementation and focused
 no source, build or product test changed or ran, and TUNE-09/TUNE-11 remain pending. The summary validator passed
 after correcting metadata and wording; evidence is in `17-QUALITY-REVIEW.md`, `17-IMPROVEMENT-CONTRACT.md` and
 `17-06-SUMMARY.md`.
+
+### Plan 17-07 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The two tasks took 18 minutes.
+The pre-change check reproduced the frame-60-only live row while the existing frame-120 fixture passed. The live
+producer now measures both supported frames and selects the requested predicate; the new distinct ledger row
+uses the existing pinned frame-120 hash and preserves all prior rows. Fixture selectors passed 3/3 and the
+compatibility/transition/protected-control/documentation selector passed 9/9. The docs generator, quality checks,
+documentation budgets and the 4,694-line repository-check cap passed. No hosted run was needed for this
+test/ledger/report change, and no process or temporary output remains. TUNE-09 is complete; TUNE-11 remains
+pending for later documentation and roadmap work. Evidence is in `17-IMPROVEMENT-EVIDENCE.md` and
+`17-07-SUMMARY.md`.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
