@@ -51,7 +51,7 @@ Plans:
 - [x] 17-04-PLAN.md — Audit repository policy, runners, tools and update settings
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 17-05-PLAN.md — Re-evaluate the BE32 shard candidate with its full preservation contract
+- [x] 17-05-PLAN.md — Re-evaluate the BE32 shard candidate with its full preservation contract
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 17-06-PLAN.md — Score all seven dimensions and select one bounded improvement
@@ -116,7 +116,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 4/9 | Executing | - |
+| 17. A measured and trustworthy playability baseline | 5/9 | Executing | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 

@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T03:13:46Z"
-last_activity: 2026-11-27
-last_activity_desc: Plan 17-04 recorded the live settings/pin audit and reconciled Dependabot policy; TUNE-11 remains pending for later documentation/score work. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: df78726
+last_updated: "2026-11-28T03:42:12Z"
+last_activity: 2026-11-28
+last_activity_desc: Plan 17-05 proved the current BE32 partition and preserved production gates pending comparable hosted shard evidence. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: 907b18c
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 4
-  percent: 44
+  completed_plans: 5
+  percent: 55
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04 complete; 17-05 next in Wave 3; 9 plans across 7 waves
+Plan: 17-01/02/03/04/05 complete; 17-06 next in Wave 4; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-27 — Plan 17-04 recorded the live settings/pin audit and reconciled Dependabot policy; TUNE-11 remains pending for later documentation/score work
+Last activity: 2026-11-28 — Plan 17-05 proved the BE32 selector and preservation contract; production gates remain unchanged pending comparable hosted shard evidence
 
-Progress: [████░░░░░░] 44%
+Progress: [█████░░░░░] 55%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -71,6 +71,17 @@ changing pins. DEC.94 now preserves its historical wording while resolving to Ph
 policy; TODO-010 stays conditional and TODO-011/012 deferred. Required shell/diff checks and summary validation
 passed. No build or product suite ran; TUNE-11 remains pending for later score and documentation work. Evidence is in
 `17-UPGRADE-AUDIT.md` and `17-04-SUMMARY.md`.
+
+### Plan 17-05 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable; `gsd-executor` delegated the plan. The two
+tasks took 23m53s. The current portable selector set contains 694 unique names: audio 1, movie 1 and broad 692,
+matching the directory inventory union with no overlap. A disposable JUnit proof accepted the exact union and
+rejected missing, duplicate, extra, wrong-shard, failed and skipped reports. The latest hosted BE32 job measured
+`libretro.host` at 1,406.60s and `libretro.input.movies` at 1,018.94s, but no comparable shard run exists, so the
+production gate and `hashes-be32` route remain unchanged and TODO-052 stays pending. Summary validation passed;
+no build or product test ran and no long BE32 test was started. Evidence is in `17-BE32-REVIEW.md`, TODO-052
+and `17-05-SUMMARY.md`.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
