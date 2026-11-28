@@ -3,7 +3,7 @@ set(hygiene_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
 # Fault prevented: repository-check code growing past its budget. Every line
 # of the shell scripts, the CMake check scripts and the hooks counts, at most
-# 4694, the Phase 16 approved ceiling and measured total at ship.
+# 4694, the Phase 17 approved ceiling, ratcheted to the measured total at ship.
 schway_add_test(NAME policy.gate_budget
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
     "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=4694

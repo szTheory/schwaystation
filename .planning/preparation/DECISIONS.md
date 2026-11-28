@@ -2,7 +2,7 @@
 title: "Decisions already made"
 summary: "One line per settled choice for schwaystation, with its reason and the preparation file and section that support it; the open questions, each with the test or phase that settles it, at the end."
 read_when: "Before reopening any choice, and whenever a phase needs to know what is settled. Reopen a decision only with new evidence, and record the change here with its date."
-updated: 2026-11-13
+updated: 2026-11-27
 ---
 
 # Decisions already made
@@ -167,6 +167,12 @@ ENGINEERING, HI = HOSTS-AND-INTEGRATION, PV = PROVENANCE.md, AP = ASSET_POLICY.m
 | DEC.94 | Dependencies: none at runtime; `libretro.h` vendored; libchdr behind an option in v2.0; Dependabot for GitHub Actions only, weekly, minors and patches grouped and auto-merged by the App; the YAGNI list of ENG 7 stays out | Build pain is a top frontend complaint | ENG 7; ECO 2 G.03 |
 | DEC.95 | Local-only paths live in gitignored `.env.local` (`SCHWAYSTATION_BIOS_DIR`, `SCHWAYSTATION_DISC_DIR`); CI holds one variable and one secret for the release App, set by the owner; agents never read `.env.local` or handle the key | 12-factor; the secret-read guard (XFER-074) | ENG 13; AP 4 |
 | DEC.96 | wasm32 memory: a 32 MB linear memory, no growth, no threads, no files; the sector ring and the 4 MB state buffer inside it; `state.bytes` is a `quality.json` ceiling of 4,194,304 | A browser host must never load a 700 MB image | ENG 14; HI 6 |
+
+### DEC.94 reconciliation (2026-11-27)
+
+The row's clause that Dependabot Actions updates are “auto-merged by the App” records the older proposal and is superseded by Phase 7's later decision: any version-update PRs remain reviewable, and Dependabot auto-merge stays off. The [Phase 7 context](../milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md) states this policy; its [delivery evidence](../milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md) records the absent `.github/dependabot.yml`, no active auto-merge workflow, and no updater or auto-merge change. The general repository `allow_auto_merge=true` capability remains as checked in, but does not create automatic Dependabot merges.
+
+Phase 17 keeps TODO-010 pending and conditional: Plan 07 may add one minimal grouped weekly GitHub Actions update configuration only if Plan 06 selects upgrade path as the lowest-scoring dimension, or selects it after an evidence-backed tie-break. TODO-011 and TODO-012 remain deferred because their goals automate Dependabot merges. The current [version-update documentation](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-version-updates) requires a checked-in `dependabot.yml`; the current [Dependabot-on-Actions restrictions](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-on-actions) say its workflows receive a read-only `GITHUB_TOKEN` by default and only Dependabot secrets, not Actions secrets. This reconciliation changes no repository setting, Dependabot configuration, or workflow.
 
 ## Process
 | ID | Decision | Because | See |

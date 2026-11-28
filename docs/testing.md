@@ -605,22 +605,23 @@ perf gpu_motion head=<n> base=<n> delta_bp=<n> verdict=PASS
 than that or more than the allow file permits; `UNSTABLE` the two base measurements differ; `NO_BASE` the base has
 no `perf` preset. An empty or non-numeric measurement is an input error, never a pass.
 
-Current bounds and producer links are in [`quality.json`](../quality.json); the [Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md)
-retains the original samples. Current values: test-card 1,620,101 Ir/frame, `gpu_motion` 138,319,540, state
-3,757,638 bytes, and Release WASI module 947,969 bytes.
-The exact CI critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
-fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
+Current bounds and producer links are in [`quality.json`](../quality.json). The [Phase 17 producer report](../.planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-BASELINES.md)
+records exact results, units, configurations and dates where available; the current hosted WASI check confirms the
+retained interval without exposing an exact byte count. The [Phase 7 baseline](../.planning/milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md)
+and [cohort](../.planning/milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md) retain historical samples.
+The active CI critical-path bound and fingerprint are in `quality.json`. The [Phase 17 cohort](../.planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-CI-EFFICIENCY.md)
+has no repeated matching full-CI workload and establishes no current speedup.
 
 CI measures these through different live producers: the `perf` job checks the current fixture instructions;
 the Linux x64 build reads `state.stable_bytes`; the WASI lane measures the linked `schwaystation-run` module
 immediately after build and before its preflight and full portable suite; and
-`CI required` derives the longest completed dependency path from the exact current Actions attempt. A timing
-comparison uses the dependency-path seconds only when the workload fingerprint matches the baseline. A changed
-fingerprint is reported as unbaselined; planning-only runs, main pushes and the full Release DAG are not that
-comparison. The in-progress `CI required` job is excluded from its own timing sample because it has no completion
-timestamp yet. PR #29's required run [44476990492](https://github.com/szTheory/schwaystation/actions/runs/44476990492)
-passed in ~70s with heavy-matrix skips. Missing merge-ref SHA prevents speedup comparison;
-see [Phase 7's closeout](../.planning/phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md).
+`CI required` measures the longest completed path in the exact Actions attempt; only matching workload fingerprints
+are comparable. Its in-progress job has no completion time. PR #29's required run
+[44476990492](https://github.com/szTheory/schwaystation/actions/runs/44476990492) passed in about 70 seconds with
+heavy-matrix skips. Its merge-ref SHA is missing, so no speedup comparison follows; see [Phase 7's closeout](../.planning/milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md).
+
+Low-power rates in [ENGINEERING.md §8](../.planning/preparation/ENGINEERING.md) are assumptions awaiting named-device
+evidence. The WASI lane uses pinned Wasmtime 48.0.7 for portable hash determinism; it does not measure browser speed.
 
 **Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
 also accepts `report`, which prints the verdict and exits 0; bad input always fails. A manual run without inputs
@@ -707,12 +708,13 @@ not replace the required hosted checks on the pull request and resulting `main` 
 slowest matching successful or failed duration, rounded up to minutes, with its established setup floor; the
 workflow comment names the extremal run and sample count. Values stay marked `provisional` below ten matching
 samples. For example, the current `asan` and `be32` bounds are 38 and 109 minutes, respectively, and remain
-provisional; the complete per-job source cohort and formulas are in the [CI efficiency report](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
+provisional; the complete per-job source cohort and formulas are in the [CI efficiency report](../.planning/milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
 `hygiene.timeout_comments` checks the evidence comment, and `policy.action_pins` checks that every action uses a
 full 40-hex commit with a `# v` comment.
 
-**Downloads.** `pins.txt` lists every download CI makes (wasmtime and the RetroArch DMG) with its SHA-256;
-`scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.
+**Pinned inputs.** `pins.txt` records pinned tool, build and test inputs beyond Wasmtime and RetroArch.
+`scripts/fetch-pin.sh NAME DEST` verifies fetched entries before extraction or copy. See
+[maintaining.md](maintaining.md#pinned-downloads) for consumers and update policy.
 
 **A red retroarch job.** The job prints RetroArch's verbose logs and uploads `retroarch-frames` after success or
 failure for one day, holding

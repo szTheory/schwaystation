@@ -3,19 +3,19 @@ gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Prove a game plays
 current_phase: 17
-current_phase_name: A measured and trustworthy playability baseline; first of 3 in v3.0
-status: planning
-stopped_at: Roadmap approved; Phase 17 has not started and awaits separate authorization
-last_updated: "2026-11-27T21:22:55.934Z"
-last_activity: 2026-11-27
-last_activity_desc: v3.0 roadmap approved and committed
-state_head: 5d6b3b196a861a48a8f7bd66c4265e575278c5df
+current_phase_name: A measured and trustworthy playability baseline
+status: executing
+stopped_at: Phase 17 gap plans passed independent review; executing TUNE-10 measurement before re-verification
+last_updated: "2026-11-28T16:09:05Z"
+last_activity: 2026-11-28
+last_activity_desc: Owner authorized focused TUNE-10 gap closure and an early draft-PR measurement; plans 17-10 and 17-11 passed independent review.
+state_head: 1623f931
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 11
+  completed_plans: 9
+  percent: 82
 ---
 
 # Project State
@@ -25,16 +25,155 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Roadmap approved; Phase 17 planning waits for separate authorization.
+**Current focus:** Execute the owner's targeted TUNE-10 gap authorization; obtain exact hosted evidence and re-verify Phase 17, then stop before ship.
 
 ## Current Position
 
-Phase: 17 of 19 (A measured and trustworthy playability baseline; first of 3 in v3.0)
-Plan: Not started (TBD)
-Status: Planning
-Last activity: 2026-11-27 — v3.0 roadmap approved and committed
+Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
+Plan: 17-01/02/03/04/05/06/07/08/09 complete; plans 17-10/11 passed review and are pending execution; TUNE-10 remains open
+Status: Executing
+Last activity: 2026-11-28 — Targeted TUNE-10 plans passed independent review; next is local producer-output controls and the authorized draft-PR run
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████████░░] 82%
+
+### Phase 17 execution authorization (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The owner instructed Codex to follow the
+recommendation to begin Phase 17 after its nine plans passed independent review. Authorization covers the nine
+plans, required local checks, code review and phase verification only. It does not cover ship/release or Phases
+18–19. Execution begins at Plan 17-01; stop at the Phase 17 verify boundary.
+
+### Plan 17-01 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two tasks took about 13 minutes. The
+release `v0.16.0` README installer succeeded and the flipped-byte control rejected its archive; the existing
+inventory names matched both sorted per-directory inventories. The public-claim audit records four broken Phase 7
+links and stale published quality values for later measured correction. Repository-check and RetroArch budgets
+passed at their unchanged 4,694- and 300-line limits. Plan artifacts and task evidence are in `17-SKELETON.md`,
+`17-DOC-AUDIT.md` and `17-01-SUMMARY.md`. No requirement is complete from this evidence-gathering plan alone.
+
+### Plan 17-02 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The bounded Actions comparison and reliability audit took about 45 minutes. The latest 40 runs yielded 556 exact-attempt job records, with one repeated release-metadata workload and no matching full-CI or Nightly workload suitable for speedup claims. Four failures were traced to a cross-compiled accounting invocation, two one-line budget overages and an external pinned archive download. The full-release critical path was recorded as one observation. Seven of the latest ten Windows jobs passed the named DLL consumer; TODO-022 remains pending with a three-pass shortfall. TODO-049 was completed after the repeat-output audit found no safe reuse; TODO-051 remains unchanged and pending. Evidence is in 17-CI-EFFICIENCY.md, 17-RELIABILITY.md and 17-02-SUMMARY.md. No builds or tests ran, and no requirement is complete from this evidence-gathering plan alone.
+
+### Plan 17-03 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two tasks took about 27 minutes. Hosted Cachegrind outputs of 1,620,381 and 138,406,446 Ir/frame and the exact Linux-x64 state length of 3,757,754 bytes match their current bounds. The latest matching WASI job passed the 1,014,617–1,014,665-byte interval but did not expose its exact linked size; preserve the interval. CI critical-path timing remains assigned to Plan 17-09. Existing quality boundary, malformed-input, integer and wiring controls passed. `quality.json` is unchanged; no build or product suite ran and TUNE-10 remains pending. Evidence is in `17-BASELINES.md` and `17-03-SUMMARY.md`.
+
+### Plan 17-04 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two audit tasks took about 21 minutes.
+The live settings check exited 0 with no drift; Dependabot alerts are enabled with zero open alerts, while version-
+update configuration is absent. All active runner labels, action SHAs, external pin consumers and documentation
+dispositions are recorded in `17-UPGRADE-AUDIT.md`. The audit found an active optional libchdr CI consumer missing
+from the old Phase 7 report, and records the Wasmtime 48.0.10 LTS patch candidate and exact official digests without
+changing pins. DEC.94 now preserves its historical wording while resolving to Phase 7's reviewable, no-auto-merge
+policy; TODO-010 stays conditional and TODO-011/012 deferred. Required shell/diff checks and summary validation
+passed. No build or product suite ran; TUNE-11 remains pending for later score and documentation work. Evidence is in
+`17-UPGRADE-AUDIT.md` and `17-04-SUMMARY.md`.
+
+### Plan 17-05 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable; `gsd-executor` delegated the plan. The two
+tasks took 23m53s. The current portable selector set contains 694 unique names: audio 1, movie 1 and broad 692,
+matching the directory inventory union with no overlap. A disposable JUnit proof accepted the exact union and
+rejected missing, duplicate, extra, wrong-shard, failed and skipped reports. The latest hosted BE32 job measured
+`libretro.host` at 1,406.60s and `libretro.input.movies` at 1,018.94s, but no comparable shard run exists, so the
+production gate and `hashes-be32` route remain unchanged and TODO-052 stays pending. Summary validation passed;
+no build or product test ran and no long BE32 test was started. Evidence is in `17-BE32-REVIEW.md`, TODO-052
+and `17-05-SUMMARY.md`.
+
+### Plan 17-06 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The two scoring and contract tasks
+took about 14 minutes. All seven dimensions were scored before selecting an improvement. Upgrade path and
+compatibility breadth tied at 2; direct impact on the measured playability evidence favored compatibility breadth.
+The contract is limited to adding a fresh `gpu_motion` frame-120 result using its existing pinned predicate, while
+preserving frame 60 and unknown rows. Plan 17-07 owns implementation and focused proof. TODO-010 remains unchanged;
+no source, build or product test changed or ran, and TUNE-09/TUNE-11 remain pending. The summary validator passed
+after correcting metadata and wording; evidence is in `17-QUALITY-REVIEW.md`, `17-IMPROVEMENT-CONTRACT.md` and
+`17-06-SUMMARY.md`.
+
+### Plan 17-07 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The two tasks took 18 minutes.
+The pre-change check reproduced the frame-60-only live row while the existing frame-120 fixture passed. The live
+producer now measures both supported frames and selects the requested predicate; the new distinct ledger row
+uses the existing pinned frame-120 hash and preserves all prior rows. Fixture selectors passed 3/3 and the
+compatibility/transition/protected-control/documentation selector passed 9/9. The docs generator, quality checks,
+documentation budgets and the 4,694-line repository-check cap passed. No hosted run was needed for this
+test/ledger/report change, and no process or temporary output remains. TUNE-09 is complete; TUNE-11 remains
+pending for later documentation and roadmap work. Evidence is in `17-IMPROVEMENT-EVIDENCE.md` and
+`17-07-SUMMARY.md`.
+
+### Plan 17-08 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The three documentation tasks took
+about 16 minutes. The testing guide now uses canonical producer sources, four repaired archived links, and clear
+limits for low-power assumptions and Wasmtime hash coverage. The README, maintaining guide, five hardware pages
+and generated compatibility page stayed unchanged after review found no drift. Every audit row now has a final
+disposition; Plan 17-09 owns compatibility regeneration and freshness. Budget/diff/link checks passed, including
+the 61,435-byte testing guide under its 61,440-byte cap. No build or product test ran, and TUNE-10/TUNE-11 remain
+pending for Plan 17-09 reconciliation. Evidence is in `17-DOC-AUDIT.md` and `17-08-SUMMARY.md`.
+
+### Plan 17-09 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The two reconciliation tasks took
+23 minutes. The rolling roadmap and prompt coverage now point to measured evidence; the lesson export records
+none because no new reusable mechanism was reproduced. The compatibility output was already fresh. All existing
+quality bounds remain unchanged: the hosted WASI job passed without exposing its exact size, and comparable
+current PR timing for `ci.critical_path_s` remains pending. All seven unresolved assumptions and the empty
+prohibition probe are carried into the delivery handoff. The quality registry, 4,694-line repository-check cap
+and 300-line RetroArch cap passed their checks. Evidence is in `17-DELIVERY-EVIDENCE.md`,
+`17-LESSONS-EXPORT.md` and `17-09-SUMMARY.md`.
+
+### Phase 17 code review (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-code-reviewer` used gpt-6-luna at standard depth. It reviewed all five
+resolved changed files (`tests/compat/tests.cmake`, `tests/compat/ledger.csv`, `tests/hygiene/tests.cmake`,
+`docs/compatibility.md` and `docs/testing.md`) and found no issues. Two plan summaries were unparsed by the
+scope resolver, but its changed-file list contained every non-planning file changed in this phase. Review is
+recorded in `17-REVIEW.md`.
+
+### Phase 17 final verification (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-verifier` used gpt-6-luna xhigh. `cmake --workflow --preset ci`
+exited 0 locally: 273 build targets, 742/742 CI tests, packaging and all 8 release-labeled tests passed.
+Hosted [CI run 46112240653](https://github.com/szTheory/schwaystation/actions/runs/46112240653) also exited 0
+with `CI required` successful: 18 jobs passed and four event-inapplicable jobs were skipped. Its wall time was
+5,094 seconds and successful jobs occupied 10,218 aggregate runner-seconds. BE32 was the 5,033-second critical
+path, passing 694/694 tests. Exact slow-test and runner-time details are in `17-DELIVERY-EVIDENCE.md`.
+
+Goal-backward verification initially found a Plan 17-03 must-have path typo; it was corrected to the existing
+repository-root `quality.json`. Reverification confirms all nine plans' artifacts and all five Phase 17
+requirements are covered, with 19/20 truths verified. One TUNE-10 gap remains: the current `ci.critical_path_s`
+producer is restricted to `pull_request` in `.github/workflows/ci.yml` and `scripts/ci-critical-path.sh`, while
+the final hosted run was `workflow_dispatch`; it also did not expose an exact hosted WASI module size. The run
+therefore cannot replace the stored push/main fingerprint or close the measurement gap.
+
+The original execution authorization ended at phase verification. On 2026-11-28, the owner extended it to cover
+a targeted TUNE-10 gap plan, its implementation and local checks, a draft PR for the pull-request-only timing and
+exact hosted WASI measurements, code review, and Phase 17 re-verification. This does not authorize merging,
+release, `$gsd-ship`, or Phases 18–19. Phase 17 remains open; proceed with the gap plan and measurement, then stop
+at the re-verification boundary.
+
+### Phase 17 gap planning and plan review (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; planner gpt-6.1-sol high; independent plan checker gpt-6-luna xhigh.
+Plans 17-10 and 17-11 target only TUNE-10: make the existing hosted WASI byte count observable, start the
+authorized pull-request measurement after focused preflights and review, then reconcile exact results without
+widening bounds. The checker reviewed all 11 plans and passed after two focused revision rounds; shell syntax,
+plan schema, failure-direction and command-path checks passed. No implementation tests or hosted measurements
+started during planning. Execution proceeds with Plan 17-10; ship, release and Phases 18–19 remain unauthorized.
+
+### Phase 17 planning and plan review (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The typed researcher used gpt-6-luna xhigh,
+the planner gpt-6.1-sol high, and the plan checker gpt-6-luna xhigh. Research is recorded in
+`.planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-RESEARCH.md`; nine plans span seven
+waves and cover all five phase requirements and 13/13 trackable decisions. The final independent checker
+passed. No builds, tests or CI runs were performed during planning. Phase execution remains outside the v3.0
+roadmap authorization.
 
 ### v3.0 roadmap creation (2026-11-27)
 
@@ -2710,9 +2849,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-27
-Stopped at: Roadmap approved; Phase 17 has not started and awaits separate authorization
-Resume file: .planning/ROADMAP.md
+Last session: 2026-11-27T23:10:09.363Z
+Stopped at: Phase 17 context gathered
+Resume file: .planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-CONTEXT.md
 
 Resume check (Codex/OpenGSD 1.23.0, primary model ID unavailable): `cmake "-DROOT=$PWD" '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` exited 0 at 3,900 lines in the phase worktree and 1 at 4,694 lines in the isolated Plan 16-14 worktree. The draft is present and uncommitted. Plans 16-15 through 16-18 depend on 16-14 directly or transitively. The owner approved the measured ceiling after this check.
 

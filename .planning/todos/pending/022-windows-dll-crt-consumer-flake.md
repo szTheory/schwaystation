@@ -28,6 +28,16 @@ the consumer's exit status so the next failure says why.
 - Rebound at phase 3: bound to the first plan that edits `tests/install/tests.cmake`, or the next hosted occurrence, whichever comes first; otherwise SEED-007, the milestone tune-up.
   comes first.
 
+## Phase 17 bounded cohort
+
+The latest ten completed Windows-x64 build jobs in the Phase 17 40-run cohort contain seven explicit
+`install.consumer.dll_crt` passes and three jobs without a clean consumer result. One job was cancelled before the
+consumer row, and two failed without a consumer row. The seven passing job URLs, all ten exact run/job identities,
+and the three-sample shortfall are recorded in
+[`17-RELIABILITY.md`](../../phases/17-a-measured-and-trustworthy-playability-baseline/17-RELIABILITY.md).
+This does not satisfy the ten-clean-run condition. The original silent failure cause remains unknown. The current
+registration still uses `ctest --build-and-test` with `PASS_REGEX`; it has no separate child-exit diagnostic.
+
 ## Acceptance Criteria
 
 - The consumer test prints the program's exit status when its expected line is missing.

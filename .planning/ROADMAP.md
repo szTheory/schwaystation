@@ -14,7 +14,10 @@ SEED-007 opens the milestone. An owned homebrew disc then proves the integrated 
 sound path in hosted RetroArch with deterministic runner parity. Finally, one owner-selected retail title proves
 the same playable threshold in a local RetroArch session. Each requirement belongs to exactly one phase.
 
-This roadmap authorizes no phase execution: milestone planning ends at roadmap review. The rolling
+This roadmap originally authorized no phase execution: milestone planning ended at roadmap review. On
+2026-11-27, the owner separately authorized Phase 17 execution after its plans passed independent review. That
+phase-specific authorization covers its nine plans, their required local checks, code review and verification; it
+does not authorize shipping or Phases 18–19. The rolling
 [product roadmap](PRODUCT-ROADMAP.md) and later milestones remain separate. No physical-console capture is
 available or required. A one-title pass does not establish broad compatibility or remove experimental status.
 
@@ -37,7 +40,36 @@ available or required. A one-title pass does not establish broad compatibility o
   3. A user can identify one verified improvement to the weakest dimension in the linked 1–5 review of performance, CI/CD, ease of use, architecture, documentation, upgrade path and compatibility breadth.
   4. Published quality bounds match remeasured existing producers, and low-power guidance distinguishes measured results from device assumptions without guessed budget changes.
   5. A user can follow current install, hardware and maintainer guidance; the linked audit covers repository settings, Dependabot, runner images and tool pins, with refreshed roadmap/prompt coverage and exported lessons, and retains unrelated pins and caches unless evidence supports a change.
-**Plans**: TBD
+**Plans**: 11 plans across 9 waves (including the TUNE-10 measurement gap closure)
+Plans:
+**Wave 1**
+- [x] 17-01-PLAN.md — Establish the existing CMake/inventory path and audit installation guidance
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 17-02-PLAN.md — Compare bounded CI runs and reliability evidence
+- [x] 17-03-PLAN.md — Remeasure quality producers and retain only supported bounds
+- [x] 17-04-PLAN.md — Audit repository policy, runners, tools and update settings
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 17-05-PLAN.md — Re-evaluate the BE32 shard candidate with its full preservation contract
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 17-06-PLAN.md — Score all seven dimensions and select one bounded improvement
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 17-07-PLAN.md — Implement and verify only the evidence-selected improvement
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 17-08-PLAN.md — Refresh only guidance whose drift is reproduced
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 17-09-PLAN.md — Refresh roadmap/lessons and reconcile phase evidence
+
+**Wave 8** *(gap closure after Wave 7 and fresh verification)*
+- [ ] 17-10-PLAN.md — Expose exact WASI bytes and start the reviewed draft-PR measurement
+
+**Wave 9** *(blocked on Wave 8's supported producer)*
+- [ ] 17-11-PLAN.md — Reconcile exact measurements and apply only supported tightening ratchets
 
 ### Phase 18: An owned game plays in RetroArch CI
 
@@ -86,11 +118,11 @@ available or required. A one-title pass does not establish broad compatibility o
 
 ## Progress
 
-**Execution order:** Phase 17 → Phase 18 → Phase 19. Phase planning and execution have not started.
+**Execution order:** Phase 17 → Phase 18 → Phase 19. Phase 17 planning is complete; its execution was separately authorized by the owner on 2026-11-27.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 0/TBD | Not started | - |
+| 17. A measured and trustworthy playability baseline | 9/9 | Verifying | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 

@@ -2,7 +2,7 @@
 title: "Product roadmap (rolling)"
 summary: "Immediate / Near / Mid / Long direction for schwaystation with the evidence and promotion trigger for each horizon; ROADMAP.md is the execution contract, seeds hold the source narratives."
 read_when: "At every new-milestone and complete-milestone step, and when a finding changes priorities."
-updated: 2026-11-27
+updated: 2026-11-28
 ---
 
 # Product roadmap (rolling)
@@ -35,6 +35,24 @@ and [delivery record](milestones/v2.0-phases/07-faster-and-more-trustworthy-ci/0
 assumptions; SEED-005 retains the cached-interpreter and target-device follow-up. The wasm32 hash lane is not a
 browser-speed measurement. The quality review selected the README's false BIOS/disc status statement and verified
 its correction; it did not broaden compatibility claims.
+
+## v3.0 tune-up evidence (Phase 17; final verification pending)
+
+Phase 17 remeasured the existing quality producers and refreshed the audited testing, compatibility, and roadmap
+evidence. `testcard` is 1,620,381 Ir/frame, `gpu_motion` is 138,406,446 Ir/frame, and stable state is 3,757,754
+bytes. The local linked-Wasm result is 1,014,617 bytes; the latest successful hosted producer passes the retained
+1,014,617–1,014,665-byte interval but does not expose its exact value. The 40-run CI review found no repeated
+comparable full-CI workload, and PR execution SHAs are unavailable. The `ci.critical_path_s` interval remains
+historical until the registered producer obtains a matching current result. See [Phase 17 baselines](phases/17-a-measured-and-trustworthy-playability-baseline/17-BASELINES.md)
+and [CI efficiency evidence](phases/17-a-measured-and-trustworthy-playability-baseline/17-CI-EFFICIENCY.md).
+
+The one selected improvement adds the existing NTSC-U `gpu_motion` frame-120 hash predicate to the measured
+compatibility ledger. The generated report now has five measured fixture predicates; all 13,407 Redump entries
+and the 27 required profile rows remain unknown, and libretro remains experimental. This result does not establish
+retail playability, device speed, browser speed, or a complete game session. Audited document freshness, quality
+ratchets, and handoff preparation are required phase work kept separate from that selected improvement. Final
+review and phase verification remain pending. The approved v3.0 homebrew and owner-selected retail scopes are
+unchanged.
 
 ## Shipped: v1.0 "PlayStation games play with sound in RetroArch" (completed 2026-11-18)
 
@@ -109,6 +127,7 @@ or measured instructions-per-frame budget for Everywhere; a concrete renderer co
 | 2026-11-24 | Final Phase 7 evidence reconciled | The automatic v0.7.0 release PR route, exact WASI producer and release evidence are recorded; the missing merge-ref SHA still prevents an exact release-App speedup comparison. Current producer values are linked above. |
 | 2026-11-26 | v2.0 shipped and archived after Phase 16 | Ten phases passed verification, 34 requirements and seven integration flows are covered, and v0.16.0 was published. v3.0's trigger is met but remains in Mid pending a separate scope decision; TODO-051/052 retain their evidence requirements. |
 | 2026-11-27 | Promoted v3.0 playability proof to Immediate; states/movies and browser to Near | The 51-row required matrix still has 35 unknowns and no retail title pass. Existing RetroArch evidence covers interactive fixtures, sound and bootable-disc behavior in separate checks. |
+| 2026-11-28 | Reconciled Phase 17's measured tune-up evidence; kept the approved v3.0 scope | One existing NTSC-U fixture predicate was added at frame 120. Quality results, CI comparability limits, unknown compatibility rows, and unmeasured device/browser performance remain explicit; review and final phase verification are pending. |
 
 | Date | Change | Why |
 |---|---|---|
