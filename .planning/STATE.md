@@ -5,10 +5,10 @@ milestone_name: Prove a game plays
 current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
-stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T05:20:20Z"
+stopped_at: Phase 17 verification found a TUNE-10 evidence gap; awaiting owner direction before gap closure or ship
+last_updated: "2026-11-28T07:56:17Z"
 last_activity: 2026-11-28
-last_activity_desc: Plan 17-09 reconciled the final evidence; standard-depth code review is clean and phase verification is next. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+last_activity_desc: Final verification found 19/20 truths; TUNE-10 still lacks a comparable current CI timing result. The pull-request producer is outside the current stop-before-ship authorization.
 state_head: 1623f931
 progress:
   total_phases: 3
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04/05/06/07/08/09 complete; code review clean; final Phase 17 verification next
+Plan: 17-01/02/03/04/05/06/07/08/09 complete; code review clean; verification gaps_found (19/20 truths), TUNE-10 remains
 Status: Executing
-Last activity: 2026-11-28 — Plan 17-09 closed phase evidence and review handoff; code review found no findings, so final phase verification is next
+Last activity: 2026-11-28 — Final verification found TUNE-10 measurement evidence incomplete; the phase remains open and ship has not started
 
 Progress: [██████████] 100%
 
@@ -133,7 +133,27 @@ Runtime/model: Codex/OpenGSD 1.23.0; `gsd-code-reviewer` used gpt-6-luna at stan
 resolved changed files (`tests/compat/tests.cmake`, `tests/compat/ledger.csv`, `tests/hygiene/tests.cmake`,
 `docs/compatibility.md` and `docs/testing.md`) and found no issues. Two plan summaries were unparsed by the
 scope resolver, but its changed-file list contained every non-planning file changed in this phase. Review is
-recorded in `17-REVIEW.md`; final phase verification has not yet run.
+recorded in `17-REVIEW.md`.
+
+### Phase 17 final verification (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-verifier` used gpt-6-luna xhigh. `cmake --workflow --preset ci`
+exited 0 locally: 273 build targets, 742/742 CI tests, packaging and all 8 release-labeled tests passed.
+Hosted [CI run 46112240653](https://github.com/szTheory/schwaystation/actions/runs/46112240653) also exited 0
+with `CI required` successful: 18 jobs passed and four event-inapplicable jobs were skipped. Its wall time was
+5,094 seconds and successful jobs occupied 10,218 aggregate runner-seconds. BE32 was the 5,033-second critical
+path, passing 694/694 tests. Exact slow-test and runner-time details are in `17-DELIVERY-EVIDENCE.md`.
+
+Goal-backward verification initially found a Plan 17-03 must-have path typo; it was corrected to the existing
+repository-root `quality.json`. Reverification confirms all nine plans' artifacts and all five Phase 17
+requirements are covered, with 19/20 truths verified. One TUNE-10 gap remains: the current `ci.critical_path_s`
+producer is restricted to `pull_request` in `.github/workflows/ci.yml` and `scripts/ci-critical-path.sh`, while
+the final hosted run was `workflow_dispatch`; it also did not expose an exact hosted WASI module size. The run
+therefore cannot replace the stored push/main fingerprint or close the measurement gap.
+
+The current authorization ends at phase verification. No gap-closure plan, PR, ship, release or later phase was
+started. Phase 17 remains open pending owner direction on additional gap-closure scope and a comparable PR
+measurement.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
