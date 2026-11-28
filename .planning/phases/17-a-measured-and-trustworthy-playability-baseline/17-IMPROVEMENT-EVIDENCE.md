@@ -33,7 +33,15 @@ Exit: 0
 Output: frame 120 sha256 f92191242105428b4345519f237979aaf0b50b33431ce945f209f03b1d47257d
 ```
 
-A task-local negative control supplied `frame@90` for the frame-120 serial to `compat_live`. The producer rejected it with `fixture/gpu_motion-frame120 must select frame 120, got frame 90` (CMake exit 1, expected). `compat.ratchet.protected_controls` separately accepts the exact protected frame-120 row and rejects a wrong fresh hash and a missing frame-120 row.
+A task-local negative control supplied `frame@90` for the frame-120 serial to `compat_live`:
+
+```text
+Command: cmake -DSOURCE_ROOT=. -DWORK_ROOT="$TASK_CASE" -DLEDGER="$TASK_CASE/ledger.csv" -DTEST_BINARY=/usr/bin/true -DRUN="$PWD/build/ci/schwaystation-run" -DFIXTURE_DIR="$PWD/build/ci/fixtures" -DEMULATOR=/usr/bin/env -DCASE=compat_live -P tests/compat/tests.cmake
+Exit: 1 (expected)
+Output: fixture/gpu_motion-frame120 must select frame 120, got frame 90
+```
+
+Here `$TASK_CASE` was the disposable `unsupported-predicate` directory under `/tmp`; `$PWD` was the repository root. `compat.ratchet.protected_controls` separately accepts the exact protected frame-120 row and rejects a wrong fresh hash and a missing frame-120 row.
 
 ## Verification record
 
@@ -44,7 +52,7 @@ All commands ran from the repository root on 2026-11-28 UTC. Local commands have
 | `cmake --build build/ci --target schwaystation-run schwaystation-fixtures schwaystation-test-compat --parallel 2` (before change and after change) | Exit 0 both times; final configure/build completed with no work to do. |
 | `ctest --test-dir build/ci --output-on-failure -R '^fixtures[.]gpu_motion[.]hash[.]120$'` (before change) | Exit 0; 1/1 passed. |
 | `ctest --test-dir build/ci --output-on-failure -R '^compat[.]ratchet[.]rows$'` (before change) | Exit 0; live fresh output still contained only the frame-60 row. |
-| `ctest --test-dir build/ci --output-on-failure -R '^compat[.]ratchet[.]rows$'` (after row, before producer) | Expected failure; CTest reported the missing frame-120 producer. |
+| `ctest --test-dir build/ci --output-on-failure -R '^compat[.]ratchet[.]rows$'` (after row, before producer) | Exit 8 (expected test failure); CTest reported the missing frame-120 producer. |
 | `ctest --test-dir build/ci --no-tests=error --output-on-failure -R '^fixtures[.]gpu_motion[.]hash[.](60|120|self_test)$'` | Exit 0; 3/3 passed, including both pinned frame hashes and the wrong-hash control. |
 | `ctest --test-dir build/ci --no-tests=error --output-on-failure -R '^compat[.]ratchet[.](rows|transitions|protected_controls)$|^policy[.]compat_doc_fresh$'` | Exit 0; 9/9 passed, including fixture setup, live rows, wrong/missing protected controls, transitions, and generated-doc freshness. |
 | `sh scripts/compat-doc.sh tests/compat/ledger.csv docs/compatibility.md` | Exit 0; the report shows frame 60 and frame 120 as separate measured rows. |
