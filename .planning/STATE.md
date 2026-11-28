@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T02:21:36Z"
+last_updated: "2026-11-28T02:50:10Z"
 last_activity: 2026-11-27
-last_activity_desc: Plan 17-02 completed the bounded Actions comparison and reliability audit; seven DLL passes, TODO-022 remains short by three. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: 75cd23a
+last_activity_desc: Plan 17-03 preserved producer-backed quality bounds; exact WASI bytes and Plan 17-09 timing remain pending. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: 202353a
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 2
-  percent: 22
+  completed_plans: 3
+  percent: 33
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02 complete; 17-03/04 next in Wave 2; 9 plans across 7 waves
+Plan: 17-01/02/03 complete; 17-04 next in Wave 2; 9 plans across 7 waves
 Status: Executing
-Last activity: 2026-11-27 — Plan 17-02 completed the bounded Actions comparison and reliability audit; seven DLL passes, TODO-022 remains short by three
+Last activity: 2026-11-27 — Plan 17-03 preserved producer-backed quality bounds; exact WASI bytes and Plan 17-09 timing remain pending
 
-Progress: [██░░░░░░░░] 22%
+Progress: [███░░░░░░░] 33%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -55,6 +55,10 @@ passed at their unchanged 4,694- and 300-line limits. Plan artifacts and task ev
 ### Plan 17-02 execution (2026-11-27)
 
 Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The bounded Actions comparison and reliability audit took about 45 minutes. The latest 40 runs yielded 556 exact-attempt job records, with one repeated release-metadata workload and no matching full-CI or Nightly workload suitable for speedup claims. Four failures were traced to a cross-compiled accounting invocation, two one-line budget overages and an external pinned archive download. The full-release critical path was recorded as one observation. Seven of the latest ten Windows jobs passed the named DLL consumer; TODO-022 remains pending with a three-pass shortfall. TODO-049 was completed after the repeat-output audit found no safe reuse; TODO-051 remains unchanged and pending. Evidence is in 17-CI-EFFICIENCY.md, 17-RELIABILITY.md and 17-02-SUMMARY.md. No builds or tests ran, and no requirement is complete from this evidence-gathering plan alone.
+
+### Plan 17-03 execution (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The two tasks took about 27 minutes. Hosted Cachegrind outputs of 1,620,381 and 138,406,446 Ir/frame and the exact Linux-x64 state length of 3,757,754 bytes match their current bounds. The latest matching WASI job passed the 1,014,617–1,014,665-byte interval but did not expose its exact linked size; preserve the interval. CI critical-path timing remains assigned to Plan 17-09. Existing quality boundary, malformed-input, integer and wiring controls passed. `quality.json` is unchanged; no build or product suite ran and TUNE-10 remains pending. Evidence is in `17-BASELINES.md` and `17-03-SUMMARY.md`.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
