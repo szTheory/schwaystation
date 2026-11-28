@@ -28,6 +28,36 @@ Plan 08 is narrowed to nine potential files: three user/maintainer pages, five a
 
 Hosted workflows may outlast an individual local plan. Estimates bound active local work; required long hosted runs are asynchronous under the orchestrator's existing phase verification, with frequent status updates. Their evidence is never represented as passed before it exists. No new timeout or campaign resource limit is inferred from these estimates.
 
+## Gap-closure extension (2026-11-28)
+
+Runtime/model: Codex / OpenGSD 1.23.0; typed planner gpt-6.1-sol high. Fresh verification left one actionable
+TUNE-10 gap: exact current hosted WASI bytes and a supported current CI timing result. The owner authorized the
+recommended draft-PR measurement, implementation, checks, review and re-verification. Plans 17-10 and 17-11
+preserve Plans 01–09 and split producer observability/early launch from completed-run reconciliation. Each has
+25 minutes of active work; the orchestrator monitors long hosted jobs asynchronously under their existing limits.
+Estimate calibration returned factor 1, zero samples and low confidence. Discovery level 0 applies: all changes
+reuse the existing CMake comparator, registered controls, PR route, exact-attempt producer and evidence reports;
+no external dependency or new API integration is introduced. Security enforcement remains disabled by project
+configuration; no threat IDs or new security gate is invented. No application build, product test or hosted run
+was performed while planning. The orchestrator owns STATE.md and independent plan checking.
+
+| SOURCE | ID / item | Existing coverage | Gap extension | Status |
+| --- | --- | --- | --- | --- |
+| GOAL | Current guidance, scoped claims and measured limits | Plans 01–09, verified except the one current metric truth | 10: observable producer and early supported PR launch; 11: exact outputs and bound disposition | COVERED |
+| REQ | TUNE-07, TUNE-08, TUNE-09, TUNE-11 | Existing plans and fresh verification remain applicable | No unrelated implementation added | COVERED |
+| REQ | TUNE-10 | Plans 03/08/09 retain exact Cachegrind/state output and explicit assumptions | 10–11 address both missing exact producer values and the current fingerprint/bound relationship | COVERED |
+| RESEARCH | Existing producer responsibilities, supported PR-only timing, exact provenance and conservative comparison | Existing research and source audit | Comparator output/control extension plus the existing supported producer; no surrogate or dispatch substitution | COVERED |
+| RESEARCH | Current-host configuration and runner/tool/route identity | Existing baseline and CI reports | 11 records exact current configuration, job/attempt identity, fingerprint and actual runner labels | COVERED |
+| CONTEXT | D-01 | Bounded matched-cohort comparison and honest raw timing | 11 reviews exact run critical path, duplication and occupancy; unmatched runs carry no speedup claim | COVERED |
+| CONTEXT | D-07 | Producer-matched tightening ratchets; no guessed/widened failing limits | 10 leaves bounds unchanged; 11 preserves CI bounds and fingerprint on an outside-range result and keeps TUNE-10 open | COVERED |
+| CONTEXT | D-08 | Device/browser rates remain assumptions | 11 preserves those limits; WASI bytes are not browser speed | COVERED |
+| CONTEXT | D-02–D-06 and D-09–D-13 | Existing implementing plans remain covered in the full audit below | No timeout, shard, selected improvement, claim, pin, cache or later-phase policy is reopened | COVERED |
+
+The original seven unresolved edge assumptions and empty bespoke prohibition probe remain carried by the
+delivery evidence. No unresolved item is silently resolved by this gap plan. Existing boundary/integer/malformed
+controls are reused. A producer result outside its active interval is new discrepancy evidence, not completion:
+Plan 17-11 requires attribution, preserved bounds and an open TUNE-10 handoff until a supported remedy exists.
+
 ## Multi-source audit
 
 | SOURCE | ID / item | Plan | Status | Contract |

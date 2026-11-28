@@ -40,7 +40,7 @@ available or required. A one-title pass does not establish broad compatibility o
   3. A user can identify one verified improvement to the weakest dimension in the linked 1–5 review of performance, CI/CD, ease of use, architecture, documentation, upgrade path and compatibility breadth.
   4. Published quality bounds match remeasured existing producers, and low-power guidance distinguishes measured results from device assumptions without guessed budget changes.
   5. A user can follow current install, hardware and maintainer guidance; the linked audit covers repository settings, Dependabot, runner images and tool pins, with refreshed roadmap/prompt coverage and exported lessons, and retains unrelated pins and caches unless evidence supports a change.
-**Plans**: 9 plans across 7 waves
+**Plans**: 11 plans across 9 waves (including the TUNE-10 measurement gap closure)
 Plans:
 **Wave 1**
 - [x] 17-01-PLAN.md — Establish the existing CMake/inventory path and audit installation guidance
@@ -64,6 +64,12 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [x] 17-09-PLAN.md — Refresh roadmap/lessons and reconcile phase evidence
+
+**Wave 8** *(gap closure after Wave 7 and fresh verification)*
+- [ ] 17-10-PLAN.md — Expose exact WASI bytes and start the reviewed draft-PR measurement
+
+**Wave 9** *(blocked on Wave 8's supported producer)*
+- [ ] 17-11-PLAN.md — Reconcile exact measurements and apply only supported tightening ratchets
 
 ### Phase 18: An owned game plays in RetroArch CI
 
