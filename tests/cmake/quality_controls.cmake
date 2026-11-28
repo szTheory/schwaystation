@@ -15,7 +15,6 @@ set(registry [=[
 string(CONFIGURE "${registry}" registry @ONLY)
 file(WRITE "${quality_file}" "${registry}")
 find_program(SH sh REQUIRED)
-
 function(compare metric expected)
   set(args "-DQUALITY=${quality_file}")
   if(NOT metric STREQUAL "registry")
@@ -34,7 +33,7 @@ function(compare_measured metric measured)
   execute_process(COMMAND "${CMAKE_COMMAND}" "-DQUALITY=${quality_file}" "-DMETRIC=${metric}" ${ARGN}
     -P "${checker}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
   string(REPLACE "." "[.]" metric_re "${metric}")
-  if(NOT rc STREQUAL "0" OR NOT "${out}" MATCHES "quality: ${metric_re}: measured ${measured}([^0-9]|$)")
+  if(NOT rc STREQUAL "0" OR NOT "${out}" MATCHES "quality: ${metric_re}: measured ${measured};")
     message(FATAL_ERROR "quality_controls: ${metric} successful output did not report exact measurement ${measured}; got exit ${rc}\n${out}")
   endif()
 endfunction()
@@ -52,7 +51,6 @@ compare(ci.critical_path_s "" -DMEASURED=20)
 compare(ci.critical_path_s "floor" -DMEASURED=9)
 compare(ci.critical_path_s "ceiling" -DMEASURED=21)
 compare(ci.critical_path_s "measurement|measured")
-
 string(REPEAT "w" 16 bytes)
 execute_process(COMMAND "${SH}" -c "printf '\\000asm%s' \"$1\" > \"$2\"" sh
     "${bytes}" "${BIN}/wasm.bin" RESULT_VARIABLE wasm_fixture_rc)
@@ -73,7 +71,6 @@ compare(size.wasm "artifact" "-DARTIFACT=${BIN}/missing")
 file(WRITE "${BIN}/empty" "")
 compare(size.wasm "artifact|measurement" "-DARTIFACT=${BIN}/empty")
 compare(state.bytes "artifact" "-DARTIFACT=${BIN}/wasm.bin")
-
 function(registry_case operation metric expected measured)
   string(JSON changed ${operation} "${registry}" ${ARGN})
   file(WRITE "${quality_file}" "${changed}")
@@ -97,7 +94,6 @@ registry_case(SET registry reasons "" "" reasons [=[[]]=])
 registry_case(SET registry "reasons entries" "" "" reasons [=[[1]]=])
 registry_case(SET registry "reasons entries" "" "" reasons [=[[" "]]=])
 registry_case(SET ci.critical_path_s workload_sha256 10 ci critical_path_s workload_sha256 [["invalid"]])
-
 file(READ "${ROOT}/quality.json" checked_registry)
 string(JSON checked_reason ERROR_VARIABLE reason_error GET "${checked_registry}" reasons 0)
 if(NOT reason_error STREQUAL "NOTFOUND" OR NOT checked_reason MATCHES "^2026-11-18.*07-01-SUMMARY[.]md.*07-CONTEXT[.]md")
@@ -105,7 +101,6 @@ if(NOT reason_error STREQUAL "NOTFOUND" OR NOT checked_reason MATCHES "^2026-11-
 endif()
 string(JSON fingerprint GET "${checked_registry}" ci critical_path_s workload_sha256)
 file(WRITE "${quality_file}" "${registry}")
-
 function(extract_block begin_marker end_marker output)
   set(found_begin FALSE)
   set(found_end FALSE)
@@ -132,7 +127,6 @@ function(extract_block begin_marker end_marker output)
   endif()
   set("${output}" "${block}" PARENT_SCOPE)
 endfunction()
-
 extract_block(QUALITY_PERF_COMPARE_BEGIN QUALITY_PERF_COMPARE_END perf_block)
 if(NOT perf_block MATCHES "head=\\$\\(per_frame" OR NOT perf_block MATCHES "MEASURED=\\$head" OR
    NOT perf_block MATCHES "tests/cmake/quality[.]cmake")
@@ -151,7 +145,6 @@ function(run_block name block setup expected)
     message(FATAL_ERROR "quality_controls: ${name} production block accepted a missing, malformed, or over-bound value")
   endif()
 endfunction()
-
 set(perf_setup [=[set -eu
 fixture=$PERF_FIXTURE
 rc=0
@@ -167,7 +160,6 @@ foreach(fixture testcard gpu_motion)
   run_block("perf-${fixture}-over" "${perf_block}test \"$rc\" -eq 0\n" "${perf_setup}" "above ceiling"
     "PERF_MEASURED=${over}" "PERF_FIXTURE=${fixture}" "RUNNER_TEMP=${BIN}" "QUALITY_FILE=${quality_file}")
 endforeach()
-
 extract_block(QUALITY_WASM_COMPARE_BEGIN QUALITY_WASM_COMPARE_END wasm_block)
 if(NOT wasm_block MATCHES "ARTIFACT=.*WASM_MODULE" OR
    NOT wasm_block MATCHES "build/wasm32/schwaystation-run" OR NOT wasm_block MATCHES "quality[.]cmake")
@@ -186,7 +178,6 @@ file(WRITE "${quality_file}" "${bounded_wasm}")
 file(COPY_FILE "${BIN}/wasm.bin" "${BIN}/wasm-over.bin")
 file(APPEND "${BIN}/wasm-over.bin" "w")
 run_block(wasm-over "${wasm_block}" "${wasm_setup}" "above ceiling" "QUALITY_FILE=${quality_file}" "WASM_MODULE=${BIN}/wasm-over.bin")
-
 extract_block(QUALITY_STATE_BYTES_BEGIN QUALITY_STATE_BYTES_END state_block)
 if(NOT state_block MATCHES "state[.]stable_bytes" OR NOT state_block MATCHES "MEASURED=\\$state_bytes" OR
    NOT state_block MATCHES "quality[.]cmake")
@@ -210,7 +201,6 @@ run_block(state-missing "${state_block}" "${state_setup}" "state_bytes" "QUALITY
 run_block(state-malformed "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=malformed")
 run_block(state-duplicate "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=duplicate")
 run_block(state-over "${state_block}" "${state_setup}" "above ceiling" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=over")
-
 # Fault prevented: incomplete Actions data or a fingerprint that omits CI-work-changing inputs.
 find_program(JQ jq REQUIRED)
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${ROOT}"
