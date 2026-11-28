@@ -50,3 +50,19 @@ Task 17-03 found no exact producer result that justifies changing a bound. The t
 - Existing exact comparator: the `testcard` 1,620,381, `gpu_motion` 138,406,446 and `state.bytes` 3,757,754 outputs passed. The known WASI samples 1,014,617 and 1,014,665 each passed against the retained interval. Each invocation of `tests/cmake/quality.cmake` exited 0.
 - Existing boundary, malformed-input, integer and producer-wiring controls: `cmake -DROOT=<absolute repo root> -DBIN=<task temporary directory>/quality-controls -P tests/cmake/quality_controls.cmake` — exit 0. An initial direct invocation with `ROOT=.` exited 1 because that script requires an absolute root; the corrected invocation completed all controls successfully.
 - `git diff --check origin/main` — exit 0.
+
+## Plan 17-09 reconciliation
+
+The latest completed hosted WASI producer is [run 45949888885, job 140343426889](https://github.com/szTheory/schwaystation/actions/runs/45949888885/job/140343426889).
+It passed its registered 635 tests and the active WASI size bound. The job log and uploaded `hashes-wasm32`
+artifact do not expose or include the linked module, so its exact byte count remains unknown. Keep the existing
+1,014,617–1,014,665 interval.
+
+The latest full Main CI route is [run 45949888885](https://github.com/szTheory/schwaystation/actions/runs/45949888885),
+whose `CI required` job completed 4,199 seconds after run creation and whose BE32 job took 4,113 seconds. This is
+a push observation. The bounded 40-run review found no repeated matching full-CI workload, and PR execution SHAs
+were unavailable; the final phase source has no qualifying completed PR producer from which to obtain a current
+workload fingerprint. Keep `ci.critical_path_s` at its existing 2,249–3,293-second interval and stored historical
+fingerprint `316f86729c5129fc618ae0acf71014a5b18784d9e7a4f6c03ff067d0b4326ed8`. No `quality.json` value or
+fingerprint changed under D-07. The current exact WASI value, matching CI result/fingerprint, and device/browser
+speed remain pending or unmeasured; no hosted success is promoted beyond its recorded output.
