@@ -5,17 +5,17 @@ milestone_name: Prove a game plays
 current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
-stopped_at: Phase 17 verification found a TUNE-10 evidence gap; awaiting owner direction before gap closure or ship
-last_updated: "2026-11-28T07:56:17Z"
+stopped_at: Phase 17 gap plans passed independent review; executing TUNE-10 measurement before re-verification
+last_updated: "2026-11-28T16:09:05Z"
 last_activity: 2026-11-28
-last_activity_desc: Final verification found 19/20 truths; TUNE-10 still lacks a comparable current CI timing result. The pull-request producer is outside the current stop-before-ship authorization.
+last_activity_desc: Owner authorized focused TUNE-10 gap closure and an early draft-PR measurement; plans 17-10 and 17-11 passed independent review.
 state_head: 1623f931
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 9
+  total_plans: 11
   completed_plans: 9
-  percent: 100
+  percent: 82
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Execute Phase 17 under the owner's 2026-11-27 phase-specific authorization; stop after verification before ship.
+**Current focus:** Execute the owner's targeted TUNE-10 gap authorization; obtain exact hosted evidence and re-verify Phase 17, then stop before ship.
 
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04/05/06/07/08/09 complete; code review clean; verification gaps_found (19/20 truths), TUNE-10 remains
+Plan: 17-01/02/03/04/05/06/07/08/09 complete; plans 17-10/11 passed review and are pending execution; TUNE-10 remains open
 Status: Executing
-Last activity: 2026-11-28 — Final verification found TUNE-10 measurement evidence incomplete; the phase remains open and ship has not started
+Last activity: 2026-11-28 — Targeted TUNE-10 plans passed independent review; next is local producer-output controls and the authorized draft-PR run
 
-Progress: [██████████] 100%
+Progress: [████████░░] 82%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -151,9 +151,20 @@ producer is restricted to `pull_request` in `.github/workflows/ci.yml` and `scri
 the final hosted run was `workflow_dispatch`; it also did not expose an exact hosted WASI module size. The run
 therefore cannot replace the stored push/main fingerprint or close the measurement gap.
 
-The current authorization ends at phase verification. No gap-closure plan, PR, ship, release or later phase was
-started. Phase 17 remains open pending owner direction on additional gap-closure scope and a comparable PR
-measurement.
+The original execution authorization ended at phase verification. On 2026-11-28, the owner extended it to cover
+a targeted TUNE-10 gap plan, its implementation and local checks, a draft PR for the pull-request-only timing and
+exact hosted WASI measurements, code review, and Phase 17 re-verification. This does not authorize merging,
+release, `$gsd-ship`, or Phases 18–19. Phase 17 remains open; proceed with the gap plan and measurement, then stop
+at the re-verification boundary.
+
+### Phase 17 gap planning and plan review (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; planner gpt-6.1-sol high; independent plan checker gpt-6-luna xhigh.
+Plans 17-10 and 17-11 target only TUNE-10: make the existing hosted WASI byte count observable, start the
+authorized pull-request measurement after focused preflights and review, then reconcile exact results without
+widening bounds. The checker reviewed all 11 plans and passed after two focused revision rounds; shell syntax,
+plan schema, failure-direction and command-path checks passed. No implementation tests or hosted measurements
+started during planning. Execution proceeds with Plan 17-10; ship, release and Phases 18–19 remain unauthorized.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
