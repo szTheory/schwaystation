@@ -6,16 +6,16 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 verification; stop before ship
-last_updated: "2026-11-28T04:43:39Z"
+last_updated: "2026-11-28T05:20:20Z"
 last_activity: 2026-11-28
-last_activity_desc: Plan 17-08 corrected demonstrated testing-guide drift and assigned final compatibility generation to Plan 17-09. Codex/OpenGSD 1.23.0; primary model ID unavailable.
-state_head: e0ab08ab
+last_activity_desc: Plan 17-09 reconciled the final evidence; standard-depth code review is clean and phase verification is next. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: 1623f931
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-27)
 ## Current Position
 
 Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
-Plan: 17-01/02/03/04/05/06/07/08 complete; 17-09 next in Wave 7; 9 plans across 7 waves
+Plan: 17-01/02/03/04/05/06/07/08/09 complete; code review clean; final Phase 17 verification next
 Status: Executing
-Last activity: 2026-11-28 — Plan 17-08 corrected demonstrated documentation drift; Plan 17-09 owns final compatibility freshness and phase evidence reconciliation
+Last activity: 2026-11-28 — Plan 17-09 closed phase evidence and review handoff; code review found no findings, so final phase verification is next
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ### Phase 17 execution authorization (2026-11-27)
 
@@ -115,6 +115,25 @@ and generated compatibility page stayed unchanged after review found no drift. E
 disposition; Plan 17-09 owns compatibility regeneration and freshness. Budget/diff/link checks passed, including
 the 61,435-byte testing guide under its 61,440-byte cap. No build or product test ran, and TUNE-10/TUNE-11 remain
 pending for Plan 17-09 reconciliation. Evidence is in `17-DOC-AUDIT.md` and `17-08-SUMMARY.md`.
+
+### Plan 17-09 execution (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; delegated `gsd-executor` used gpt-6-luna. The two reconciliation tasks took
+23 minutes. The rolling roadmap and prompt coverage now point to measured evidence; the lesson export records
+none because no new reusable mechanism was reproduced. The compatibility output was already fresh. All existing
+quality bounds remain unchanged: the hosted WASI job passed without exposing its exact size, and comparable
+current PR timing for `ci.critical_path_s` remains pending. All seven unresolved assumptions and the empty
+prohibition probe are carried into the delivery handoff. The quality registry, 4,694-line repository-check cap
+and 300-line RetroArch cap passed their checks. Evidence is in `17-DELIVERY-EVIDENCE.md`,
+`17-LESSONS-EXPORT.md` and `17-09-SUMMARY.md`.
+
+### Phase 17 code review (2026-11-28)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-code-reviewer` used gpt-6-luna at standard depth. It reviewed all five
+resolved changed files (`tests/compat/tests.cmake`, `tests/compat/ledger.csv`, `tests/hygiene/tests.cmake`,
+`docs/compatibility.md` and `docs/testing.md`) and found no issues. Two plan summaries were unparsed by the
+scope resolver, but its changed-file list contained every non-planning file changed in this phase. Review is
+recorded in `17-REVIEW.md`; final phase verification has not yet run.
 
 ### Phase 17 planning and plan review (2026-11-27)
 
