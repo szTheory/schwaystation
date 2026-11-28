@@ -37,7 +37,30 @@ available or required. A one-title pass does not establish broad compatibility o
   3. A user can identify one verified improvement to the weakest dimension in the linked 1–5 review of performance, CI/CD, ease of use, architecture, documentation, upgrade path and compatibility breadth.
   4. Published quality bounds match remeasured existing producers, and low-power guidance distinguishes measured results from device assumptions without guessed budget changes.
   5. A user can follow current install, hardware and maintainer guidance; the linked audit covers repository settings, Dependabot, runner images and tool pins, with refreshed roadmap/prompt coverage and exported lessons, and retains unrelated pins and caches unless evidence supports a change.
-**Plans**: TBD
+**Plans**: 9 plans across 7 waves
+Plans:
+**Wave 1**
+- [ ] 17-01-PLAN.md — Establish the existing CMake/inventory path and audit installation guidance
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 17-02-PLAN.md — Compare bounded CI runs and reliability evidence
+- [ ] 17-03-PLAN.md — Remeasure quality producers and retain only supported bounds
+- [ ] 17-04-PLAN.md — Audit repository policy, runners, tools and update settings
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 17-05-PLAN.md — Re-evaluate the BE32 shard candidate with its full preservation contract
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 17-06-PLAN.md — Score all seven dimensions and select one bounded improvement
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 17-07-PLAN.md — Implement and verify only the evidence-selected improvement
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 17-08-PLAN.md — Refresh only guidance whose drift is reproduced
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 17-09-PLAN.md — Refresh roadmap/lessons and reconcile phase evidence
 
 ### Phase 18: An owned game plays in RetroArch CI
 
@@ -86,11 +109,11 @@ available or required. A one-title pass does not establish broad compatibility o
 
 ## Progress
 
-**Execution order:** Phase 17 → Phase 18 → Phase 19. Phase planning and execution have not started.
+**Execution order:** Phase 17 → Phase 18 → Phase 19. Phase 17 planning is complete; execution has not started and is not authorized by this roadmap.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 0/TBD | Not started | - |
+| 17. A measured and trustworthy playability baseline | 0/9 | Ready to execute | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 

@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Prove a game plays
 current_phase: 17
-current_phase_name: A measured and trustworthy playability baseline; first of 3 in v3.0
-status: planning
-stopped_at: Phase 17 context gathered
-last_updated: "2026-11-27T23:11:52.295Z"
+current_phase_name: A measured and trustworthy playability baseline
+status: executing
+stopped_at: Phase 17 planning complete; stop before execution
+last_updated: "2026-11-28T01:02:27Z"
 last_activity: 2026-11-27
-last_activity_desc: Phase 17 context captured; Codex/OpenGSD 1.23.0, primary model ID unavailable; three gsd-advisor-researcher agents used gpt-6-luna xhigh.
-state_head: b826f9fab9adf7a4fee849deb9ec9b190e2b6794
+last_activity_desc: Phase 17 planning complete; 9 plans across 7 waves passed independent review. Codex/OpenGSD 1.23.0; primary model ID unavailable.
+state_head: c6a208803d28d3be74bfc19d9336df53f70eb8c4
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
+  total_plans: 9
   completed_plans: 0
   percent: 0
 ---
@@ -25,16 +25,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 17 context gathered; next step is plan phase 17 when invoked.
+**Current focus:** Phase 17 planning is complete; its nine plans are ready for execution when separately authorized.
 
 ## Current Position
 
-Phase: 17 of 19 (A measured and trustworthy playability baseline; first of 3 in v3.0)
-Plan: Not started (TBD)
-Status: Planning
-Last activity: 2026-11-27 — Phase 17 context gathered
+Phase: 17 (A measured and trustworthy playability baseline) — READY TO EXECUTE
+Plan: 17-01 ready; 9 plans across 7 waves
+Status: Ready to execute
+Last activity: 2026-11-27 — Phase 17 planning complete; independent checker passed
 
 Progress: [░░░░░░░░░░] 0%
+
+### Phase 17 planning and plan review (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The typed researcher used gpt-6-luna xhigh,
+the planner gpt-6.1-sol high, and the plan checker gpt-6-luna xhigh. Research is recorded in
+`.planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-RESEARCH.md`; nine plans span seven
+waves and cover all five phase requirements and 13/13 trackable decisions. The final independent checker
+passed. No builds, tests or CI runs were performed during planning. Phase execution remains outside the v3.0
+roadmap authorization.
 
 ### v3.0 roadmap creation (2026-11-27)
 

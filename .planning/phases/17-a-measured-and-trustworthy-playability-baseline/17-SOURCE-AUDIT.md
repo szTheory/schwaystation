@@ -15,14 +15,16 @@ Discovery: the phase research and existing project-owned CMake, policy, quality,
 | 17-05 | 3 | 17-02 | Both-test BE32 equivalence and hosted-proof disposition | 25 min |
 | 17-06 | 4 | 17-02/03/04/05 | Seven scores and one exact selected-change contract | 20 min |
 | 17-07 | 5 | 17-06 | One bounded selected improvement and its proof | 25 min |
-| 17-08 | 6 | 17-07 | Only demonstrated public-doc/hardware/compatibility freshness | 25 min |
-| 17-09 | 7 | 17-08 | Direction, lessons and complete review/verification handoff | 25 min |
+| 17-08 | 6 | 17-07 | Only demonstrated public-doc/hardware freshness and complete drift dispositions | 25 min |
+| 17-09 | 7 | 17-08 | Direction, lessons, final generated compatibility freshness and review/verification handoff | 25 min |
 
 Wave 2 source files, reports and todo ownership are disjoint. Each worktree uses its own task-named scratch/build resources; hosted dispatch is coordinated by the parent to avoid duplicated suites. Plan 03 deliberately does not consume the concurrent Plan 02 report; Plan 09 reconciles its timing row later. Inventory/header changes are serial: Plan 01 establishes their existing exact skeleton, and any chosen Plan 07 registration change happens later. No plan writes STATE.md; the orchestrator records the runtime/model and progress.
 
 Plan 01 reuses the already-complete CMake skeleton and per-directory inventories. Correct registrations/rows stay unchanged; the first task records their exact active identities and exercises the existing installer end to end. Only a reproduced wiring fault warrants an inventory modification. A new unused test scaffold or prose-report validator would consume budget without preventing a named fault.
 
-Plan 07 has an explicit conditional file union, approved by the orchestrator to preserve D-06's measurement-before-selection rule and a fixed executable plan inventory. Its implementation must touch at most five exact selected files, from only one candidate branch. Unselected branches stay untouched. This is the sole task-file-count exception: the declaration lists plausible ownership, not simultaneous implementation. No task creates/edits a downstream PLAN during execution. The score contract records a real blocker if no bounded candidate can improve the lowest-scoring dimension; it must not inflate a score, choose the next-best dimension or call the audit itself an improvement.
+Plan 07 has an explicit conditional file union, approved by the orchestrator to preserve D-06's measurement-before-selection rule and a fixed executable plan inventory. Its potential union is nine files, including the evidence report; implementation touches at most five exact selected files from one branch (the largest concrete added route uses three), with the report separate. Unselected branches stay untouched. This is the sole task-file-count exception: the declaration lists plausible ownership, not simultaneous implementation. No task creates/edits a downstream PLAN during execution. Plan 06 now maps every one of the seven lowest-score outcomes to a bounded route, including genuine host-code invariant consolidation for architecture, a measured removal of redundant decode validation for performance, and a fresh later-frame existing-fixture predicate for compatibility. Each must prove its current premise before selection; neither prose relabeling nor a higher score can substitute. If evidence invalidates a route and no eligible minimum-score candidate remains, return the exact constraint conflict for scoped replanning before implementation; that cannot be accepted as successful TUNE-09 delivery.
+
+Plan 08 is narrowed to nine potential files: three user/maintainer pages, five audited hardware pages and the audit report. Final generated compatibility refresh moves to Plan 09's existing reconciliation task (four files; eight files total in that plan). All page byte budgets, README concision and demonstrated-drift conditions remain unchanged. Plan 07's compatibility branch, if selected, regenerates its own ledger-derived output in the same change; Plan 09 still checks final freshness.
 
 Hosted workflows may outlast an individual local plan. Estimates bound active local work; required long hosted runs are asynchronous under the orchestrator's existing phase verification, with frequent status updates. Their evidence is never represented as passed before it exists. No new timeout or campaign resource limit is inferred from these estimates.
 
@@ -33,7 +35,7 @@ Hosted workflows may outlast an individual local plan. Estimates bound active lo
 | GOAL | Current install guidance, scoped compatibility and measured limits before playability | 01–09 | COVERED | Tracer/audits → score/change → docs/direction → review/verification |
 | GOAL | Success criterion 1: bounded linked comparable CI evidence | 02, 05, 09 | COVERED | Exact workflow/matrix/workload groups and exclusions |
 | GOAL | Success criterion 2: traceable timeout and flaky-check decisions | 02, 07, 09 | COVERED | Doubled slowest comparable job with source run; retained gaps |
-| GOAL | Success criterion 3: one verified lowest-dimension improvement | 06, 07, 09 | COVERED | All seven scores before selection; explicit blocked contract if unavailable |
+| GOAL | Success criterion 3: one verified lowest-dimension improvement | 06, 07, 09 | COVERED | All seven scores before selection; bounded routes for all seven dimensions, then exact before/after proof |
 | GOAL | Success criterion 4: measured bounds and device assumptions | 03, 08, 09 | COVERED | Exact producer units/configurations, no widening to pass |
 | GOAL | Success criterion 5: maintenance audit, guidance, roadmap and lessons | 01, 04, 08, 09 | COVERED | Read-only live policy and actual consumers; source-scoped edits |
 | REQ | TUNE-07 | 02, 05, 09 | COVERED | Bounded exact-attempt cohort, critical path/duplicates/cores/flake signals |
@@ -51,7 +53,7 @@ Hosted workflows may outlast an individual local plan. Estimates bound active lo
 | RESEARCH | Old quality figures/links in public guidance require evidence-scoped refresh | 01, 08, 09 | COVERED | Canonical links preferred to stale duplicate values |
 | RESEARCH | Low-power rate assumptions; Wasmtime determinism is not browser speed | 03, 08, 09 | COVERED | Named-device evidence required for a measured rate |
 | RESEARCH | Seven current scores; Phase 7 precedent is not default selection | 06, 07 | COVERED | One minimum/tied-minimum selection from observed impact |
-| RESEARCH | Exact title/configuration/predicate claims and required experimental matrix | 01, 06, 08, 09 | COVERED | No new playability data or metadata promotion |
+| RESEARCH | Exact title/configuration/predicate claims and required experimental matrix | 01, 06, 07, 08, 09 | COVERED | Optional existing-fixture later-frame evidence only; no new playability data or metadata promotion |
 | RESEARCH | Current runner primary sources and actual pin consumers | 04 | COVERED | No retired-image introduction or stale wasi-sdk consumer inference |
 | RESEARCH | Dependabot restrictions and later no-auto-merge policy | 04, 06, 07 | COVERED | Conditional Actions-only grouped configuration |
 | RESEARCH | Ten-job Windows DLL evidence still needs collecting | 02 | COVERED | Ten eligible jobs within bounded cohort or pending sample shortfall |
@@ -63,10 +65,10 @@ Hosted workflows may outlast an individual local plan. Estimates bound active lo
 | CONTEXT | D-03 both-test BE32 full equivalence and hosted gain | 05 | COVERED | Current gates retained without exact complete proof |
 | CONTEXT | D-04 repeat-work audit; deferred Nightly route | 02, 07 | COVERED | Only proved equivalent removal; no Nightly implementation |
 | CONTEXT | D-05 current ten-job DLL condition | 02 | COVERED | Clean ten-job sample or explicitly pending |
-| CONTEXT | D-06 seven scores, observed-impact tie-break, exactly one improvement | 06, 07, 09 | COVERED | No preselection, relabeling or substitution |
+| CONTEXT | D-06 seven scores, observed-impact tie-break, exactly one improvement | 06, 07, 09 | COVERED | Seven bounded dimension routes; architecture centralizes host validation, performance measures removal of redundant decoding work, and compatibility independently measures existing frame-120 evidence; no preselection, relabeling or substitution |
 | CONTEXT | D-07 existing producers and exact measured bounds | 03, 09 | COVERED | Missing comparison retains bound; out-of-bound result investigated |
 | CONTEXT | D-08 device assumptions and Wasmtime/browser distinction | 03, 08, 09 | COVERED | Claims preserve measurement units and limits |
-| CONTEXT | D-09 narrow compatibility and required experimental matrix | 01, 06, 08, 09 | COVERED | No integrated-playability inference from protocol/inventory |
+| CONTEXT | D-09 narrow compatibility and required experimental matrix | 01, 06, 07, 08, 09 | COVERED | Exact optional fixture predicate does not promote unknown rows or establish integrated playability |
 | CONTEXT | D-10 read-only policy audit and current actual consumers | 04 | COVERED | No unrelated pin/cache changes |
 | CONTEXT | D-11 later no-auto-merge policy; conditional TODO-010 | 04, 06, 07 | COVERED | TODO-011/012 remain deferred |
 | CONTEXT | D-12 demonstrated guidance drift; direction/prompt and applicable lessons | 01, 04, 08, 09 | COVERED | Concise README and existing budgets |
@@ -100,8 +102,9 @@ Precision outcome: no additional bespoke prohibition is retained. The meaningful
 
 - Existing evidence commands are grounded in current tracked paths; intended new report/contract paths are named explicitly. No absolute checkout path is embedded in task commands.
 - Every automated element is immediately followed by a concrete fails_when direction. Count/text-grep gates are not authored; existing project controls own budgets, inventory and claims.
+- Revision validation records attach observed shell-only syntax results to every runnable automated element; CMake -P targets and the gh jq filter are separately marked without a sanctioned parse-only mode. No build, test, target script, API or producer is executed for that syntax validation.
 - Current per-phase gate ceiling remains 4,694 counted lines and RetroArch remains 300; no guessed adjustment. Ship ratchets the actual measured shipping count.
-- Plan 07's actual chosen code behavior requires a failing concrete regression followed by a passing check registered in existing CI. Configuration/documentation-only branches use appropriate existing guards and one-off agent evidence.
+- Plan 07's behavior-changing branch requires a failing concrete regression followed by a passing check in existing CI; its semantics-preserving architecture/performance branches use passing byte/invalid-input characterization plus reviewed consolidation evidence or matched operation timing respectively. Configuration/documentation-only branches use existing guards and one-off agent evidence. No fabricated RED is required for unchanged semantics.
 - Audit artifacts can be complete with explicit unsupported-evidence dispositions where locked decisions allow retaining existing state. Missing required remeasurement or selected-improvement proof stays pending and cannot be disguised as the phase's successful completion.
 - Code review/fixes precede final phase verification. Required builds/tests/hosted checks remain required; no build/test ran during this planning step.
 - No manual approval checkpoint is introduced for a settled reversible choice. Real unresolved selected-change scope or identity-bound authority remains a concrete blocker for the orchestrator, not a ritual acknowledgment.
