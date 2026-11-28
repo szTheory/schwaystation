@@ -37,10 +37,16 @@ The exact hosted producer is the Linux x64 build job in run 45923003995. It used
 
 ### Low-power and browser assumptions
 
-The only measured instructions-per-frame values above are Cachegrind counts on the hosted Ubuntu runner for the two named fixtures. The device table in `.planning/preparation/ENGINEERING.md` §8 computes assumed budgets from assumed sustained rates: Apple Silicon M1 class 12,000 MIPS → 100 million Ir/frame; Raspberry Pi 4 A72 2,250 MIPS → 18.8 million; RG35XX-H A53 1,500 MIPS → 12.5 million. Those rates are hypotheses, not measurements on any of those devices; no owner hardware was run. `gpu_motion` exceeds each listed assumed budget, while that comparison does not establish device frame rate. The WASI hash lane proves deterministic output under the pinned Wasmtime 48.0.7 environment; it provides no browser-speed measurement.
+The only measured instructions-per-frame values above are Cachegrind counts on the hosted Ubuntu runner for the two named fixtures. The device table in `.planning/preparation/ENGINEERING.md` §8 computes assumed budgets from assumed sustained rates: Apple Silicon M1 class 12,000 MIPS → 100 million Ir/frame; Raspberry Pi 4 A72 2,250 MIPS → 18.8 million; RG35XX-H A53 1,500 MIPS → 12.5 million. `.planning/preparation/PSX-ECOSYSTEM-AND-USERS.md` §4 records the derived work-per-frame model and the source references behind these device assumptions. Those rates are hypotheses, not measurements on any of those devices; no owner hardware was run. `gpu_motion` exceeds each listed assumed budget, while that comparison does not establish device frame rate. The WASI hash lane proves deterministic output under the pinned Wasmtime 48.0.7 environment; it provides no browser-speed measurement.
 
 ## Bound disposition
 
 Task 17-03 found no exact producer result that justifies changing a bound. The two Cachegrind outputs match their current single-value bounds; the stable-state output matches its bound. The current local WASI result supports the lower endpoint, the older hosted result supports the upper endpoint, and the newest matching hosted check passes within the interval without exposing its exact integer. Retain that interval until an exact result is observable. Leave `ci.critical_path_s` and its workload fingerprint unchanged for Plan 17-09. The 100-basis-point relative performance limit, Cachegrind frame windows, metric keys, units, and serialized-state definition are unchanged.
 
-Required task checks and the existing quality controls are recorded in `17-03-SUMMARY.md`.
+## Validation record
+
+- Task 1: `cmake -DQUALITY=quality.json -P tests/cmake/quality.cmake && git diff --check origin/main` — exit 0.
+- Task 2: the same registry and diff check — exit 0. No `quality.json` value changed; `git diff --exit-code origin/main -- quality.json` exited 0.
+- Existing exact comparator: the `testcard` 1,620,381, `gpu_motion` 138,406,446 and `state.bytes` 3,757,754 outputs passed. The known WASI samples 1,014,617 and 1,014,665 each passed against the retained interval. Each invocation of `tests/cmake/quality.cmake` exited 0.
+- Existing boundary, malformed-input, integer and producer-wiring controls: `cmake -DROOT=<absolute repo root> -DBIN=<task temporary directory>/quality-controls -P tests/cmake/quality_controls.cmake` — exit 0. An initial direct invocation with `ROOT=.` exited 1 because that script requires an absolute root; the corrected invocation completed all controls successfully.
+- `git diff --check origin/main` — exit 0.
