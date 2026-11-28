@@ -13,7 +13,7 @@ provides:
 affects:
   - Phase 17 scoring and documentation refresh
 actuals:
-  tokens: 4217
+  tokens: 4185
   tasks: 2
   commits: 2
 tech-stack:
@@ -50,7 +50,7 @@ coverage:
       status: pass
     human_judgment: false
 duration: 13m
-completed: 2026-11-28
+completed: 2026-11-27
 status: complete
 ---
 
@@ -94,9 +94,9 @@ No TUNE requirement is complete from this audit alone. TUNE-09 still needs the s
 
 ## Cleanup
 
-The task's downloaded archive, installer outputs and temporary CMake scratch are retained only in the task-owned temporary directory until the phase-level cleanup check; no archive bytes or logs were committed.
+The task-owned temporary directory, downloaded archive, installer outputs and CMake scratch were removed after the bounded checks completed; no archive bytes or logs were committed.
 
 ---
 *Phase: 17-a-measured-and-trustworthy-playability-baseline*
 *Plan: 01*
-*Completed: 2026-11-28*
+*Completed: 2026-11-27*
