@@ -6,7 +6,7 @@ current_phase: 17
 current_phase_name: A measured and trustworthy playability baseline
 status: executing
 stopped_at: Phase 17 planning complete; stop before execution
-last_updated: "2026-11-28T01:02:27Z"
+last_updated: "2026-11-28T01:09:25Z"
 last_activity: 2026-11-27
 last_activity_desc: Phase 17 planning complete; 9 plans across 7 waves passed independent review. Codex/OpenGSD 1.23.0; primary model ID unavailable.
 state_head: c6a208803d28d3be74bfc19d9336df53f70eb8c4
@@ -25,16 +25,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-27)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 17 planning is complete; its nine plans are ready for execution when separately authorized.
+**Current focus:** Execute Phase 17 under the owner's 2026-11-27 phase-specific authorization; stop after verification before ship.
 
 ## Current Position
 
-Phase: 17 (A measured and trustworthy playability baseline) — READY TO EXECUTE
-Plan: 17-01 ready; 9 plans across 7 waves
-Status: Ready to execute
-Last activity: 2026-11-27 — Phase 17 planning complete; independent checker passed
+Phase: 17 (A measured and trustworthy playability baseline) — EXECUTING
+Plan: 17-01 executing; 9 plans across 7 waves
+Status: Executing
+Last activity: 2026-11-27 — Owner authorized Phase 17 execution after independent plan review
 
 Progress: [░░░░░░░░░░] 0%
+
+### Phase 17 execution authorization (2026-11-27)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary model ID unavailable. The owner instructed Codex to follow the
+recommendation to begin Phase 17 after its nine plans passed independent review. Authorization covers the nine
+plans, required local checks, code review and phase verification only. It does not cover ship/release or Phases
+18–19. Execution begins at Plan 17-01; stop at the Phase 17 verify boundary.
 
 ### Phase 17 planning and plan review (2026-11-27)
 

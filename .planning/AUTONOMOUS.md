@@ -57,6 +57,11 @@ fix within the current step; record larger work as one todo tied to the phase th
 
 ## Current authorization and boundaries
 
+On 2026-11-27, after Phase 17 planning and independent review, the owner instructed Codex to follow the
+recommendation to begin Phase 17 execution. This phase-specific authorization covers the nine existing Phase 17
+plans, their required local checks, code review and phase verification. It does not authorize `$gsd-ship`, release,
+or execution of Phases 18–19. Stop after Phase 17 verification and await the owner's next instruction.
+
 On 2026-11-15, the owner renewed autonomous authorization to finish milestone v1.0, starting with Phase 6.
 The discussion, verification and CI guidance above is standing policy: use focused role fan-out, primary
 sources, an adversarial pass and a synthesized best-supported recommendation; automate useful verification,

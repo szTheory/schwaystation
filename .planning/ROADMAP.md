@@ -14,7 +14,10 @@ SEED-007 opens the milestone. An owned homebrew disc then proves the integrated 
 sound path in hosted RetroArch with deterministic runner parity. Finally, one owner-selected retail title proves
 the same playable threshold in a local RetroArch session. Each requirement belongs to exactly one phase.
 
-This roadmap authorizes no phase execution: milestone planning ends at roadmap review. The rolling
+This roadmap originally authorized no phase execution: milestone planning ended at roadmap review. On
+2026-11-27, the owner separately authorized Phase 17 execution after its plans passed independent review. That
+phase-specific authorization covers its nine plans, their required local checks, code review and verification; it
+does not authorize shipping or Phases 18–19. The rolling
 [product roadmap](PRODUCT-ROADMAP.md) and later milestones remain separate. No physical-console capture is
 available or required. A one-title pass does not establish broad compatibility or remove experimental status.
 
@@ -109,11 +112,11 @@ Plans:
 
 ## Progress
 
-**Execution order:** Phase 17 → Phase 18 → Phase 19. Phase 17 planning is complete; execution has not started and is not authorized by this roadmap.
+**Execution order:** Phase 17 → Phase 18 → Phase 19. Phase 17 planning is complete; its execution was separately authorized by the owner on 2026-11-27.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. A measured and trustworthy playability baseline | 0/9 | Ready to execute | - |
+| 17. A measured and trustworthy playability baseline | 0/9 | Executing | - |
 | 18. An owned game plays in RetroArch CI | 0/TBD | Not started | - |
 | 19. One retail game plays locally | 0/TBD | Not started | - |
 
