@@ -28,7 +28,7 @@ key-files:
 key-decisions:
   - Upgrade path and compatibility breadth tied at 2; compatibility breadth won on direct impact to the phase's playability evidence.
   - Keep TODO-010 pending and auto-merge disabled because upgrade path did not win the tie-break.
-requirements-completed: [TUNE-09, TUNE-11]
+requirements-completed: []
 coverage:
   - id: D1
     description: Seven evidence-linked quality scores select the lowest dimension using observed impact.
@@ -97,8 +97,8 @@ The measured plan base was `f7ddfbe6266eb54dee8af9d07b977b97c6198d73`; the two t
 
 ## Verification
 
-- `git diff --check origin/main && test -s .planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-QUALITY-REVIEW.md` — exit 0.
-- `git diff --check origin/main && test -s .planning/phases/17-a-measured-and-trustworthy-playability-baseline/17-IMPROVEMENT-CONTRACT.md` — exit 0.
+- The quality-review whitespace and nonempty-file checks passed (exit 0).
+- The improvement-contract whitespace and nonempty-file checks passed (exit 0).
 - Read-only source inspection confirmed `compat_live` runs frame 60 and maps the current row to `frame@60`; the existing `fixtures.gpu_motion.hash.120` row pins `f92191242105428b4345519f237979aaf0b50b33431ce945f209f03b1d47257d`.
 - No build, product test or hosted run was needed or performed while authoring this scoring/contract plan. Plan 07's focused checks and the phase's hosted gates remain pending for their owning steps. Existing source evidence links and run URLs are in the review and contract.
 
@@ -109,7 +109,7 @@ The measured plan base was `f7ddfbe6266eb54dee8af9d07b977b97c6198d73`; the two t
 
 ## Deviations from Plan
 
-The plan's `.git/` commit-ledger location was blocked because the workspace exposes `.git` as read-only. The exact base SHA was instead stored in the task-local `/private/tmp/schwaystation-phase17-06/plan-head-before`; the commit count was measured from that value. Git index writes also required the authorized escalation path. The two task commits staged only their assigned files. No plan scope or candidate changed.
+The plan ledger could not be written because the workspace exposes `.git` as read-only; the exact base SHA and task commit range are preserved in this summary metadata. Git index writes used the authorized escalation path. The two task commits staged only their assigned files. No plan scope or candidate changed.
 
 STATE.md and ROADMAP.md were not edited because the phase orchestrator owns those updates.
 
