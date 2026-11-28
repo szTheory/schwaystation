@@ -67,3 +67,20 @@ The exact source DAG and job records identify the critical chain: `changes` 8s �
 The full workflow wall intervals were 2,728s for run 1 and 2,780s for run 2. Run 1 used 8,281 aggregate runner-seconds (8,270 successful and 11 failed); run 2 used 7,507 successful runner-seconds. Across both attempts this is 15,777 successful runner-seconds plus 11 seconds from the two failed gates. These are unweighted runner-time totals, not billing estimates. The run API shows creation and workflow start at the same second; the first `changes` job began two seconds later. Per-job queued duration, CPU utilization, and billing-weighted cost are not exposed by these records.
 
 Run 2 was a full workflow repeat required because run 1's title gate made `CI required` fail and skipped the exact timing producer. After the completed run, one title correction triggered one full current-head run. No additional full suite was run for bookkeeping. Within the successful route, the six platform builds cover distinct targets and OpenBIOS is supplied as a shared artifact; no other duplicate full-suite job was identified. The title correction and the two successful WASI measurements are recorded above; no bound was loosened and no workflow was manually dispatched.
+
+## Plan 17-11 reconciliation and local checks
+
+The linked WASI producer returned the same exact integer twice under the same logged ubuntu-26.04 wasm32-chd toolchain/configuration. `quality.json` now tightens `size.wasm` to floor=ceiling=1,014,665. The 1,014,617 local CMake 4.2.3 output remains documented separately because it is a distinct local toolchain observation. The exact CI result 2,761 seconds falls within the existing 2,249–3,293 interval; only the stored workload fingerprint changed, from the historical push/main value to the printed full, uncalled, non-main PR value. No speedup or timeout change is claimed.
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=1014665 -P tests/cmake/quality.cmake` | 0 | Exact hosted WASI result passes the refreshed point bound. |
+| `cmake -DQUALITY=quality.json -DMETRIC=ci.critical_path_s -DMEASURED=2761 -P tests/cmake/quality.cmake` | 0 | Exact successful PR timing passes the retained interval. |
+| `cmake -DQUALITY=quality.json -P tests/cmake/quality.cmake` | 0 | Registry schema and active bound definitions pass. |
+| `cmake -DROOT=$PWD -DBIN=<task-temp>/quality -P tests/cmake/quality_controls.cmake` with the refreshed registry | 1 | Existing `checked_pr_baseline` fixture expected the current synthetic route to be unbaselined. It now matches the refreshed producer fingerprint and correctly rejects that fixture's 11-second measurement below the 2,249-second floor. No control source was changed because it is part of the workload fingerprint. |
+| Same registered quality controls with a task-temporary copy of `quality.json` carrying the prior fingerprint `316f8672…` | 0 | Existing boundary, malformed-input, integer, artifact/state producer-wiring and timing-route controls pass. The temporary registry was restored and the checked-in fingerprint rechecked as `453c9901…`. |
+| `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=4694 -P tests/cmake/line_budget.cmake` | 0 | 4,694 counted lines at the existing limit. |
+| `cmake -DROOT=. '-DPATTERNS=tests/retroarch/*' -DLIMIT=300 -P tests/cmake/line_budget.cmake` | 0 | 300 counted lines at the existing limit. |
+| `git diff --check origin/main` | 0 | No whitespace errors. |
+
+The one failing quality-control assertion is now a stale test expectation exposed by the authorized fingerprint refresh, not a producer mismatch: the control still expects a full current route to be unbaselined. Editing that control would itself change a workload input and make this hosted timing observation no longer match the checked-in fingerprint without another full hosted measurement. The direct exact timing comparator, registry validation, remaining quality controls, and both budget checks pass. The focused control discrepancy is carried to the orchestrator for review before TUNE-10 is closed.
